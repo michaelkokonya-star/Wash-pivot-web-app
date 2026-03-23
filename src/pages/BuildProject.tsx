@@ -1,0 +1,184 @@
+import React, { useState, useEffect } from 'react';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '../firebase';
+import { motion, AnimatePresence } from 'motion/react';
+import { Plus, Trash2, Calculator, FileText, CheckCircle2, User, Package } from 'lucide-react';
+
+const BuildProject = () => {
+  const [step, setStep] = useState(1);
+  const [selectedProducts, setSelectedProducts] = useState<any[]>([]);
+  const [selectedExperts, setSelectedExperts] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [experts, setExperts] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const pSnap = await getDocs(collection(db, 'products'));
+        setProducts(pSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      } catch (error) {
+        console.error("Error fetching products:", error);
+      }
+
+      try {
+        const eSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'expert')));
+        setExperts(eSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      } catch (error) {
+        console.error("Error fetching experts:", error);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const totalPrice = selectedProducts.reduce((sum, p) => sum + p.price, 0);
+  const expertFees = selectedExperts.length * 75000; // Mock fee in KSh
+
+  const displayProducts = products;
+  const displayExperts = experts;
+
+  return (
+    <div className="pt-28 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+      <div className="mb-16">
+        <h1 className="text-5xl font-bold tracking-tighter mb-4">BUILD MY PROJECT</h1>
+        <p className="text-black/50 text-lg">Connect products and expertise to generate a comprehensive project quote.</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+        {/* Selection Area */}
+        <div className="lg:col-span-2 space-y-12">
+          {/* Step 1: Products */}
+          <section>
+            <div className="flex items-center space-x-4 mb-8">
+              <div className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center font-bold">1</div>
+              <h2 className="text-2xl font-bold">Select Products</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {displayProducts.length > 0 ? (
+                displayProducts.map((product) => (
+                  <button
+                    key={product.id}
+                    onClick={() => {
+                      if (!selectedProducts.find(p => p.id === product.id)) {
+                        setSelectedProducts([...selectedProducts, product]);
+                      }
+                    }}
+                    className="p-6 bg-white border border-black/5 rounded-2xl text-left hover:border-emerald-600 transition-all group"
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="text-xs font-bold uppercase tracking-widest text-emerald-600">{product.category}</span>
+                      <Plus size={18} className="text-black/20 group-hover:text-emerald-600" />
+                    </div>
+                    <h3 className="font-bold mb-1">{product.name}</h3>
+                    <span className="text-lg font-bold">KSh {product.price.toLocaleString()}</span>
+                  </button>
+                ))
+              ) : (
+                <div className="col-span-full py-10 text-center bg-stone-50 rounded-2xl border border-dashed border-black/10">
+                  <p className="text-black/40 text-sm">No products available to select.</p>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Step 2: Experts */}
+          <section>
+            <div className="flex items-center space-x-4 mb-8">
+              <div className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center font-bold">2</div>
+              <h2 className="text-2xl font-bold">Connect Experts</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {displayExperts.length > 0 ? (
+                displayExperts.map((expert) => (
+                  <button
+                    key={expert.id}
+                    onClick={() => {
+                      if (!selectedExperts.find(e => e.id === expert.id)) {
+                        setSelectedExperts([...selectedExperts, expert]);
+                      }
+                    }}
+                    className="p-6 bg-white border border-black/5 rounded-2xl text-left hover:border-emerald-600 transition-all group"
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="text-xs font-bold uppercase tracking-widest text-orange-600">{expert.expertise}</span>
+                      <Plus size={18} className="text-black/20 group-hover:text-emerald-600" />
+                    </div>
+                    <h3 className="font-bold mb-1">{expert.displayName}</h3>
+                    <span className="text-sm text-black/40">Consultation Fee: KSh 75,000</span>
+                  </button>
+                ))
+              ) : (
+                <div className="col-span-full py-10 text-center bg-stone-50 rounded-2xl border border-dashed border-black/10">
+                  <p className="text-black/40 text-sm">No experts available to connect.</p>
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+
+        {/* Quote Summary */}
+        <div className="lg:col-span-1">
+          <div className="bg-black text-white p-8 rounded-3xl sticky top-28 shadow-2xl">
+            <div className="flex items-center space-x-2 mb-8 text-emerald-400">
+              <Calculator size={24} />
+              <h2 className="text-xl font-bold uppercase tracking-tighter">Project Quote</h2>
+            </div>
+
+            <div className="space-y-6 mb-8">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-widest text-white/40 mb-4">Selected Products</h3>
+                <div className="space-y-3">
+                  {selectedProducts.length === 0 && <p className="text-sm text-white/20 italic">No products selected</p>}
+                  {selectedProducts.map(p => (
+                    <div key={p.id} className="flex justify-between items-center text-sm">
+                      <span className="truncate mr-4">{p.name}</span>
+                      <div className="flex items-center space-x-3">
+                        <span className="font-bold">KSh {p.price.toLocaleString()}</span>
+                        <button onClick={() => setSelectedProducts(selectedProducts.filter(item => item.id !== p.id))}>
+                          <Trash2 size={14} className="text-red-400 hover:text-red-300" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-widest text-white/40 mb-4">Assigned Experts</h3>
+                <div className="space-y-3">
+                  {selectedExperts.length === 0 && <p className="text-sm text-white/20 italic">No experts assigned</p>}
+                  {selectedExperts.map(e => (
+                    <div key={e.id} className="flex justify-between items-center text-sm">
+                      <span className="truncate mr-4">{e.displayName}</span>
+                      <div className="flex items-center space-x-3">
+                        <span className="font-bold">KSh 75,000</span>
+                        <button onClick={() => setSelectedExperts(selectedExperts.filter(item => item.id !== e.id))}>
+                          <Trash2 size={14} className="text-red-400 hover:text-red-300" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-8 border-t border-white/10 space-y-4">
+              <div className="flex justify-between items-center text-lg font-bold">
+                <span>Total Estimate</span>
+                <span className="text-emerald-400">KSh {(totalPrice + expertFees).toLocaleString()}</span>
+              </div>
+              <button
+                disabled={selectedProducts.length === 0}
+                className="w-full py-4 bg-emerald-500 text-black font-bold rounded-xl hover:bg-emerald-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+              >
+                <FileText size={20} />
+                <span>Generate PDF Quote</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default BuildProject;

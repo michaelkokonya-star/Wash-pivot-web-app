@@ -1,0 +1,7 @@
+{
+  "name": "Wash Pivot",
+  "description": "A bold, modern platform for sustainable solutions in solar energy, water treatment, and sanitation (WASH). Features a marketplace, expert recruitment, micro-funding, and project building tools.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
