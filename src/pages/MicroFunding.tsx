@@ -3,12 +3,17 @@ import { collection, getDocs, addDoc, serverTimestamp, updateDoc, doc } from 'fi
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'motion/react';
-import { Plus, Target, Users, TrendingUp, Heart } from 'lucide-react';
+import { Helmet } from 'react-helmet-async';
+import { Plus, Target, Users, TrendingUp, Heart, ListTodo, X } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 
 const MicroFunding = () => {
   const { user, profile } = useAuth();
+  const navigate = useNavigate();
   const [projects, setProjects] = useState<any[]>([]);
   const [isAdding, setIsAdding] = useState(false);
+  const [milestoneInput, setMilestoneInput] = useState({ title: '', description: '' });
+  const [milestones, setMilestones] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -25,6 +30,20 @@ const MicroFunding = () => {
     fetchProjects();
   }, []);
 
+  const handleAddMilestone = () => {
+    if (!milestoneInput.title.trim()) return;
+    setMilestones([...milestones, { 
+      id: Math.random().toString(36).substr(2, 9),
+      ...milestoneInput, 
+      isCompleted: false 
+    }]);
+    setMilestoneInput({ title: '', description: '' });
+  };
+
+  const handleRemoveMilestone = (id: string) => {
+    setMilestones(milestones.filter(m => m.id !== id));
+  };
+
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -33,11 +52,13 @@ const MicroFunding = () => {
       await addDoc(collection(db, 'projects'), {
         ...formData,
         ownerUid: user.uid,
-        ownerName: user.displayName,
+        ownerName: profile?.displayName || user.displayName || 'Anonymous',
         currentFunding: 0,
+        milestones: milestones,
         createdAt: serverTimestamp(),
       });
       setIsAdding(false);
+      setMilestones([]);
       window.location.reload();
     } catch (error) {
       console.error("Error creating project:", error);
@@ -61,6 +82,14 @@ const MicroFunding = () => {
 
   return (
     <div className="pt-28 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+      <Helmet>
+        <title>Micro Funding | Support Community WASH Projects</title>
+        <meta name="description" content="Support community-led water, sanitation, and hygiene projects. Fund sustainable initiatives and track their impact through transparent milestones." />
+        <link rel="canonical" href="https://www.washpivot.com/funding" />
+        <meta property="og:title" content="Micro Funding | WASH Pivot" />
+        <meta property="og:description" content="Support community-led water, sanitation, and hygiene projects." />
+        <meta property="og:url" content="https://www.washpivot.com/funding" />
+      </Helmet>
       <div className="flex flex-col md:flex-row justify-between items-start mb-16 gap-8">
         <div className="max-w-2xl">
           <h1 className="text-5xl font-bold tracking-tighter mb-4">MICRO FUNDING</h1>
@@ -117,6 +146,52 @@ const MicroFunding = () => {
                 required
               />
             </div>
+            <div className="md:col-span-2 space-y-4">
+              <label className="text-xs font-bold uppercase tracking-widest text-black/40">Project Milestones</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    placeholder="Milestone Title"
+                    value={milestoneInput.title}
+                    onChange={(e) => setMilestoneInput({ ...milestoneInput, title: e.target.value })}
+                    className="w-full p-4 bg-white border border-black/10 rounded-xl focus:outline-none focus:border-emerald-600 text-sm"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Milestone Description"
+                    value={milestoneInput.description}
+                    onChange={(e) => setMilestoneInput({ ...milestoneInput, description: e.target.value })}
+                    className="w-full p-4 bg-white border border-black/10 rounded-xl focus:outline-none focus:border-emerald-600 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddMilestone}
+                    className="w-full py-3 bg-stone-100 text-black font-bold rounded-xl hover:bg-stone-200 transition-all text-xs uppercase tracking-widest"
+                  >
+                    Add Milestone
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {milestones.map((m) => (
+                    <div key={m.id} className="flex items-center justify-between p-4 bg-white border border-black/5 rounded-xl">
+                      <div className="truncate mr-4">
+                        <p className="font-bold text-sm">{m.title}</p>
+                        <p className="text-xs text-black/40 truncate">{m.description}</p>
+                      </div>
+                      <button type="button" onClick={() => handleRemoveMilestone(m.id)} className="text-red-500 hover:text-red-700">
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))}
+                  {milestones.length === 0 && (
+                    <div className="h-full flex items-center justify-center border border-dashed border-black/10 rounded-xl p-8">
+                      <p className="text-xs text-black/30 italic">No milestones added yet</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
             <div className="flex gap-4">
               <button type="submit" className="px-8 py-4 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all">
                 Publish Project
@@ -138,7 +213,7 @@ const MicroFunding = () => {
                 key={project.id}
                 className="bg-white rounded-3xl border border-black/5 overflow-hidden flex flex-col md:flex-row h-full group hover:shadow-2xl transition-all"
               >
-                <div className="md:w-2/5 relative overflow-hidden">
+                <div className="md:w-2/5 relative overflow-hidden cursor-pointer" onClick={() => navigate(`/funding/${project.id}`)}>
                   <img
                     src={project.imageUrl}
                     alt={project.title}
@@ -152,7 +227,7 @@ const MicroFunding = () => {
                   </div>
                 </div>
                 <div className="p-8 md:w-3/5 flex flex-col">
-                  <h3 className="text-2xl font-bold mb-4">{project.title}</h3>
+                  <h3 className="text-2xl font-bold mb-4 hover:text-emerald-600 transition-colors cursor-pointer" onClick={() => navigate(`/funding/${project.id}`)}>{project.title}</h3>
                   <p className="text-black/60 text-sm mb-8 line-clamp-3 flex-grow">{project.description}</p>
                   
                   <div className="space-y-4">
@@ -172,13 +247,22 @@ const MicroFunding = () => {
                         <Users size={14} />
                         <span>By {project.ownerName}</span>
                       </div>
-                      <button
-                        onClick={() => handleSupport(project.id, project.currentFunding)}
-                        className="px-6 py-2 bg-black text-white text-sm font-bold rounded-lg hover:bg-emerald-600 transition-all flex items-center space-x-2"
-                      >
-                        <Heart size={16} />
-                        <span>Support</span>
-                      </button>
+                      <div className="flex items-center space-x-3">
+                        <Link
+                          to={`/funding/${project.id}`}
+                          className="px-4 py-2 bg-stone-100 text-black text-xs font-bold rounded-lg hover:bg-stone-200 transition-all flex items-center space-x-2"
+                        >
+                          <ListTodo size={14} />
+                          <span>Milestones</span>
+                        </Link>
+                        <button
+                          onClick={() => handleSupport(project.id, project.currentFunding)}
+                          className="px-6 py-2 bg-black text-white text-sm font-bold rounded-lg hover:bg-emerald-600 transition-all flex items-center space-x-2"
+                        >
+                          <Heart size={16} />
+                          <span>Support</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>

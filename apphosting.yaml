@@ -1,0 +1,7 @@
+# apphosting.yaml
+runConfig:
+  cpu: 1
+  memoryMiB: 512
+scripts:
+  build: npm run build
+  run: npm start

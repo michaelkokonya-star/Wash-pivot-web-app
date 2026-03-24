@@ -46,6 +46,19 @@
         "currentFunding": { "type": "number" },
         "category": { "type": "string", "enum": ["Solar", "Water", "Sanitation"] },
         "imageUrl": { "type": "string" },
+        "milestones": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "title": { "type": "string" },
+              "description": { "type": "string" },
+              "isCompleted": { "type": "boolean" }
+            },
+            "required": ["id", "title", "isCompleted"]
+          }
+        },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["title", "ownerUid", "targetFunding", "category"]

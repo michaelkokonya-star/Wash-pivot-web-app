@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { Sun, Droplets, ShieldCheck, ArrowRight, Zap, Globe, Users, Sparkles, Loader2 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 import OptimizedImage from '../components/OptimizedImage';
@@ -50,6 +51,14 @@ const Home = () => {
 
   return (
     <div className="pt-20">
+      <Helmet>
+        <title>Wash Pivot | Sustainable WASH Solutions & Social Enterprise</title>
+        <meta name="description" content="Wash Pivot empowers communities through sustainable solar energy, water treatment, and sanitation solutions. Join our mission for a cleaner, greener future." />
+        <link rel="canonical" href="https://www.washpivot.com/" />
+        <meta property="og:title" content="Wash Pivot | Sustainable WASH Solutions" />
+        <meta property="og:description" content="Empowering communities through sustainable solar, water, and sanitation technology." />
+        <meta property="og:url" content="https://www.washpivot.com/" />
+      </Helmet>
       {/* Hero Section */}
       <section className="relative h-[90vh] flex items-center overflow-hidden bg-stone-950">
         <div className="absolute inset-0 z-0 opacity-20">

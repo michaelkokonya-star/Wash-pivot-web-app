@@ -1,0 +1,6 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="128" fill="#1A242F"/>
+  <text x="50%" y="45%" dominant-baseline="middle" text-anchor="middle" fill="white" style="font-family: sans-serif; font-weight: 900; font-size: 120px; letter-spacing: -5px;">WASH</text>
+  <text x="50%" y="65%" dominant-baseline="middle" text-anchor="middle" fill="white" style="font-family: sans-serif; font-weight: 900; font-size: 120px; letter-spacing: -5px;">PIV T</text>
+  <path d="M256 280C256 280 220 328 220 358C220 377.882 236.118 394 256 394C275.882 394 292 377.882 292 358C292 328 256 280 256 280Z" fill="#00C49A"/>
+</svg>

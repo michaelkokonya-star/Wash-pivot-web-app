@@ -43,10 +43,29 @@ const AdminDashboard = () => {
   const handleUpdateRole = async (userId: string, newRole: string) => {
     try {
       const userRef = doc(db, 'users', userId);
+      const publicRef = doc(db, 'public_profiles', userId);
+      
       await updateDoc(userRef, { role: newRole });
+      
+      // If demoted from expert, remove public profile
+      if (newRole !== 'expert') {
+        await deleteDoc(publicRef);
+      }
+      
       setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
     } catch (error) {
       console.error("Error updating role:", error);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!window.confirm('Are you sure you want to delete this user? This action is irreversible.')) return;
+    try {
+      await deleteDoc(doc(db, 'users', userId));
+      await deleteDoc(doc(db, 'public_profiles', userId));
+      setUsers(users.filter(u => u.id !== userId));
+    } catch (error) {
+      console.error("Error deleting user:", error);
     }
   };
 
@@ -137,7 +156,7 @@ const AdminDashboard = () => {
                       </div>
                     </td>
                     <td className="px-8 py-6">
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-3">
                         <select
                           value={user.role}
                           onChange={(e) => handleUpdateRole(user.id, e.target.value)}
@@ -147,6 +166,13 @@ const AdminDashboard = () => {
                           <option value="expert">Expert</option>
                           <option value="admin">Admin</option>
                         </select>
+                        <button
+                          onClick={() => handleDeleteUser(user.id)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Delete User"
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </div>
                     </td>
                   </tr>

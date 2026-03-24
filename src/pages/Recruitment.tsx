@@ -19,7 +19,7 @@ const Recruitment = () => {
   const fetchExperts = async () => {
     setLoading(true);
     try {
-      const q = query(collection(db, 'users'), where('role', '==', 'expert'));
+      const q = query(collection(db, 'public_profiles'), where('role', '==', 'expert'));
       const querySnapshot = await getDocs(q);
       const expertsData = querySnapshot.docs.map(doc => ({
         id: doc.id,
@@ -36,7 +36,9 @@ const Recruitment = () => {
   const handleDeleteExpert = async (expertId: string) => {
     if (!window.confirm('Are you sure you want to remove this expert?')) return;
     try {
+      // Delete from both collections
       await deleteDoc(doc(db, 'users', expertId));
+      await deleteDoc(doc(db, 'public_profiles', expertId));
       setExperts(experts.filter(e => e.id !== expertId));
     } catch (error) {
       console.error("Error deleting expert:", error);

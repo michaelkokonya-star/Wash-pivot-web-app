@@ -57,7 +57,8 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() && 
-        request.auth.token.email.lower() == "michael.kokonya@washpivot.com";
+        request.auth.token.email.lower() == "michael.kokonya@washpivot.com" &&
+        request.auth.token.email_verified == true;
     }
 
     function isValidEmail(email) {
@@ -79,37 +80,57 @@ service cloud.firestore {
              data.role in ['user', 'expert', 'admin'] &&
              (!('expertise' in data) || (data.expertise is string && data.expertise.size() < 200)) &&
              (!('academics' in data) || (data.academics is string && data.academics.size() < 500)) &&
-             (!('bio' in data) || (data.bio is string && data.bio.size() < 1000)) &&
+             (!('bio' in data) || (data.bio is string && data.bio.size() < 2000)) &&
+             (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() < 1000)) &&
              (!('hasSeenWelcome' in data) || data.hasSeenWelcome is bool) &&
              (!('onboardingCompleted' in data) || data.onboardingCompleted is bool) &&
              (!('expertJoinedAt' in data) || data.expertJoinedAt is string);
     }
 
+    function isValidPublicProfile(data) {
+      return hasOnlyAllowedFields(['uid', 'displayName', 'role', 'expertise', 'academics', 'bio', 'photoURL', 'expertJoinedAt']) &&
+             data.uid == request.auth.uid &&
+             data.displayName is string && data.displayName.size() > 0 && data.displayName.size() < 100 &&
+             data.role == 'expert' &&
+             data.expertise is string && data.expertise.size() < 200 &&
+             data.academics is string && data.academics.size() < 500 &&
+             data.bio is string && data.bio.size() < 2000 &&
+             (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() < 1000)) &&
+             data.expertJoinedAt is string;
+    }
+
     function isValidProduct(data) {
       return hasOnlyAllowedFields(['name', 'description', 'price', 'category', 'imageUrl', 'createdAt']) &&
              data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
-             data.description is string && data.description.size() < 2000 &&
+             data.description is string && data.description.size() < 5000 &&
              data.price is number && data.price >= 0 &&
              data.category in ['Solar', 'Water', 'Sanitation'] &&
+             (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() < 1000)) &&
              (!('createdAt' in data) || data.createdAt is timestamp);
     }
 
     function isValidProject(data) {
-      return hasOnlyAllowedFields(['title', 'description', 'ownerUid', 'ownerName', 'targetFunding', 'currentFunding', 'category', 'imageUrl', 'createdAt']) &&
+      return hasOnlyAllowedFields(['title', 'description', 'ownerUid', 'ownerName', 'targetFunding', 'currentFunding', 'category', 'imageUrl', 'milestones', 'createdAt']) &&
              data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.description is string && data.description.size() < 5000 &&
              data.ownerUid == request.auth.uid &&
+             data.ownerName is string && data.ownerName.size() > 0 && data.ownerName.size() < 100 &&
              data.targetFunding is number && data.targetFunding > 0 &&
              data.currentFunding is number && data.currentFunding >= 0 &&
-             data.category in ['Solar', 'Water', 'Sanitation'];
+             data.category in ['Solar', 'Water', 'Sanitation'] &&
+             (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() < 1000)) &&
+             (!('milestones' in data) || data.milestones is list) &&
+             (!('createdAt' in data) || data.createdAt is timestamp);
     }
 
     function isValidReview(data) {
       return hasOnlyAllowedFields(['productId', 'userId', 'userName', 'rating', 'comment', 'createdAt']) &&
-             data.productId is string &&
+             data.productId is string && data.productId.size() < 100 &&
              data.userId == request.auth.uid &&
-             data.userName is string && data.userName.size() > 0 &&
+             data.userName is string && data.userName.size() > 0 && data.userName.size() < 100 &&
              data.rating is number && data.rating >= 1 && data.rating <= 5 &&
-             data.comment is string && data.comment.size() > 0 && data.comment.size() < 1000;
+             data.comment is string && data.comment.size() > 0 && data.comment.size() < 2000 &&
+             (!('createdAt' in data) || data.createdAt is timestamp);
     }
 
     // ===============================================================
@@ -117,10 +138,16 @@ service cloud.firestore {
     // ===============================================================
 
     match /users/{userId} {
-      allow read: if isAuthenticated() || resource.data.role == 'expert';
+      allow read: if isOwner(userId) || isAdmin();
       allow create: if isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role != 'admin' || isAdmin());
       allow update: if isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
       allow delete: if isAdmin();
+    }
+
+    match /public_profiles/{userId} {
+      allow read: if true;
+      allow create, update: if isOwner(userId) && isValidPublicProfile(request.resource.data);
+      allow delete: if isOwner(userId) || isAdmin();
     }
 
     match /products/{productId} {

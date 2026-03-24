@@ -4,6 +4,7 @@ import { db } from '../firebase';
 import { motion, useAnimation, AnimatePresence } from 'motion/react';
 import { ShoppingCart, Filter, Search, Sun, Droplets, ShieldCheck, ChevronLeft, ChevronRight, Check, Plus, Edit, Trash2, LogIn } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import OptimizedImage from '../components/OptimizedImage';
 import { useAuth } from '../context/AuthContext';
 import AddProductModal from '../components/AddProductModal';
@@ -88,6 +89,14 @@ const Marketplace = () => {
 
   return (
     <div className="pt-28 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto overflow-hidden">
+      <Helmet>
+        <title>WASH Marketplace | Sustainable Products & Solutions</title>
+        <meta name="description" content="Browse our marketplace for certified sustainable solar energy, water treatment, and sanitation products. High-quality technology for your WASH projects." />
+        <link rel="canonical" href="https://www.washpivot.com/marketplace" />
+        <meta property="og:title" content="WASH Marketplace | Sustainable Products" />
+        <meta property="og:description" content="Certified sustainable technology for solar, water, and sanitation projects." />
+        <meta property="og:url" content="https://www.washpivot.com/marketplace" />
+      </Helmet>
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
         <div>
           <h1 className="text-5xl font-bold tracking-tighter mb-2">MARKETPLACE</h1>

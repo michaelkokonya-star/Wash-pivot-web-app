@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, getDoc, collection, getDocs, addDoc, query, where, onSnapshot, orderBy, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShoppingCart, ArrowLeft, Sun, Droplets, ShieldCheck, CheckCircle2, Star, MessageSquare, Send, User, ArrowRight, Facebook, Twitter, Linkedin, Share2, Link as LinkIcon, Globe, ChevronDown, ChevronUp } from 'lucide-react';
+import { Helmet } from 'react-helmet-async';
+import { ShoppingCart, ArrowLeft, Sun, Droplets, ShieldCheck, CheckCircle2, Star, MessageSquare, Send, User, ArrowRight, Facebook, Twitter, Linkedin, Share2, Link as LinkIcon, Globe, ChevronDown, ChevronUp, Trash2, Loader2 } from 'lucide-react';
 import OptimizedImage from '../components/OptimizedImage';
 
 const ProductDetail = () => {
@@ -23,6 +24,7 @@ const ProductDetail = () => {
   const [loadingRates, setLoadingRates] = useState(false);
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
 
   const currencies = [
     { code: 'USD', symbol: '$', name: 'US Dollar' },
@@ -121,8 +123,7 @@ const ProductDetail = () => {
 
     const q = query(
       collection(db, 'reviews'),
-      where('productId', '==', id),
-      orderBy('createdAt', 'desc')
+      where('productId', '==', id)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -130,11 +131,35 @@ const ProductDetail = () => {
         id: doc.id,
         ...doc.data()
       }));
+      // Sort in memory to avoid index requirement
+      reviewsData.sort((a: any, b: any) => {
+        const dateA = a.createdAt?.toDate()?.getTime() || 0;
+        const dateB = b.createdAt?.toDate()?.getTime() || 0;
+        return dateB - dateA;
+      });
       setReviews(reviewsData);
+    }, (error) => {
+      console.error("Error fetching reviews:", error);
     });
 
     return () => unsubscribe();
   }, [id]);
+
+  const averageRating = reviews.length > 0 
+    ? reviews.reduce((acc, curr) => acc + curr.rating, 0) / reviews.length 
+    : 0;
+
+  const handleDeleteReview = async (reviewId: string) => {
+    if (!window.confirm('Are you sure you want to delete your review?')) return;
+    setDeletingReviewId(reviewId);
+    try {
+      await deleteDoc(doc(db, 'reviews', reviewId));
+    } catch (error) {
+      console.error("Error deleting review:", error);
+    } finally {
+      setDeletingReviewId(null);
+    }
+  };
 
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -187,6 +212,15 @@ const ProductDetail = () => {
       animate={{ opacity: 1 }}
       className="pt-28 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto"
     >
+      <Helmet>
+        <title>{`${product.name} | WASH Pivot Marketplace`}</title>
+        <meta name="description" content={product.description.substring(0, 160)} />
+        <link rel="canonical" href={`https://www.washpivot.com/marketplace/${product.id}`} />
+        <meta property="og:title" content={product.name} />
+        <meta property="og:description" content={product.description.substring(0, 160)} />
+        <meta property="og:image" content={product.imageUrl} />
+        <meta property="og:url" content={`https://www.washpivot.com/marketplace/${product.id}`} />
+      </Helmet>
       <button 
         onClick={() => navigate('/marketplace')}
         className="flex items-center space-x-2 text-black/50 hover:text-black transition-colors mb-8 group"
@@ -249,6 +283,14 @@ const ProductDetail = () => {
             <h1 className="text-5xl font-bold tracking-tighter mb-4 leading-tight">{product.name}</h1>
             <div className="flex items-center space-x-6 mb-8">
               <div className="text-3xl font-bold text-black">{formatPrice(product.price)}</div>
+              <div className="flex items-center space-x-2">
+                <div className="flex text-emerald-600">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Star key={star} size={16} fill={star <= Math.round(averageRating) ? "currentColor" : "none"} />
+                  ))}
+                </div>
+                <span className="text-sm font-bold text-black/40">({reviews.length})</span>
+              </div>
               <div className="relative group">
                 <div className="flex items-center space-x-2 px-3 py-1.5 bg-stone-100 rounded-lg text-xs font-bold cursor-pointer hover:bg-stone-200 transition-colors">
                   <Globe size={14} className="text-black/40" />
@@ -326,11 +368,26 @@ const ProductDetail = () => {
                   <Linkedin size={18} />
                 </button>
                 <button 
+                  onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`Check out this ${product.name} on WASH Pivot: ${window.location.href}`)}`, '_blank')}
+                  className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center hover:bg-[#25D366] hover:text-white transition-all"
+                  title="Share on WhatsApp"
+                >
+                  <MessageSquare size={18} />
+                </button>
+                <button 
                   onClick={() => {
                     navigator.clipboard.writeText(window.location.href);
-                    alert('Link copied to clipboard!');
+                    const btn = document.getElementById('copy-link-btn');
+                    if (btn) {
+                      const originalContent = btn.innerHTML;
+                      btn.innerHTML = '<span class="text-[10px] font-bold">COPIED!</span>';
+                      setTimeout(() => {
+                        btn.innerHTML = originalContent;
+                      }, 2000);
+                    }
                   }}
-                  className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center hover:bg-black hover:text-white transition-all"
+                  id="copy-link-btn"
+                  className="px-4 h-10 rounded-full bg-stone-100 flex items-center justify-center hover:bg-black hover:text-white transition-all"
                   title="Copy Link"
                 >
                   <LinkIcon size={18} />
@@ -349,10 +406,12 @@ const ProductDetail = () => {
             <div className="flex items-center space-x-2">
               <div className="flex text-emerald-600">
                 {[1, 2, 3, 4, 5].map((star) => (
-                  <Star key={star} size={18} fill={star <= 4 ? "currentColor" : "none"} />
+                  <Star key={star} size={18} fill={star <= Math.round(averageRating) ? "currentColor" : "none"} />
                 ))}
               </div>
-              <span className="text-sm font-bold text-black/50">{reviews.length} Reviews</span>
+              <span className="text-sm font-bold text-black/50">
+                {averageRating > 0 ? averageRating.toFixed(1) : 'No'} Rating • {reviews.length} Reviews
+              </span>
             </div>
           </div>
 
@@ -389,10 +448,26 @@ const ProductDetail = () => {
                         </p>
                       </div>
                     </div>
-                    <div className="flex text-emerald-600">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Star key={star} size={14} fill={star <= review.rating ? "currentColor" : "none"} />
-                      ))}
+                    <div className="flex items-center space-x-4">
+                      <div className="flex text-emerald-600">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star key={star} size={14} fill={star <= review.rating ? "currentColor" : "none"} />
+                        ))}
+                      </div>
+                      {(user?.uid === review.userId || profile?.role === 'admin') && (
+                        <button
+                          onClick={() => handleDeleteReview(review.id)}
+                          disabled={deletingReviewId === review.id}
+                          className="text-red-500 hover:text-red-700 transition-colors"
+                          title="Delete Review"
+                        >
+                          {deletingReviewId === review.id ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : (
+                            <Trash2 size={14} />
+                          )}
+                        </button>
+                      )}
                     </div>
                   </div>
                   <p className="text-black/70 leading-relaxed text-sm italic">"{review.comment}"</p>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, CheckCircle2, Award, GraduationCap, Briefcase, ArrowRight, ArrowLeft, Sparkles, ShieldCheck } from 'lucide-react';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 
@@ -39,7 +39,7 @@ const steps = [
 ];
 
 const ExpertOnboardingModal: React.FC<ExpertOnboardingModalProps> = ({ isOpen, onClose, onComplete }) => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -62,16 +62,33 @@ const ExpertOnboardingModal: React.FC<ExpertOnboardingModalProps> = ({ isOpen, o
   };
 
   const handleSubmit = async () => {
-    if (!user) return;
+    if (!user || !profile) return;
     setLoading(true);
     try {
+      const expertJoinedAt = new Date().toISOString();
       const userRef = doc(db, 'users', user.uid);
+      const publicRef = doc(db, 'public_profiles', user.uid);
+
+      // Update private user document
       await updateDoc(userRef, {
         ...formData,
         role: 'expert',
         onboardingCompleted: true,
-        expertJoinedAt: new Date().toISOString()
+        expertJoinedAt
       });
+
+      // Create public profile (no PII like email)
+      await setDoc(publicRef, {
+        uid: user.uid,
+        displayName: profile.displayName,
+        photoURL: profile.photoURL || null,
+        role: 'expert',
+        expertise: formData.expertise,
+        academics: formData.academics,
+        bio: formData.bio,
+        expertJoinedAt
+      });
+
       onComplete();
       onClose();
     } catch (error) {
