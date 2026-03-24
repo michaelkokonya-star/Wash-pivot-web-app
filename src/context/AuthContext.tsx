@@ -7,7 +7,8 @@ import {
   signOut,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  updatePassword
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase';
@@ -20,6 +21,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, displayName: string) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  changePassword: (password: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -36,7 +38,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const docRef = doc(db, 'users', user.uid);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-          setProfile(docSnap.data());
+          const data = docSnap.data();
+          if (user.email === 'michael.kokonya@washpivot.com' && data.role !== 'admin') {
+            const updatedProfile = { ...data, role: 'admin', isApproved: true };
+            await setDoc(docRef, updatedProfile);
+            setProfile(updatedProfile);
+          } else {
+            setProfile(data);
+          }
         } else {
           // Create initial profile
           const initialProfile = {
@@ -110,8 +119,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await sendPasswordResetEmail(auth, email);
   };
 
+  const changePassword = async (password: string) => {
+    if (auth.currentUser) {
+      await updatePassword(auth.currentUser, password);
+    } else {
+      throw new Error('No user is currently signed in');
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signIn, signUp, logout, resetPassword }}>
+    <AuthContext.Provider value={{ user, profile, loading, signIn, signUp, logout, resetPassword, changePassword }}>
       {children}
     </AuthContext.Provider>
   );

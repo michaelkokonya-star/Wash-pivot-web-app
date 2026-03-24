@@ -24,17 +24,33 @@ interface Order {
 }
 
 const Profile = () => {
-  const { user, profile, logout } = useAuth();
+  const { user, profile, logout, changePassword } = useAuth();
   const [loading, setLoading] = useState(false);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [orders, setOrders] = useState<Order[]>([]);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
   const [formData, setFormData] = useState({
     displayName: '',
     phoneNumber: '',
     showContacts: true
   });
+
+  const getPasswordStrength = (pass: string) => {
+    let score = 0;
+    if (!pass) return 0;
+    if (pass.length >= 8) score++;
+    if (/[A-Z]/.test(pass)) score++;
+    if (/[0-9]/.test(pass)) score++;
+    if (/[^A-Za-z0-9]/.test(pass)) score++;
+    return score;
+  };
+
+  const strength = getPasswordStrength(newPassword);
+  const strengthLabels = ['Very Weak', 'Weak', 'Fair', 'Good', 'Strong'];
+  const strengthColors = ['bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-blue-500', 'bg-emerald-500'];
 
   useEffect(() => {
     if (profile) {
@@ -105,6 +121,35 @@ const Profile = () => {
     } catch (error) {
       console.error("Error updating profile:", error);
       setMessage({ type: 'error', text: 'Failed to update profile. Please try again.' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    if (strength < 3) {
+      setMessage({ type: 'error', text: 'Please choose a stronger password.' });
+      return;
+    }
+
+    setLoading(true);
+    setMessage(null);
+
+    try {
+      await changePassword(newPassword);
+      setMessage({ type: 'success', text: 'Password updated successfully!' });
+      setNewPassword('');
+      setIsChangingPassword(false);
+    } catch (error: any) {
+      console.error("Error updating password:", error);
+      if (error.code === 'auth/requires-recent-login') {
+        setMessage({ type: 'error', text: 'This operation is sensitive and requires recent authentication. Please log in again.' });
+      } else {
+        setMessage({ type: 'error', text: error.message || 'Failed to update password.' });
+      }
     } finally {
       setLoading(false);
     }
@@ -351,6 +396,68 @@ const Profile = () => {
                 <p className="text-black/60 leading-relaxed italic">
                   "{profile.bio}"
                 </p>
+              </div>
+            )}
+          </div>
+
+          {/* Change Password Section */}
+          <div className="bg-stone-50 p-10 rounded-[3rem] border border-black/5">
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="text-xl font-bold">Security</h3>
+              <button 
+                onClick={() => setIsChangingPassword(!isChangingPassword)}
+                className={`px-6 py-2 rounded-xl border border-black/5 font-bold text-sm transition-all ${isChangingPassword ? 'bg-red-50 text-red-600 border-red-100' : 'bg-white text-black hover:bg-stone-100'}`}
+              >
+                {isChangingPassword ? 'Cancel' : 'Change Password'}
+              </button>
+            </div>
+
+            {isChangingPassword ? (
+              <form onSubmit={handleUpdatePassword} className="space-y-6">
+                <div className="max-w-md">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-black/40 mb-2 block ml-1">New Password</label>
+                  <div className="relative mb-4">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-black/20" size={18} />
+                    <input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full pl-12 pr-4 py-4 bg-white border-none rounded-2xl focus:ring-2 focus:ring-emerald-600 outline-none font-medium transition-all"
+                      placeholder="Enter new password"
+                      required
+                    />
+                  </div>
+
+                  {newPassword.length > 0 && (
+                    <div className="px-1 space-y-1.5 mb-6">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-black/40">Strength: {strengthLabels[strength]}</span>
+                      </div>
+                      <div className="flex gap-1 h-1">
+                        {[0, 1, 2, 3, 4].map((i) => (
+                          <div 
+                            key={i} 
+                            className={`flex-1 rounded-full transition-all duration-500 ${i <= strength ? strengthColors[strength] : 'bg-stone-200'}`}
+                          />
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-black/30">Use 8+ characters with numbers, symbols & uppercase</p>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={loading || strength < 3}
+                    className="w-full py-4 bg-black text-white rounded-2xl font-bold hover:bg-black/80 transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
+                  >
+                    {loading ? <Loader2 className="animate-spin" size={20} /> : <span>Update Password</span>}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="flex items-center space-x-4 text-black/40">
+                <Shield size={24} />
+                <p className="text-sm">Keep your account secure by using a strong, unique password.</p>
               </div>
             )}
           </div>

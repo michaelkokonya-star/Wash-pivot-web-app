@@ -5,8 +5,20 @@ import cors from 'cors';
 import Stripe from 'stripe';
 import axios from 'axios';
 import dotenv from 'dotenv';
+import admin from 'firebase-admin';
+import firebaseConfig from './firebase-applet-config.json' assert { type: 'json' };
 
 dotenv.config();
+
+// Initialize Firebase Admin
+try {
+  admin.initializeApp({
+    projectId: firebaseConfig.projectId,
+  });
+  console.log('Firebase Admin Initialized');
+} catch (error) {
+  console.error('Firebase Admin Initialization Error:', error);
+}
 
 const stripe = process.env.STRIPE_SECRET_KEY 
   ? new Stripe(process.env.STRIPE_SECRET_KEY) 
@@ -62,6 +74,50 @@ async function startServer() {
     // API routes
     app.get('/api/health', (req, res) => {
       res.json({ status: 'ok' });
+    });
+
+    // Provision System Owner
+    app.post('/api/admin/provision-owner', async (req, res) => {
+      const { secret, password } = req.body;
+      const ownerEmail = 'michael.kokonya@washpivot.com';
+
+      if (!process.env.PROVISIONING_SECRET) {
+        return res.status(500).json({ error: 'PROVISIONING_SECRET is not set in the environment' });
+      }
+
+      if (secret !== process.env.PROVISIONING_SECRET) {
+        return res.status(401).json({ error: 'Invalid provisioning secret' });
+      }
+
+      if (!password || password.length < 8) {
+        return res.status(400).json({ error: 'Password must be at least 8 characters' });
+      }
+
+      try {
+        let user;
+        try {
+          user = await admin.auth().getUserByEmail(ownerEmail);
+          console.log(`User ${ownerEmail} exists, updating password...`);
+          await admin.auth().updateUser(user.uid, { password });
+        } catch (error: any) {
+          if (error.code === 'auth/user-not-found') {
+            console.log(`User ${ownerEmail} not found, creating...`);
+            user = await admin.auth().createUser({
+              email: ownerEmail,
+              password,
+              displayName: 'System Owner',
+              emailVerified: true,
+            });
+          } else {
+            throw error;
+          }
+        }
+
+        res.json({ success: true, message: `Successfully provisioned password for ${ownerEmail}` });
+      } catch (error: any) {
+        console.error('Provisioning Error:', error);
+        res.status(500).json({ error: error.message });
+      }
     });
 
     // Stripe Checkout

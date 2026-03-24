@@ -21,7 +21,7 @@ const BuildProject = () => {
       }
 
       try {
-        const eSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'expert')));
+        const eSnap = await getDocs(query(collection(db, 'public_profiles'), where('role', '==', 'expert')));
         setExperts(eSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       } catch (error) {
         console.error("Error fetching experts:", error);

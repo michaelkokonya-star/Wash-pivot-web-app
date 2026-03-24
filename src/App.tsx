@@ -20,6 +20,7 @@ import Logo from './components/Logo';
 
 import Profile from './pages/Profile';
 import AdminDashboard from './pages/AdminDashboard';
+import ProvisionOwner from './pages/ProvisionOwner';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
 import CheckoutSuccess from './pages/CheckoutSuccess';
@@ -43,6 +44,7 @@ function App() {
                   <Route path="/" element={<Home />} />
                   <Route path="/signin" element={<Auth />} />
                   <Route path="/signup" element={<Auth />} />
+                  <Route path="/provision-owner" element={<ProvisionOwner />} />
                   <Route path="/marketplace" element={<Marketplace />} />
                   <Route path="/marketplace/:id" element={<ProductDetail />} />
                   <Route path="/cart" element={<Cart />} />

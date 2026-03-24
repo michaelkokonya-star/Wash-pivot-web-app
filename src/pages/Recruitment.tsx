@@ -64,7 +64,15 @@ const Recruitment = () => {
           </p>
         </div>
         
-        {user && profile?.role !== 'expert' && (
+        {!user ? (
+          <button
+            onClick={() => window.location.href = '/signin'}
+            className="px-8 py-4 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 flex items-center space-x-2 group"
+          >
+            <Sparkles size={18} className="group-hover:scale-110 transition-transform" />
+            <span>Join as Expert</span>
+          </button>
+        ) : profile?.role !== 'expert' && (
           <button
             onClick={() => setShowOnboarding(true)}
             className="px-8 py-4 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 flex items-center space-x-2 group"

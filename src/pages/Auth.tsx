@@ -18,6 +18,20 @@ const Auth = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const getPasswordStrength = (pass: string) => {
+    let score = 0;
+    if (!pass) return 0;
+    if (pass.length >= 8) score++;
+    if (/[A-Z]/.test(pass)) score++;
+    if (/[0-9]/.test(pass)) score++;
+    if (/[^A-Za-z0-9]/.test(pass)) score++;
+    return score;
+  };
+
+  const strength = getPasswordStrength(password);
+  const strengthLabels = ['Very Weak', 'Weak', 'Fair', 'Good', 'Strong'];
+  const strengthColors = ['bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-blue-500', 'bg-emerald-500'];
+
   const from = (location.state as any)?.from?.pathname || "/";
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -122,16 +136,35 @@ const Auth = () => {
               </div>
 
               {!isResetMode && (
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-black/20" size={18} />
-                  <input
-                    type="password"
-                    placeholder="Password"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-stone-100 border-none rounded-2xl py-4 pl-12 pr-4 text-sm focus:ring-2 focus:ring-emerald-600 outline-none transition-all"
-                  />
+                <div className="space-y-2">
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-black/20" size={18} />
+                    <input
+                      type="password"
+                      placeholder="Password"
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full bg-stone-100 border-none rounded-2xl py-4 pl-12 pr-4 text-sm focus:ring-2 focus:ring-emerald-600 outline-none transition-all"
+                    />
+                  </div>
+                  
+                  {!isLogin && password.length > 0 && (
+                    <div className="px-1 space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-black/40">Strength: {strengthLabels[strength]}</span>
+                      </div>
+                      <div className="flex gap-1 h-1">
+                        {[0, 1, 2, 3, 4].map((i) => (
+                          <div 
+                            key={i} 
+                            className={`flex-1 rounded-full transition-all duration-500 ${i <= strength ? strengthColors[strength] : 'bg-stone-200'}`}
+                          />
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-black/30">Use 8+ characters with numbers, symbols & uppercase</p>
+                    </div>
+                  )}
                 </div>
               )}
 
