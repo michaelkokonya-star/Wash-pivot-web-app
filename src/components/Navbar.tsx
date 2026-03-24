@@ -1,12 +1,14 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Menu, X, LogIn, User as UserIcon, ChevronDown } from 'lucide-react';
+import { useCart } from '../context/CartContext';
+import { Menu, X, LogIn, User as UserIcon, ChevronDown, ShoppingCart } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Logo from './Logo';
 
 const Navbar = () => {
   const { user, profile, signIn, logout } = useAuth();
+  const { cartCount } = useCart();
   const [isOpen, setIsOpen] = React.useState(false);
   const [isAboutOpen, setIsAboutOpen] = React.useState(false);
   const location = useLocation();
@@ -84,6 +86,12 @@ const Navbar = () => {
                     >
                       Our Team
                     </Link>
+                    <Link
+                      to="/contact"
+                      className="block px-4 py-3 text-sm font-medium text-black/60 hover:text-emerald-600 hover:bg-stone-50 transition-colors"
+                    >
+                      Contact Us
+                    </Link>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -91,6 +99,14 @@ const Navbar = () => {
 
             {user ? (
               <div className="flex items-center space-x-4">
+                <Link to="/cart" className="p-2 hover:bg-black/5 rounded-full transition-colors relative group">
+                  <ShoppingCart size={20} className="group-hover:text-emerald-600 transition-colors" />
+                  {cartCount > 0 && (
+                    <span className="absolute top-0 right-0 bg-emerald-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center border-2 border-white">
+                      {cartCount}
+                    </span>
+                  )}
+                </Link>
                 <Link to="/profile" className="p-2 hover:bg-black/5 rounded-full transition-colors">
                   <UserIcon size={20} />
                 </Link>
@@ -102,13 +118,23 @@ const Navbar = () => {
                 </button>
               </div>
             ) : (
-              <button
-                onClick={signIn}
-                className="px-6 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors flex items-center space-x-2"
-              >
-                <LogIn size={18} />
-                <span>Sign In</span>
-              </button>
+              <div className="flex items-center space-x-4">
+                <Link to="/cart" className="p-2 hover:bg-black/5 rounded-full transition-colors relative group">
+                  <ShoppingCart size={20} className="group-hover:text-emerald-600 transition-colors" />
+                  {cartCount > 0 && (
+                    <span className="absolute top-0 right-0 bg-emerald-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center border-2 border-white">
+                      {cartCount}
+                    </span>
+                  )}
+                </Link>
+                <Link
+                  to="/signin"
+                  className="px-6 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors flex items-center space-x-2"
+                >
+                  <LogIn size={18} />
+                  <span>Sign In</span>
+                </Link>
+              </div>
             )}
           </div>
 
@@ -162,9 +188,28 @@ const Navbar = () => {
                 >
                   Our Team
                 </Link>
+                <Link
+                  to="/contact"
+                  onClick={() => setIsOpen(false)}
+                  className="block px-3 py-4 text-base font-medium text-black/60 hover:text-emerald-600 hover:bg-black/5 rounded-lg transition-all"
+                >
+                  Contact Us
+                </Link>
               </div>
 
               <div className="pt-4 border-t border-black/5">
+                <Link
+                  to="/cart"
+                  onClick={() => setIsOpen(false)}
+                  className="block px-3 py-4 text-base font-medium text-black/60 hover:text-emerald-600 flex items-center justify-between"
+                >
+                  <span>Shopping Cart</span>
+                  {cartCount > 0 && (
+                    <span className="bg-emerald-600 text-white text-xs font-bold px-2 py-1 rounded-full">
+                      {cartCount}
+                    </span>
+                  )}
+                </Link>
                 {user ? (
                   <div className="space-y-2">
                     <Link
@@ -185,15 +230,13 @@ const Navbar = () => {
                     </button>
                   </div>
                 ) : (
-                  <button
-                    onClick={() => {
-                      signIn();
-                      setIsOpen(false);
-                    }}
-                    className="w-full px-3 py-4 text-left text-base font-medium text-emerald-600"
+                  <Link
+                    to="/signin"
+                    onClick={() => setIsOpen(false)}
+                    className="block px-3 py-4 text-base font-medium text-emerald-600"
                   >
                     Sign In
-                  </button>
+                  </Link>
                 )}
               </div>
             </div>

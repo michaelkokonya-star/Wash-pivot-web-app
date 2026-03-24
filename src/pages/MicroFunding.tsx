@@ -24,11 +24,21 @@ const MicroFunding = () => {
 
   useEffect(() => {
     const fetchProjects = async () => {
-      const querySnapshot = await getDocs(collection(db, 'projects'));
-      setProjects(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      try {
+        const querySnapshot = await getDocs(collection(db, 'projects'));
+        const allProjects = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        // Only show approved projects to regular users
+        if (profile?.role === 'admin') {
+          setProjects(allProjects);
+        } else {
+          setProjects(allProjects.filter((p: any) => p.isApproved === true));
+        }
+      } catch (error) {
+        console.error("Error fetching projects:", error);
+      }
     };
     fetchProjects();
-  }, []);
+  }, [profile]);
 
   const handleAddMilestone = () => {
     if (!milestoneInput.title.trim()) return;
@@ -56,6 +66,8 @@ const MicroFunding = () => {
         currentFunding: 0,
         milestones: milestones,
         createdAt: serverTimestamp(),
+        isApproved: false,
+        status: 'pending'
       });
       setIsAdding(false);
       setMilestones([]);

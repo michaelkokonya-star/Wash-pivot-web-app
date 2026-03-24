@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc, collection, getDocs, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { Helmet } from 'react-helmet-async';
 import { ShoppingCart, ArrowLeft, Sun, Droplets, ShieldCheck, CheckCircle2, Star, MessageSquare, Send, User, ArrowRight, Facebook, Twitter, Linkedin, Share2, Link as LinkIcon, Globe, ChevronDown, ChevronUp, Trash2, Loader2 } from 'lucide-react';
@@ -12,8 +13,10 @@ const ProductDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user, profile } = useAuth();
+  const { addToCart } = useCart();
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [addedToCart, setAddedToCart] = useState(false);
   const [reviews, setReviews] = useState<any[]>([]);
   const [newRating, setNewRating] = useState(5);
   const [newComment, setNewComment] = useState('');
@@ -184,6 +187,15 @@ const ProductDetail = () => {
     }
   };
 
+  const handleAddToCart = (productToAdd = product) => {
+    if (!productToAdd) return;
+    addToCart(productToAdd);
+    if (productToAdd.id === product.id) {
+      setAddedToCart(true);
+      setTimeout(() => setAddedToCart(false), 2000);
+    }
+  };
+
   if (loading) {
     return (
       <div className="pt-32 flex justify-center items-center min-h-screen">
@@ -332,9 +344,16 @@ const ProductDetail = () => {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4">
-            <button className="flex-1 py-5 bg-black text-white rounded-2xl font-bold text-lg hover:bg-black/80 transition-all flex items-center justify-center space-x-3 shadow-xl shadow-black/10">
+            <button 
+              onClick={handleAddToCart}
+              className={`flex-1 py-5 rounded-2xl font-bold text-lg transition-all flex items-center justify-center space-x-3 shadow-xl ${
+                addedToCart 
+                  ? 'bg-emerald-600 text-white shadow-emerald-600/20' 
+                  : 'bg-black text-white hover:bg-black/80 shadow-black/10'
+              }`}
+            >
               <ShoppingCart size={24} />
-              <span>Add to Cart</span>
+              <span>{addedToCart ? 'Added to Cart!' : 'Add to Cart'}</span>
             </button>
             <button className="flex-1 py-5 bg-white text-black border-2 border-black rounded-2xl font-bold text-lg hover:bg-stone-50 transition-all">
               Request Quote
@@ -636,7 +655,10 @@ const ProductDetail = () => {
                   </h3>
                   <div className="flex items-center justify-between mt-4">
                     <span className="text-xl font-bold">{formatPrice(related.price)}</span>
-                    <button className="p-2 bg-black text-white rounded-lg hover:bg-emerald-600 transition-colors">
+                    <button 
+                      onClick={() => handleAddToCart(related)}
+                      className="p-2 bg-black text-white rounded-lg hover:bg-emerald-600 transition-colors"
+                    >
                       <ShoppingCart size={18} />
                     </button>
                   </div>

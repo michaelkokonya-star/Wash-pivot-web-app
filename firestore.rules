@@ -73,11 +73,14 @@ service cloud.firestore {
     // Domain Validators
     // ===============================================================
     function isValidUser(data) {
-      return hasOnlyAllowedFields(['uid', 'displayName', 'email', 'role', 'expertise', 'academics', 'bio', 'createdAt', 'photoURL', 'hasSeenWelcome', 'onboardingCompleted', 'expertJoinedAt']) &&
+      return hasOnlyAllowedFields(['uid', 'displayName', 'email', 'role', 'expertise', 'academics', 'bio', 'createdAt', 'photoURL', 'hasSeenWelcome', 'onboardingCompleted', 'expertJoinedAt', 'isApproved', 'showContacts', 'phoneNumber']) &&
              data.uid == request.auth.uid &&
              data.displayName is string && data.displayName.size() > 0 && data.displayName.size() < 100 &&
              isValidEmail(data.email) &&
              data.role in ['user', 'expert', 'admin'] &&
+             data.isApproved is bool &&
+             data.showContacts is bool &&
+             (!('phoneNumber' in data) || (data.phoneNumber is string && data.phoneNumber.size() < 20)) &&
              (!('expertise' in data) || (data.expertise is string && data.expertise.size() < 200)) &&
              (!('academics' in data) || (data.academics is string && data.academics.size() < 500)) &&
              (!('bio' in data) || (data.bio is string && data.bio.size() < 2000)) &&
@@ -88,10 +91,13 @@ service cloud.firestore {
     }
 
     function isValidPublicProfile(data) {
-      return hasOnlyAllowedFields(['uid', 'displayName', 'role', 'expertise', 'academics', 'bio', 'photoURL', 'expertJoinedAt']) &&
+      return hasOnlyAllowedFields(['uid', 'displayName', 'role', 'expertise', 'academics', 'bio', 'photoURL', 'expertJoinedAt', 'isApproved', 'showContacts', 'phoneNumber']) &&
              data.uid == request.auth.uid &&
              data.displayName is string && data.displayName.size() > 0 && data.displayName.size() < 100 &&
              data.role == 'expert' &&
+             data.isApproved is bool &&
+             data.showContacts is bool &&
+             (!('phoneNumber' in data) || (data.phoneNumber is string && data.phoneNumber.size() < 20)) &&
              data.expertise is string && data.expertise.size() < 200 &&
              data.academics is string && data.academics.size() < 500 &&
              data.bio is string && data.bio.size() < 2000 &&
@@ -110,7 +116,7 @@ service cloud.firestore {
     }
 
     function isValidProject(data) {
-      return hasOnlyAllowedFields(['title', 'description', 'ownerUid', 'ownerName', 'targetFunding', 'currentFunding', 'category', 'imageUrl', 'milestones', 'createdAt']) &&
+      return hasOnlyAllowedFields(['title', 'description', 'ownerUid', 'ownerName', 'targetFunding', 'currentFunding', 'category', 'imageUrl', 'milestones', 'createdAt', 'isApproved', 'status']) &&
              data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
              data.description is string && data.description.size() < 5000 &&
              data.ownerUid == request.auth.uid &&
@@ -120,7 +126,9 @@ service cloud.firestore {
              data.category in ['Solar', 'Water', 'Sanitation'] &&
              (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() < 1000)) &&
              (!('milestones' in data) || data.milestones is list) &&
-             (!('createdAt' in data) || data.createdAt is timestamp);
+             (!('createdAt' in data) || data.createdAt is timestamp) &&
+             data.isApproved is bool &&
+             data.status in ['pending', 'active', 'completed', 'rejected'];
     }
 
     function isValidReview(data) {
@@ -133,14 +141,32 @@ service cloud.firestore {
              (!('createdAt' in data) || data.createdAt is timestamp);
     }
 
+    function isValidOrder(data) {
+      return hasOnlyAllowedFields(['userId', 'userEmail', 'items', 'totalAmount', 'status', 'paymentMethod', 'shippingInfo', 'createdAt', 'paidAt']) &&
+             data.userId == request.auth.uid &&
+             data.userEmail is string && isValidEmail(data.userEmail) &&
+             data.items is list && data.items.size() > 0 && data.items.size() < 50 &&
+             data.totalAmount is number && data.totalAmount >= 0 &&
+             data.status in ['pending', 'paid', 'failed', 'shipped', 'delivered'] &&
+             data.paymentMethod in ['card', 'mpesa'] &&
+             data.shippingInfo is map &&
+             (!('createdAt' in data) || data.createdAt is timestamp) &&
+             (!('paidAt' in data) || data.paidAt is timestamp);
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
 
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      allow create: if isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role != 'admin' || isAdmin());
-      allow update: if isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && 
+                      request.resource.data.isApproved == false && 
+                      (request.resource.data.role != 'admin' || isAdmin());
+      allow update: if (isOwner(userId) && isValidUser(request.resource.data) && 
+                        request.resource.data.isApproved == resource.data.isApproved && 
+                        (request.resource.data.role == resource.data.role || isAdmin())) || 
+                      (isAdmin() && isValidUser(request.resource.data));
       allow delete: if isAdmin();
     }
 
@@ -157,8 +183,13 @@ service cloud.firestore {
 
     match /projects/{projectId} {
       allow read: if true;
-      allow create: if isAuthenticated() && isValidProject(request.resource.data);
-      allow update: if isAuthenticated() && (isAdmin() || (request.auth.uid == resource.data.ownerUid && isValidProject(request.resource.data)));
+      allow create: if isAuthenticated() && isValidProject(request.resource.data) && 
+                      request.resource.data.isApproved == false && 
+                      request.resource.data.status == 'pending';
+      allow update: if isAuthenticated() && (isAdmin() || (request.auth.uid == resource.data.ownerUid && 
+                                                          isValidProject(request.resource.data) && 
+                                                          request.resource.data.isApproved == resource.data.isApproved && 
+                                                          request.resource.data.status == resource.data.status));
       allow delete: if isAdmin() || (isAuthenticated() && request.auth.uid == resource.data.ownerUid);
     }
 
@@ -167,6 +198,13 @@ service cloud.firestore {
       allow create: if isAuthenticated() && isValidReview(request.resource.data);
       allow update: if isAuthenticated() && request.auth.uid == resource.data.userId && isValidReview(request.resource.data);
       allow delete: if isAdmin() || (isAuthenticated() && request.auth.uid == resource.data.userId);
+    }
+
+    match /orders/{orderId} {
+      allow read: if isAuthenticated() && (isAdmin() || request.auth.uid == resource.data.userId);
+      allow create: if isAuthenticated() && isValidOrder(request.resource.data);
+      allow update: if isAuthenticated() && (isAdmin() || (request.auth.uid == resource.data.userId && isValidOrder(request.resource.data)));
+      allow delete: if isAdmin();
     }
   }
 }

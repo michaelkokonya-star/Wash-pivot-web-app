@@ -1,10 +1,30 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import cors from 'cors';
+import Stripe from 'stripe';
+import axios from 'axios';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const stripe = process.env.STRIPE_SECRET_KEY 
+  ? new Stripe(process.env.STRIPE_SECRET_KEY) 
+  : null;
+
+const mpesaConfig = {
+  consumerKey: process.env.MPESA_CONSUMER_KEY,
+  consumerSecret: process.env.MPESA_CONSUMER_SECRET,
+  shortcode: process.env.MPESA_SHORTCODE || '174379', // Default test shortcode
+  passkey: process.env.MPESA_PASSKEY,
+  callbackUrl: process.env.MPESA_CALLBACK_URL || `${process.env.APP_URL}/api/mpesa/callback`,
+};
 
 console.log('--- Server Starting ---');
 console.log('NODE_ENV:', process.env.NODE_ENV);
 console.log('PORT:', process.env.PORT);
+console.log('Stripe Initialized:', !!stripe);
+console.log('M-Pesa Configured:', !!(mpesaConfig.consumerKey && mpesaConfig.consumerSecret));
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,14 +37,122 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
+// M-Pesa OAuth Token Generator
+async function getMpesaToken() {
+  const auth = Buffer.from(`${mpesaConfig.consumerKey}:${mpesaConfig.consumerSecret}`).toString('base64');
+  try {
+    const response = await axios.get('https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials', {
+      headers: { Authorization: `Basic ${auth}` },
+    });
+    return response.data.access_token;
+  } catch (error: any) {
+    console.error('M-Pesa Token Error:', error.response?.data || error.message);
+    throw new Error('Failed to get M-Pesa access token');
+  }
+}
+
 async function startServer() {
   try {
     const app = express();
-    const PORT = parseInt(process.env.PORT || '3000', 10);
+    const PORT = 3000;
 
-    // API routes can go here
+    app.use(cors());
+    app.use(express.json());
+
+    // API routes
     app.get('/api/health', (req, res) => {
       res.json({ status: 'ok' });
+    });
+
+    // Stripe Checkout
+    app.post('/api/create-checkout-session', async (req, res) => {
+      if (!stripe) {
+        return res.status(500).json({ error: 'Stripe is not configured' });
+      }
+
+      try {
+        const { items, successUrl, cancelUrl } = req.body;
+
+        const lineItems = items.map((item: any) => ({
+          price_data: {
+            currency: 'kes',
+            product_data: {
+              name: item.name,
+              images: [item.imageUrl],
+            },
+            unit_amount: Math.round(item.price * 100), // Stripe expects cents
+          },
+          quantity: item.quantity,
+        }));
+
+        const session = await stripe.checkout.sessions.create({
+          payment_method_types: ['card'],
+          line_items: lineItems,
+          mode: 'payment',
+          success_url: successUrl,
+          cancel_url: cancelUrl,
+        });
+
+        res.json({ id: session.id, url: session.url });
+      } catch (error: any) {
+        console.error('Error creating checkout session:', error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // M-Pesa STK Push
+    app.post('/api/mpesa/stkpush', async (req, res) => {
+      return res.status(503).json({ error: 'M-Pesa integration is currently paused for maintenance. Please use Stripe.' });
+      /*
+      try {
+        const { phoneNumber, amount, accountReference, transactionDesc } = req.body;
+        
+        // Format phone number to 254XXXXXXXXX
+        let formattedPhone = phoneNumber.replace(/\+/g, '');
+        if (formattedPhone.startsWith('0')) {
+          formattedPhone = '254' + formattedPhone.slice(1);
+        } else if (formattedPhone.startsWith('7') || formattedPhone.startsWith('1')) {
+          formattedPhone = '254' + formattedPhone;
+        }
+
+        const token = await getMpesaToken();
+        const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+        const password = Buffer.from(`${mpesaConfig.shortcode}${mpesaConfig.passkey}${timestamp}`).toString('base64');
+
+        const response = await axios.post(
+          'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
+          {
+            BusinessShortCode: mpesaConfig.shortcode,
+            Password: password,
+            Timestamp: timestamp,
+            TransactionType: 'CustomerPayBillOnline',
+            Amount: Math.round(amount),
+            PartyA: formattedPhone,
+            PartyB: mpesaConfig.shortcode,
+            PhoneNumber: formattedPhone,
+            CallBackURL: mpesaConfig.callbackUrl,
+            AccountReference: accountReference || 'WashPivot',
+            TransactionDesc: transactionDesc || 'Payment for sustainable products',
+          },
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+
+        res.json(response.data);
+      } catch (error: any) {
+        console.error('M-Pesa STK Push Error:', error.response?.data || error.message);
+        res.status(500).json({ error: error.response?.data?.errorMessage || error.message });
+      }
+      */
+    });
+
+    // M-Pesa Callback (Safaricom calls this)
+    app.post('/api/mpesa/callback', (req, res) => {
+      console.log('M-Pesa Callback Received:', JSON.stringify(req.body, null, 2));
+      // In a real app, you'd update the order status in Firestore here
+      // For this demo, we'll just log it.
+      res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
     });
 
     if (process.env.NODE_ENV !== 'production') {

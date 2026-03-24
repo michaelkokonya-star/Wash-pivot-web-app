@@ -22,6 +22,7 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
   ...props
 }) => {
   const [isLoaded, setIsLoaded] = useState(false);
+  const [hasError, setHasError] = useState(false);
 
   // Function to optimize Unsplash/Picsum URLs
   const getOptimizedUrl = (url: string) => {
@@ -70,12 +71,21 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
   return (
     <div className={`relative overflow-hidden ${className}`}>
       <AnimatePresence>
-        {!isLoaded && (
+        {!isLoaded && !hasError && (
           <motion.div
             initial={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="absolute inset-0 bg-stone-100 animate-pulse z-10"
           />
+        )}
+        {hasError && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="absolute inset-0 bg-stone-200 flex items-center justify-center z-10"
+          >
+            <span className="text-xs text-black/30 font-mono uppercase tracking-widest">Image Unavailable</span>
+          </motion.div>
         )}
       </AnimatePresence>
       <motion.img
@@ -85,6 +95,10 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         animate={{ opacity: isLoaded ? 1 : 0 }}
         transition={{ duration: 0.5 }}
         onLoad={() => setIsLoaded(true)}
+        onError={() => {
+          setHasError(true);
+          setIsLoaded(false);
+        }}
         loading={priority ? "eager" : "lazy"}
         // @ts-ignore - fetchPriority is supported in React 18.2+ but might be missing from some type definitions
         fetchPriority={priority ? "high" : "auto"}

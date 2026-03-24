@@ -8,7 +8,7 @@ const teamMembers = [
     name: "Michael Kokonya",
     role: "Founder & CEO",
     bio: "Visionary leader with a passion for sustainable development and social impact. Dedicated to empowering communities through accessible technology and expertise.",
-    image: "https://drive.google.com/thumbnail?id=10eosV20Sm4XeckDxGkO68zMAnmvBn8ZV&sz=w1000",
+    image: "https://lh3.googleusercontent.com/d/10eosV20Sm4XeckDxGkO68zMAnmvBn8ZV",
     socials: { twitter: "#", linkedin: "#", mail: "michael.kokonya@washpivot.com" }
   }
 ];
@@ -21,8 +21,8 @@ const Team = () => {
       className="pt-32 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto"
     >
       <div className="text-center mb-20">
-        <h1 className="text-6xl font-bold tracking-tighter mb-6">MEET THE TEAM</h1>
-        <p className="text-xl text-black/60 max-w-2xl mx-auto leading-relaxed">
+        <h1 className="text-5xl sm:text-6xl font-bold tracking-tighter mb-6 uppercase">Meet the Team</h1>
+        <p className="text-lg sm:text-xl text-black/60 max-w-2xl mx-auto leading-relaxed px-4">
           The dedicated individuals behind Wash Pivot, working together to build a more sustainable future.
         </p>
       </div>

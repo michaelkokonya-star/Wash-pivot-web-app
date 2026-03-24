@@ -1,23 +1,119 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { motion } from 'motion/react';
-import { User, Mail, Shield, Award, GraduationCap, Briefcase, CheckCircle2, Clock, Settings, LogOut, Sparkles } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { doc, updateDoc, getDoc, collection, query, where, orderBy, getDocs, Timestamp } from 'firebase/firestore';
+import { db } from '../firebase';
+import { motion, AnimatePresence } from 'motion/react';
+import { User, Mail, Shield, CheckCircle2, XCircle, Phone, Eye, EyeOff, Save, Loader2, Award, GraduationCap, Briefcase, Clock, Settings, LogOut, Sparkles, Package, ExternalLink } from 'lucide-react';
+import { Link } from 'react-router-dom';
+
+interface OrderItem {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+  image: string;
+}
+
+interface Order {
+  id: string;
+  items: OrderItem[];
+  totalAmount: number;
+  status: 'pending' | 'paid' | 'failed' | 'shipped' | 'delivered';
+  paymentMethod: 'card' | 'mpesa';
+  createdAt: Timestamp;
+}
 
 const Profile = () => {
   const { user, profile, logout } = useAuth();
-  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [ordersLoading, setOrdersLoading] = useState(true);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [formData, setFormData] = useState({
+    displayName: '',
+    phoneNumber: '',
+    showContacts: true
+  });
+
+  useEffect(() => {
+    if (profile) {
+      setFormData({
+        displayName: profile.displayName || '',
+        phoneNumber: profile.phoneNumber || '',
+        showContacts: profile.showContacts ?? true
+      });
+    }
+  }, [profile]);
+
+  useEffect(() => {
+    const fetchOrders = async () => {
+      if (!user) return;
+      try {
+        const ordersRef = collection(db, 'orders');
+        const q = query(
+          ordersRef,
+          where('userId', '==', user.uid),
+          orderBy('createdAt', 'desc')
+        );
+        const querySnapshot = await getDocs(q);
+        const fetchedOrders = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Order[];
+        setOrders(fetchedOrders);
+      } catch (error) {
+        console.error("Error fetching orders:", error);
+      } finally {
+        setOrdersLoading(false);
+      }
+    };
+
+    fetchOrders();
+  }, [user]);
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    setLoading(true);
+    setMessage(null);
+
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, {
+        displayName: formData.displayName,
+        phoneNumber: formData.phoneNumber,
+        showContacts: formData.showContacts
+      });
+
+      // Also update public profile if it exists
+      if (profile?.role === 'expert') {
+        const publicRef = doc(db, 'public_profiles', user.uid);
+        const publicDoc = await getDoc(publicRef);
+        if (publicDoc.exists()) {
+          await updateDoc(publicRef, {
+            displayName: formData.displayName,
+            phoneNumber: formData.phoneNumber,
+            showContacts: formData.showContacts
+          });
+        }
+      }
+
+      setMessage({ type: 'success', text: 'Profile updated successfully!' });
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      setMessage({ type: 'error', text: 'Failed to update profile. Please try again.' });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (!user || !profile) {
     return (
-      <div className="pt-32 px-8 text-center min-h-screen">
-        <h1 className="text-3xl font-bold mb-4">Please Sign In</h1>
-        <button 
-          onClick={() => navigate('/')}
-          className="text-emerald-600 font-bold hover:underline"
-        >
-          Back to Home
-        </button>
+      <div className="pt-32 pb-20 flex justify-center">
+        <Loader2 className="animate-spin text-emerald-600" size={40} />
       </div>
     );
   }
@@ -58,12 +154,9 @@ const Profile = () => {
               <span className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest ${profile.role === 'admin' ? 'bg-purple-100 text-purple-700' : profile.role === 'expert' ? 'bg-emerald-100 text-emerald-700' : 'bg-stone-200 text-black/40'}`}>
                 {profile.role}
               </span>
-              {user.emailVerified && (
-                <span className="px-4 py-1.5 bg-blue-100 text-blue-700 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center space-x-1">
-                  <Shield size={10} />
-                  <span>Verified</span>
-                </span>
-              )}
+              <span className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest ${profile.isApproved ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                {profile.isApproved ? 'Approved' : 'Pending Approval'}
+              </span>
             </div>
 
             <button
@@ -110,56 +203,229 @@ const Profile = () => {
           <div className="bg-stone-50 p-10 rounded-[3rem] border border-black/5">
             <div className="flex items-center justify-between mb-10">
               <h3 className="text-3xl font-bold tracking-tight">Profile Details</h3>
-              <button className="p-3 bg-white rounded-2xl border border-black/5 hover:bg-stone-100 transition-all">
-                <Settings size={20} className="text-black/40" />
+              <button 
+                onClick={() => setIsEditing(!isEditing)}
+                className={`p-3 rounded-2xl border border-black/5 transition-all ${isEditing ? 'bg-emerald-600 text-white' : 'bg-white text-black/40 hover:bg-stone-100'}`}
+              >
+                <Settings size={20} />
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-6">
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-black/40 mb-2 block">Full Name</label>
-                  <p className="font-bold text-lg">{profile.displayName}</p>
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-black/40 mb-2 block">Email Address</label>
-                  <p className="font-bold text-lg">{profile.email}</p>
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-black/40 mb-2 block">Member Since</label>
-                  <div className="flex items-center space-x-2 font-bold text-lg">
-                    <Clock size={18} className="text-black/20" />
-                    <span>{profile.createdAt?.toDate().toLocaleDateString() || 'N/A'}</span>
+            <AnimatePresence>
+              {message && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className={`mb-8 p-4 rounded-2xl text-sm font-bold flex items-center space-x-2 ${
+                    message.type === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
+                  }`}
+                >
+                  {message.type === 'success' ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
+                  <span>{message.text}</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {isEditing ? (
+              <form onSubmit={handleUpdateProfile} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-black/40 mb-2 block ml-1">Full Name</label>
+                    <div className="relative">
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 text-black/20" size={18} />
+                      <input
+                        type="text"
+                        value={formData.displayName}
+                        onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
+                        className="w-full pl-12 pr-4 py-4 bg-white border-none rounded-2xl focus:ring-2 focus:ring-emerald-600 outline-none font-medium transition-all"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-black/40 mb-2 block ml-1">Phone Number</label>
+                    <div className="relative">
+                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-black/20" size={18} />
+                      <input
+                        type="tel"
+                        value={formData.phoneNumber}
+                        onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                        className="w-full pl-12 pr-4 py-4 bg-white border-none rounded-2xl focus:ring-2 focus:ring-emerald-600 outline-none font-medium transition-all"
+                        placeholder="+254 700 000 000"
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {profile.role === 'expert' && (
+                <div className="pt-4">
+                  <label className="flex items-center cursor-pointer group">
+                    <div className="relative">
+                      <input
+                        type="checkbox"
+                        className="sr-only"
+                        checked={formData.showContacts}
+                        onChange={(e) => setFormData({ ...formData, showContacts: e.target.checked })}
+                      />
+                      <div className={`w-14 h-8 rounded-full transition-colors ${formData.showContacts ? 'bg-emerald-600' : 'bg-stone-200'}`}></div>
+                      <div className={`absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform ${formData.showContacts ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                    </div>
+                    <div className="ml-4">
+                      <p className="font-bold text-sm flex items-center space-x-2">
+                        {formData.showContacts ? <Eye size={16} /> : <EyeOff size={16} />}
+                        <span>Show Contact Details</span>
+                      </p>
+                      <p className="text-xs text-black/40">Allow other users to see your phone number on your profile.</p>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="flex space-x-4 pt-4">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="flex-1 py-4 bg-black text-white rounded-2xl font-bold hover:bg-black/80 transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
+                  >
+                    {loading ? <Loader2 className="animate-spin" size={20} /> : <><Save size={20} /><span>Save Changes</span></>}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing(false)}
+                    className="px-8 py-4 bg-white text-black border border-black/5 rounded-2xl font-bold hover:bg-stone-100 transition-all"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-6">
                   <div>
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-black/40 mb-2 block">Specialization</label>
-                    <div className="flex items-center space-x-2 font-bold text-lg text-emerald-600">
-                      <Sparkles size={18} />
-                      <span>{profile.expertise}</span>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-black/40 mb-2 block">Full Name</label>
+                    <p className="font-bold text-lg">{profile.displayName}</p>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-black/40 mb-2 block">Email Address</label>
+                    <p className="font-bold text-lg">{profile.email}</p>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-black/40 mb-2 block">Phone Number</label>
+                    <div className="flex items-center space-x-2 font-bold text-lg">
+                      <Phone size={18} className="text-black/20" />
+                      <span>{profile.phoneNumber || 'Not provided'}</span>
                     </div>
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-black/40 mb-2 block">Academics</label>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-black/40 mb-2 block">Member Since</label>
                     <div className="flex items-center space-x-2 font-bold text-lg">
-                      <GraduationCap size={18} className="text-black/20" />
-                      <span>{profile.academics}</span>
+                      <Clock size={18} className="text-black/20" />
+                      <span>{profile.createdAt?.toDate().toLocaleDateString() || 'N/A'}</span>
                     </div>
                   </div>
                 </div>
-              )}
-            </div>
 
-            {profile.role === 'expert' && (
+                {profile.role === 'expert' && (
+                  <div className="space-y-6">
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-black/40 mb-2 block">Specialization</label>
+                      <div className="flex items-center space-x-2 font-bold text-lg text-emerald-600">
+                        <Sparkles size={18} />
+                        <span>{profile.expertise}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-black/40 mb-2 block">Academics</label>
+                      <div className="flex items-center space-x-2 font-bold text-lg">
+                        <GraduationCap size={18} className="text-black/20" />
+                        <span>{profile.academics}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {profile.role === 'expert' && !isEditing && (
               <div className="mt-10 pt-10 border-t border-black/5">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-black/40 mb-4 block">Professional Bio</label>
                 <p className="text-black/60 leading-relaxed italic">
                   "{profile.bio}"
                 </p>
+              </div>
+            )}
+          </div>
+
+          {/* Order History */}
+          <div className="bg-white p-10 rounded-[3rem] border border-black/5">
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="text-xl font-bold">Order History</h3>
+              <Link to="/marketplace" className="text-emerald-600 text-sm font-bold flex items-center space-x-1 hover:underline">
+                <span>Shop More</span>
+                <ExternalLink size={14} />
+              </Link>
+            </div>
+
+            {ordersLoading ? (
+              <div className="flex justify-center py-12">
+                <Loader2 className="animate-spin text-emerald-600" size={32} />
+              </div>
+            ) : orders.length === 0 ? (
+              <div className="text-center py-12 bg-stone-50 rounded-3xl border border-dashed border-black/10">
+                <Package className="mx-auto text-black/20 mb-4" size={48} />
+                <p className="text-black/40 font-medium">No orders found yet.</p>
+                <Link to="/marketplace" className="mt-4 inline-block text-emerald-600 font-bold hover:underline">
+                  Start Shopping
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {orders.map((order) => (
+                  <div key={order.id} className="group bg-stone-50 p-6 rounded-3xl border border-black/5 hover:border-emerald-600/20 transition-all">
+                    <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-black/40 mb-1">Order ID</p>
+                        <p className="font-mono text-xs font-bold">{order.id}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-black/40 mb-1">Date</p>
+                        <p className="text-sm font-bold">{order.createdAt?.toDate().toLocaleDateString()}</p>
+                      </div>
+                      <div>
+                        <span className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest ${
+                          order.status === 'paid' ? 'bg-emerald-100 text-emerald-700' :
+                          order.status === 'pending' ? 'bg-amber-100 text-amber-700' :
+                          order.status === 'failed' ? 'bg-red-100 text-red-700' :
+                          'bg-stone-200 text-black/40'
+                        }`}>
+                          {order.status}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-4 border-t border-black/5">
+                      <div className="flex -space-x-3 overflow-hidden">
+                        {order.items.slice(0, 3).map((item, idx) => (
+                          <img
+                            key={idx}
+                            src={item.image}
+                            alt={item.name}
+                            className="w-10 h-10 rounded-xl border-2 border-white object-cover"
+                            referrerPolicy="no-referrer"
+                          />
+                        ))}
+                        {order.items.length > 3 && (
+                          <div className="w-10 h-10 rounded-xl border-2 border-white bg-stone-200 flex items-center justify-center text-[10px] font-bold">
+                            +{order.items.length - 3}
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-black/40">Total Amount</p>
+                        <p className="text-lg font-bold text-emerald-600">KES {order.totalAmount.toLocaleString()}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -191,3 +457,4 @@ const Profile = () => {
 };
 
 export default Profile;
+

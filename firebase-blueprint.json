@@ -15,10 +15,13 @@
         "bio": { "type": "string" },
         "hasSeenWelcome": { "type": "boolean" },
         "onboardingCompleted": { "type": "boolean" },
+        "isApproved": { "type": "boolean", "description": "Whether the user profile is approved by admin" },
+        "showContacts": { "type": "boolean", "description": "Whether to reveal contact details to other users" },
+        "phoneNumber": { "type": "string" },
         "expertJoinedAt": { "type": "string", "format": "date-time" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["uid", "displayName", "email", "role"]
+      "required": ["uid", "displayName", "email", "role", "isApproved", "showContacts"]
     },
     "Product": {
       "title": "Marketplace Product",
@@ -46,6 +49,8 @@
         "currentFunding": { "type": "number" },
         "category": { "type": "string", "enum": ["Solar", "Water", "Sanitation"] },
         "imageUrl": { "type": "string" },
+        "isApproved": { "type": "boolean", "description": "Whether the project is approved by admin" },
+        "status": { "type": "string", "enum": ["pending", "active", "completed", "rejected"] },
         "milestones": {
           "type": "array",
           "items": {
@@ -76,6 +81,23 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["productId", "userId", "userName", "rating", "comment", "createdAt"]
+    },
+    "Order": {
+      "title": "Marketplace Order",
+      "description": "Customer orders from the marketplace.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "items": { "type": "array" },
+        "totalAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "paid", "failed", "shipped", "delivered"] },
+        "paymentMethod": { "type": "string", "enum": ["card", "mpesa"] },
+        "shippingInfo": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "paidAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "items", "totalAmount", "status", "paymentMethod", "createdAt"]
     }
   },
   "firestore": {
@@ -94,6 +116,10 @@
     "/reviews/{reviewId}": {
       "schema": "Review",
       "description": "Product reviews."
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Customer orders."
     }
   }
 }

@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import OptimizedImage from '../components/OptimizedImage';
 import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
 import AddProductModal from '../components/AddProductModal';
 import EditProductModal from '../components/EditProductModal';
 
@@ -21,6 +22,7 @@ const Marketplace = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const { user, profile, signIn } = useAuth();
+  const { addToCart } = useCart();
 
   const isAdmin = user?.email?.toLowerCase() === 'michael.kokonya@washpivot.com';
 
@@ -82,8 +84,9 @@ const Marketplace = () => {
     }
   };
 
-  const handleAddToCart = (id: string) => {
-    setAddedId(id);
+  const handleAddToCart = (product: any) => {
+    addToCart(product);
+    setAddedId(product.id);
     setTimeout(() => setAddedId(null), 2000);
   };
 
@@ -104,15 +107,6 @@ const Marketplace = () => {
         </div>
         
         <div className="flex flex-wrap gap-4 items-center">
-          {!user && (
-            <button
-              onClick={signIn}
-              className="px-6 py-2 bg-stone-100 text-black/60 rounded-full text-sm font-bold hover:bg-stone-200 transition-all flex items-center space-x-2"
-            >
-              <LogIn size={18} />
-              <span>Sign In to Manage</span>
-            </button>
-          )}
           {isAdmin && (
             <button
               onClick={() => setIsModalOpen(true)}
@@ -244,7 +238,7 @@ const Marketplace = () => {
                             )}
                           </AnimatePresence>
                           <button 
-                            onClick={() => handleAddToCart(product.id)}
+                            onClick={() => handleAddToCart(product)}
                             className={`p-4 rounded-2xl transition-all hover:scale-105 active:scale-95 shadow-lg ${
                               addedId === product.id 
                                 ? 'bg-white text-emerald-600 border-2 border-emerald-600' 
