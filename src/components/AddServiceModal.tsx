@@ -1,56 +1,52 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Upload, Save, Loader2 } from 'lucide-react';
-import { doc, updateDoc } from 'firebase/firestore';
+import { X, Upload, Plus, Loader2, Mail, Phone, MapPin } from 'lucide-react';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 
-interface EditProductModalProps {
+interface AddServiceModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  product: any;
 }
 
-const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, onSuccess, product }) => {
+const AddServiceModal: React.FC<AddServiceModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
-    price: '',
-    category: 'Solar',
+    category: 'Installation',
     subCategory: 'None',
     description: '',
-    imageUrl: ''
+    imageUrl: '',
+    contactEmail: '',
+    contactPhone: '',
+    location: ''
   });
-
-  useEffect(() => {
-    if (product) {
-      setFormData({
-        name: product.name || '',
-        price: product.price?.toString() || '',
-        category: product.category || 'Solar',
-        subCategory: product.subCategory || 'None',
-        description: product.description || '',
-        imageUrl: product.imageUrl || ''
-      });
-    }
-  }, [product]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!product?.id) return;
     setLoading(true);
 
     try {
-      const productRef = doc(db, 'products', product.id);
-      await updateDoc(productRef, {
+      await addDoc(collection(db, 'service_providers'), {
         ...formData,
-        price: parseFloat(formData.price)
+        createdAt: serverTimestamp()
       });
       onSuccess();
       onClose();
+      setFormData({
+        name: '',
+        category: 'Installation',
+        subCategory: 'None',
+        description: '',
+        imageUrl: '',
+        contactEmail: '',
+        contactPhone: '',
+        location: ''
+      });
     } catch (error) {
-      console.error("Error updating product:", error);
-      alert("Failed to update product. Check console for details.");
+      console.error("Error adding service provider:", error);
+      alert("Failed to add service provider. Check console for details.");
     } finally {
       setLoading(false);
     }
@@ -72,12 +68,12 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl overflow-hidden"
+            className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
           >
-            <div className="p-8 border-b border-black/5 flex justify-between items-center">
+            <div className="p-8 border-b border-black/5 flex justify-between items-center sticky top-0 bg-white z-10">
               <div>
-                <h2 className="text-2xl font-bold tracking-tight">Edit Product</h2>
-                <p className="text-sm text-black/40">Update the details for this item.</p>
+                <h2 className="text-2xl font-bold tracking-tight">Add Service Provider</h2>
+                <p className="text-sm text-black/40">List a new professional service on the marketplace.</p>
               </div>
               <button 
                 onClick={onClose}
@@ -88,32 +84,19 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
             </div>
 
             <form onSubmit={handleSubmit} className="p-8 space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Product Name</label>
-                  <input
-                    required
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors"
-                    placeholder="e.g. Solar Home Kit"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Price (KSh)</label>
-                  <input
-                    required
-                    type="number"
-                    value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                    className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors"
-                    placeholder="58500"
-                  />
-                </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Provider Name</label>
+                <input
+                  required
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors"
+                  placeholder="e.g. SolarTech Solutions"
+                />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Category</label>
                   <select
@@ -121,8 +104,13 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
                     onChange={(e) => setFormData({ ...formData, category: e.target.value, subCategory: 'None' })}
                     className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors appearance-none"
                   >
-                    <option value="Solar">Solar</option>
+                    <option value="Installation">Installation</option>
+                    <option value="Maintenance">Maintenance</option>
+                    <option value="Consulting">Consulting</option>
+                    <option value="Engineering">Engineering</option>
+                    <option value="Drilling">Drilling</option>
                     <option value="Water Treatment">Water Treatment</option>
+                    <option value="Solar">Solar</option>
                     <option value="Sanitation">Sanitation</option>
                   </select>
                 </div>
@@ -176,6 +164,52 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
                 )}
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Contact Email</label>
+                  <div className="relative">
+                    <input
+                      required
+                      type="email"
+                      value={formData.contactEmail}
+                      onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
+                      className="w-full pl-12 pr-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors"
+                      placeholder="contact@provider.com"
+                    />
+                    <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-black/20" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Contact Phone</label>
+                  <div className="relative">
+                    <input
+                      required
+                      type="tel"
+                      value={formData.contactPhone}
+                      onChange={(e) => setFormData({ ...formData, contactPhone: e.target.value })}
+                      className="w-full pl-12 pr-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors"
+                      placeholder="+254 700 000 000"
+                    />
+                    <Phone size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-black/20" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Location</label>
+                <div className="relative">
+                  <input
+                    required
+                    type="text"
+                    value={formData.location}
+                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                    className="w-full pl-12 pr-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors"
+                    placeholder="e.g. Nairobi, Kenya"
+                  />
+                  <MapPin size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-black/20" />
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Image URL</label>
                 <div className="relative">
@@ -198,7 +232,7 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors h-32 resize-none"
-                  placeholder="Describe the product and its benefits..."
+                  placeholder="Describe the services offered..."
                 />
               </div>
 
@@ -211,8 +245,8 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
                   <Loader2 className="animate-spin" size={20} />
                 ) : (
                   <>
-                    <Save size={20} />
-                    <span>Save Changes</span>
+                    <Plus size={20} />
+                    <span>Add Service Provider</span>
                   </>
                 )}
               </button>
@@ -224,4 +258,4 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
   );
 };
 
-export default EditProductModal;
+export default AddServiceModal;

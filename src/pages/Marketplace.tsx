@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { collection, getDocs, query, where, deleteDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, query, where, deleteDoc, doc, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { motion, useAnimation, AnimatePresence } from 'motion/react';
-import { ShoppingCart, Filter, Search, Sun, Droplets, ShieldCheck, ChevronLeft, ChevronRight, Check, Plus, Edit, Trash2, LogIn } from 'lucide-react';
+import { ShoppingCart, Filter, Search, Sun, Droplets, ShieldCheck, ChevronLeft, ChevronRight, Check, Plus, Edit, Trash2, LogIn, Mail, Phone, MapPin, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import OptimizedImage from '../components/OptimizedImage';
@@ -13,9 +13,13 @@ import EditProductModal from '../components/EditProductModal';
 
 const Marketplace = () => {
   const [products, setProducts] = useState<any[]>([]);
+  const [services, setServices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [servicesLoading, setServicesLoading] = useState(true);
   const [filter, setFilter] = useState('All');
+  const [subFilter, setSubFilter] = useState('All');
   const carouselRef = useRef<HTMLDivElement>(null);
+  const servicesCarouselRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   const [addedId, setAddedId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -29,20 +33,65 @@ const Marketplace = () => {
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      const q = filter === 'All' 
-        ? collection(db, 'products') 
-        : query(collection(db, 'products'), where('category', '==', filter));
+      let q;
+      if (filter === 'All') {
+        q = collection(db, 'products');
+      } else {
+        if (subFilter !== 'All') {
+          q = query(
+            collection(db, 'products'), 
+            where('category', '==', filter),
+            where('subCategory', '==', subFilter)
+          );
+        } else {
+          q = query(collection(db, 'products'), where('category', '==', filter));
+        }
+      }
       
       const querySnapshot = await getDocs(q);
       const productsData = querySnapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
+        ...(doc.data() as any)
       }));
       setProducts(productsData);
     } catch (error) {
       console.error("Error fetching products:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchServices = async () => {
+    setServicesLoading(true);
+    try {
+      let q;
+      if (filter === 'All') {
+        q = query(collection(db, 'service_providers'), orderBy('createdAt', 'desc'));
+      } else if (subFilter !== 'All') {
+        q = query(
+          collection(db, 'service_providers'), 
+          where('category', '==', filter),
+          where('subCategory', '==', subFilter),
+          orderBy('createdAt', 'desc')
+        );
+      } else {
+        q = query(
+          collection(db, 'service_providers'), 
+          where('category', '==', filter),
+          orderBy('createdAt', 'desc')
+        );
+      }
+      
+      const querySnapshot = await getDocs(q);
+      const servicesData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...(doc.data() as any)
+      }));
+      setServices(servicesData);
+    } catch (error) {
+      console.error("Error fetching services:", error);
+    } finally {
+      setServicesLoading(false);
     }
   };
 
@@ -64,7 +113,8 @@ const Marketplace = () => {
 
   useEffect(() => {
     fetchProducts();
-  }, [filter]);
+    fetchServices();
+  }, [filter, subFilter]);
 
   useEffect(() => {
     if (carouselRef.current) {
@@ -74,10 +124,10 @@ const Marketplace = () => {
 
   const allProducts = products;
 
-  const scroll = (direction: 'left' | 'right') => {
-    if (carouselRef.current) {
-      const scrollAmount = carouselRef.current.offsetWidth * 0.8;
-      carouselRef.current.scrollBy({
+  const scroll = (ref: React.RefObject<HTMLDivElement>, direction: 'left' | 'right') => {
+    if (ref.current) {
+      const scrollAmount = ref.current.offsetWidth * 0.8;
+      ref.current.scrollBy({
         left: direction === 'left' ? -scrollAmount : scrollAmount,
         behavior: 'smooth'
       });
@@ -116,20 +166,91 @@ const Marketplace = () => {
               <span>Add Product</span>
             </button>
           )}
-          <div className="flex gap-2">
-            {['All', 'Solar', 'Water', 'Sanitation'].map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setFilter(cat)}
-                className={`px-6 py-2 rounded-full text-sm font-bold transition-all border ${
-                  filter === cat 
-                    ? 'bg-black text-white border-black' 
-                    : 'bg-white text-black/60 border-black/10 hover:border-black'
-                }`}
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap gap-2">
+              {['All', 'Solar', 'Water Treatment', 'Sanitation'].map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => {
+                    setFilter(cat);
+                    setSubFilter('All');
+                  }}
+                  className={`px-6 py-2 rounded-full text-sm font-bold transition-all border ${
+                    filter === cat 
+                      ? 'bg-black text-white border-black' 
+                      : 'bg-white text-black/60 border-black/10 hover:border-black'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
+            {filter === 'Water Treatment' && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex flex-wrap gap-2 p-2 bg-stone-100 rounded-2xl border border-black/5"
               >
-                {cat}
-              </button>
-            ))}
+                {['All', 'Fluoride Removal', 'Filtration', 'Chlorination'].map((sub) => (
+                  <button
+                    key={sub}
+                    onClick={() => setSubFilter(sub)}
+                    className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      subFilter === sub 
+                        ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20' 
+                        : 'bg-white text-black/40 hover:text-black'
+                    }`}
+                  >
+                    {sub}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+
+            {filter === 'Solar' && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex flex-wrap gap-2 p-2 bg-stone-100 rounded-2xl border border-black/5"
+              >
+                {['All', 'Solar Panels', 'Batteries', 'Charge Controller', 'Inverter', 'Accessories'].map((sub) => (
+                  <button
+                    key={sub}
+                    onClick={() => setSubFilter(sub)}
+                    className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      subFilter === sub 
+                        ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20' 
+                        : 'bg-white text-black/40 hover:text-black'
+                    }`}
+                  >
+                    {sub}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+
+            {filter === 'Sanitation' && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex flex-wrap gap-2 p-2 bg-stone-100 rounded-2xl border border-black/5"
+              >
+                {['All', 'Exhaust Services'].map((sub) => (
+                  <button
+                    key={sub}
+                    onClick={() => setSubFilter(sub)}
+                    className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      subFilter === sub 
+                        ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20' 
+                        : 'bg-white text-black/40 hover:text-black'
+                    }`}
+                  >
+                    {sub}
+                  </button>
+                ))}
+              </motion.div>
+            )}
           </div>
         </div>
       </div>
@@ -150,14 +271,14 @@ const Marketplace = () => {
       <div className="relative group/carousel">
         {/* Navigation Arrows - Hidden on mobile, visible on hover on desktop */}
         <button 
-          onClick={() => scroll('left')}
+          onClick={() => scroll(carouselRef, 'left')}
           className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 z-20 p-4 bg-white shadow-2xl rounded-full border border-black/5 opacity-0 group-hover/carousel:opacity-100 group-hover/carousel:translate-x-0 transition-all hidden md:flex items-center justify-center hover:bg-stone-50"
         >
           <ChevronLeft size={24} />
         </button>
         
         <button 
-          onClick={() => scroll('right')}
+          onClick={() => scroll(carouselRef, 'right')}
           className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 z-20 p-4 bg-white shadow-2xl rounded-full border border-black/5 opacity-0 group-hover/carousel:opacity-100 group-hover/carousel:translate-x-0 transition-all hidden md:flex items-center justify-center hover:bg-stone-50"
         >
           <ChevronRight size={24} />
@@ -271,6 +392,105 @@ const Marketplace = () => {
           />
         </div>
         <span className="text-[10px] font-bold uppercase tracking-widest text-black/30">Swipe to browse</span>
+      </div>
+
+      {/* Service Providers Section */}
+      <div className="mt-32">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
+          <div>
+            <h2 className="text-4xl font-bold tracking-tighter mb-2">SERVICE PROVIDERS</h2>
+            <p className="text-black/50">Professional WASH installation and maintenance services.</p>
+          </div>
+          <Link 
+            to="/recruitment"
+            className="px-6 py-2 bg-black text-white rounded-full text-sm font-bold hover:bg-stone-800 transition-all flex items-center space-x-2"
+          >
+            <span>View Experts</span>
+            <ExternalLink size={16} />
+          </Link>
+        </div>
+
+        <div className="relative group/services">
+          <button 
+            onClick={() => scroll(servicesCarouselRef, 'left')}
+            className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 z-20 p-4 bg-white shadow-2xl rounded-full border border-black/5 opacity-0 group-hover/services:opacity-100 group-hover/services:translate-x-0 transition-all hidden md:flex items-center justify-center hover:bg-stone-50"
+          >
+            <ChevronLeft size={24} />
+          </button>
+          
+          <button 
+            onClick={() => scroll(servicesCarouselRef, 'right')}
+            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 z-20 p-4 bg-white shadow-2xl rounded-full border border-black/5 opacity-0 group-hover/services:opacity-100 group-hover/services:translate-x-0 transition-all hidden md:flex items-center justify-center hover:bg-stone-50"
+          >
+            <ChevronRight size={24} />
+          </button>
+
+          <motion.div 
+            ref={servicesCarouselRef}
+            className="flex overflow-x-auto scrollbar-hide gap-8 pb-12 snap-x snap-mandatory cursor-grab active:cursor-grabbing"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
+            <AnimatePresence mode="popLayout">
+              {services.length > 0 ? (
+                services.map((service) => (
+                  <motion.div
+                    key={service.id}
+                    layout
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    className="min-w-[300px] sm:min-w-[350px] lg:min-w-[400px] snap-start"
+                  >
+                    <div className="group bg-stone-50 rounded-[2.5rem] border border-black/5 overflow-hidden hover:shadow-2xl transition-all h-full flex flex-col p-8">
+                      <div className="flex items-start justify-between mb-8">
+                        <div className="w-20 h-20 rounded-3xl overflow-hidden bg-white shadow-sm border border-black/5">
+                          <img 
+                            src={service.imageUrl} 
+                            alt={service.name}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <span className="px-4 py-1.5 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-bold uppercase tracking-widest">
+                          {service.category}
+                        </span>
+                      </div>
+
+                      <h3 className="text-2xl font-bold tracking-tight mb-4">{service.name}</h3>
+                      <p className="text-black/50 text-sm mb-8 line-clamp-3 leading-relaxed">{service.description}</p>
+
+                      <div className="mt-auto space-y-4">
+                        <div className="flex items-center gap-3 text-sm text-black/60">
+                          <MapPin size={16} className="text-emerald-600" />
+                          <span>{service.location}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2 pt-4 border-t border-black/5">
+                          <a 
+                            href={`mailto:${service.contactEmail}`}
+                            className="flex-1 py-3 bg-white border border-black/5 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 hover:bg-black hover:text-white transition-all"
+                          >
+                            <Mail size={14} />
+                            <span>Email</span>
+                          </a>
+                          <a 
+                            href={`tel:${service.contactPhone}`}
+                            className="flex-1 py-3 bg-white border border-black/5 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 hover:bg-black hover:text-white transition-all"
+                          >
+                            <Phone size={14} />
+                            <span>Call</span>
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))
+              ) : (
+                <div className="w-full py-20 text-center bg-stone-50 rounded-3xl border border-dashed border-black/10">
+                  <p className="text-black/40 font-medium">No service providers available at the moment.</p>
+                </div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        </div>
       </div>
     </div>
   );

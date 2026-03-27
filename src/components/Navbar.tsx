@@ -92,6 +92,12 @@ const Navbar = () => {
                     >
                       Contact Us
                     </Link>
+                    <Link
+                      to="/privacy"
+                      className="block px-4 py-3 text-sm font-medium text-black/60 hover:text-emerald-600 hover:bg-stone-50 transition-colors"
+                    >
+                      Privacy Policy
+                    </Link>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -194,6 +200,13 @@ const Navbar = () => {
                   className="block px-3 py-4 text-base font-medium text-black/60 hover:text-emerald-600 hover:bg-black/5 rounded-lg transition-all"
                 >
                   Contact Us
+                </Link>
+                <Link
+                  to="/privacy"
+                  onClick={() => setIsOpen(false)}
+                  className="block px-3 py-4 text-base font-medium text-black/60 hover:text-emerald-600 hover:bg-black/5 rounded-lg transition-all"
+                >
+                  Privacy Policy
                 </Link>
               </div>
 

@@ -27,6 +27,9 @@ import CheckoutSuccess from './pages/CheckoutSuccess';
 import Auth from './pages/Auth';
 import WelcomeOnboarding from './components/WelcomeOnboarding';
 import ProtectedRoute from './components/ProtectedRoute';
+import VerificationBanner from './components/VerificationBanner';
+
+import { Toaster } from 'sonner';
 
 // Main Application Component - Updated 2026-03-24
 function App() {
@@ -36,7 +39,9 @@ function App() {
         <CartProvider>
           <Router>
           <div className="min-h-screen bg-white font-sans text-black selection:bg-emerald-200">
+            <Toaster position="top-center" expand={false} richColors />
             <Navbar />
+            <VerificationBanner />
             <WelcomeOnboarding />
             <main>
               <AnimatePresence mode="wait">
@@ -54,7 +59,7 @@ function App() {
                   <Route path="/funding" element={<MicroFunding />} />
                   <Route path="/funding/:id" element={<ProjectDetail />} />
                   <Route path="/build" element={
-                    <ProtectedRoute>
+                    <ProtectedRoute requireVerification>
                       <BuildProject />
                     </ProtectedRoute>
                   } />
@@ -68,7 +73,7 @@ function App() {
                     </ProtectedRoute>
                   } />
                   <Route path="/admin" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
+                    <ProtectedRoute allowedRoles={['admin']} requireVerification>
                       <AdminDashboard />
                     </ProtectedRoute>
                   } />

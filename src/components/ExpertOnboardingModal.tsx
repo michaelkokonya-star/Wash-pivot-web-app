@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, CheckCircle2, Award, GraduationCap, Briefcase, ArrowRight, ArrowLeft, Sparkles, ShieldCheck } from 'lucide-react';
+import { X, CheckCircle2, Award, GraduationCap, Briefcase, ArrowRight, ArrowLeft, Sparkles, ShieldCheck, Mail } from 'lucide-react';
 import { doc, updateDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
@@ -25,6 +25,12 @@ const steps = [
     icon: GraduationCap
   },
   {
+    id: 'contact',
+    title: 'Contact Details',
+    description: 'Provide your professional contact information for the network.',
+    icon: Mail
+  },
+  {
     id: 'bio',
     title: 'Professional Bio',
     description: 'Share your journey and professional achievements with the community.',
@@ -46,6 +52,8 @@ const ExpertOnboardingModal: React.FC<ExpertOnboardingModalProps> = ({ isOpen, o
     expertise: '',
     academics: '',
     bio: '',
+    phone: '',
+    contactEmail: profile?.email || '',
     role: 'expert'
   });
 
@@ -74,10 +82,11 @@ const ExpertOnboardingModal: React.FC<ExpertOnboardingModalProps> = ({ isOpen, o
         ...formData,
         role: 'expert',
         onboardingCompleted: true,
-        expertJoinedAt
+        expertJoinedAt,
+        isApproved: false
       });
 
-      // Create public profile (no PII like email)
+      // Create public profile
       await setDoc(publicRef, {
         uid: user.uid,
         displayName: profile.displayName,
@@ -86,7 +95,10 @@ const ExpertOnboardingModal: React.FC<ExpertOnboardingModalProps> = ({ isOpen, o
         expertise: formData.expertise,
         academics: formData.academics,
         bio: formData.bio,
-        expertJoinedAt
+        phone: formData.phone,
+        contactEmail: formData.contactEmail,
+        expertJoinedAt,
+        isApproved: false
       });
 
       onComplete();
@@ -200,6 +212,31 @@ const ExpertOnboardingModal: React.FC<ExpertOnboardingModalProps> = ({ isOpen, o
               {currentStep === 2 && (
                 <div className="space-y-6">
                   <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Professional Email</label>
+                    <input
+                      type="email"
+                      value={formData.contactEmail}
+                      onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
+                      placeholder="e.g. expert@example.com"
+                      className="w-full p-4 bg-stone-50 border border-black/10 rounded-2xl focus:outline-none focus:border-emerald-600 transition-colors font-medium"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Phone Number</label>
+                    <input
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      placeholder="e.g. +254 700 000 000"
+                      className="w-full p-4 bg-stone-50 border border-black/10 rounded-2xl focus:outline-none focus:border-emerald-600 transition-colors font-medium"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {currentStep === 3 && (
+                <div className="space-y-6">
+                  <div className="space-y-2">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Professional Bio</label>
                     <textarea
                       value={formData.bio}
@@ -212,7 +249,7 @@ const ExpertOnboardingModal: React.FC<ExpertOnboardingModalProps> = ({ isOpen, o
                 </div>
               )}
 
-              {currentStep === 3 && (
+              {currentStep === 4 && (
                 <div className="space-y-6">
                   <div className="p-6 bg-emerald-50 rounded-3xl border border-emerald-100">
                     <h4 className="font-bold text-emerald-900 mb-4 flex items-center space-x-2">
@@ -227,10 +264,10 @@ const ExpertOnboardingModal: React.FC<ExpertOnboardingModalProps> = ({ isOpen, o
                         <span>Specialization Selected</span>
                       </li>
                       <li className="flex items-center space-x-3 text-sm text-emerald-800/70">
-                        <div className={`w-5 h-5 rounded-full flex items-center justify-center ${formData.academics ? 'bg-emerald-200 text-emerald-700' : 'bg-stone-200 text-stone-400'}`}>
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center ${formData.contactEmail && formData.phone ? 'bg-emerald-200 text-emerald-700' : 'bg-stone-200 text-stone-400'}`}>
                           <CheckCircle2 size={14} />
                         </div>
-                        <span>Academic Background Provided</span>
+                        <span>Contact Information Provided</span>
                       </li>
                       <li className="flex items-center space-x-3 text-sm text-emerald-800/70">
                         <div className={`w-5 h-5 rounded-full flex items-center justify-center ${formData.bio.length > 50 ? 'bg-emerald-200 text-emerald-700' : 'bg-stone-200 text-stone-400'}`}>
@@ -261,7 +298,7 @@ const ExpertOnboardingModal: React.FC<ExpertOnboardingModalProps> = ({ isOpen, o
             {currentStep === steps.length - 1 ? (
               <button
                 onClick={handleSubmit}
-                disabled={loading || !formData.expertise || !formData.academics || formData.bio.length < 50}
+                disabled={loading || !formData.expertise || !formData.academics || !formData.contactEmail || !formData.phone || formData.bio.length < 50}
                 className="px-8 py-4 bg-emerald-600 text-white font-bold rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-600/20 disabled:opacity-50 flex items-center space-x-2"
               >
                 {loading ? (

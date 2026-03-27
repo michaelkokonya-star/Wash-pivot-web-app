@@ -16,6 +16,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
     name: '',
     price: '',
     category: 'Solar',
+    subCategory: 'None',
     description: '',
     imageUrl: ''
   });
@@ -36,6 +37,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
         name: '',
         price: '',
         category: 'Solar',
+        subCategory: 'None',
         description: '',
         imageUrl: ''
       });
@@ -104,17 +106,67 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Category</label>
-                <select
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors appearance-none"
-                >
-                  <option value="Solar">Solar</option>
-                  <option value="Water">Water</option>
-                  <option value="Sanitation">Sanitation</option>
-                </select>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Category</label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value, subCategory: 'None' })}
+                    className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors appearance-none"
+                  >
+                    <option value="Solar">Solar</option>
+                    <option value="Water Treatment">Water Treatment</option>
+                    <option value="Sanitation">Sanitation</option>
+                  </select>
+                </div>
+
+                {formData.category === 'Water Treatment' && (
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Sub-Category</label>
+                    <select
+                      value={formData.subCategory}
+                      onChange={(e) => setFormData({ ...formData, subCategory: e.target.value })}
+                      className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors appearance-none"
+                    >
+                      <option value="None">None</option>
+                      <option value="Fluoride Removal">Fluoride Removal</option>
+                      <option value="Filtration">Filtration</option>
+                      <option value="Chlorination">Chlorination</option>
+                    </select>
+                  </div>
+                )}
+
+                {formData.category === 'Solar' && (
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Sub-Category</label>
+                    <select
+                      value={formData.subCategory}
+                      onChange={(e) => setFormData({ ...formData, subCategory: e.target.value })}
+                      className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors appearance-none"
+                    >
+                      <option value="None">None</option>
+                      <option value="Solar Panels">Solar Panels</option>
+                      <option value="Batteries">Batteries</option>
+                      <option value="Charge Controller">Charge Controller</option>
+                      <option value="Inverter">Inverter</option>
+                      <option value="Accessories">Accessories</option>
+                    </select>
+                  </div>
+                )}
+
+                {formData.category === 'Sanitation' && (
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Sub-Category</label>
+                    <select
+                      value={formData.subCategory}
+                      onChange={(e) => setFormData({ ...formData, subCategory: e.target.value })}
+                      className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors appearance-none"
+                    >
+                      <option value="None">None</option>
+                      <option value="Exhaust Services">Exhaust Services</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">

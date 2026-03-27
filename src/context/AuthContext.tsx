@@ -7,10 +7,12 @@ import {
   signOut,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  signInAnonymously,
   sendPasswordResetEmail,
-  updatePassword
+  updatePassword,
+  sendEmailVerification
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 
 interface AuthContextType {
@@ -18,10 +20,14 @@ interface AuthContextType {
   profile: any | null;
   loading: boolean;
   signIn: (email?: string, password?: string) => Promise<void>;
+  signInAsGuest: () => Promise<void>;
   signUp: (email: string, password: string, displayName: string) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   changePassword: (password: string) => Promise<void>;
+  sendVerification: () => Promise<void>;
+  refreshUser: () => Promise<void>;
+  updateProfile: (data: any) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -90,9 +96,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const signInAsGuest = async () => {
+    await signInAnonymously(auth);
+  };
+
   const signUp = async (email: string, password: string, displayName: string) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
+    
+    // Send verification email
+    await sendEmailVerification(user);
     
     // Create profile immediately to ensure fields are set
     const docRef = doc(db, 'users', user.uid);
@@ -127,8 +140,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const sendVerification = async () => {
+    if (auth.currentUser) {
+      await sendEmailVerification(auth.currentUser);
+    }
+  };
+
+  const refreshUser = async () => {
+    if (auth.currentUser) {
+      await auth.currentUser.reload();
+      setUser({ ...auth.currentUser });
+    }
+  };
+
+  const updateProfile = async (data: any) => {
+    if (!user) return;
+    const docRef = doc(db, 'users', user.uid);
+    await updateDoc(docRef, data);
+    setProfile((prev: any) => ({ ...prev, ...data }));
+  };
+
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signIn, signUp, logout, resetPassword, changePassword }}>
+    <AuthContext.Provider value={{ user, profile, loading, signIn, signInAsGuest, signUp, logout, resetPassword, changePassword, sendVerification, refreshUser, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

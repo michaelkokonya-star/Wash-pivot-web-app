@@ -26,7 +26,8 @@ service cloud.firestore {
     //   - name: string (required)
     //   - description: string (required)
     //   - price: number (required)
-    //   - category: string (required, enum: Solar, Water, Sanitation)
+    //   - category: string (required, enum: Solar, Water Treatment, Sanitation)
+    //   - subCategory: string (optional, enum: Fluoride Removal, Filtration, Chlorination, None)
     //   - imageUrl: string (optional)
     //
     // Collection: projects
@@ -38,7 +39,7 @@ service cloud.firestore {
     //   - ownerName: string (required)
     //   - targetFunding: number (required)
     //   - currentFunding: number (required)
-    //   - category: string (required, enum: Solar, Water, Sanitation)
+    //   - category: string (required, enum: Solar, Water Treatment, Sanitation)
     //   - imageUrl: string (optional)
     //   - createdAt: timestamp (required)
     //
@@ -72,9 +73,9 @@ service cloud.firestore {
     // ===============================================================
     // Domain Validators
     // ===============================================================
-    function isValidUser(data) {
+    function isValidUser(data, userId) {
       return hasOnlyAllowedFields(['uid', 'displayName', 'email', 'role', 'expertise', 'academics', 'bio', 'createdAt', 'photoURL', 'hasSeenWelcome', 'onboardingCompleted', 'expertJoinedAt', 'isApproved', 'showContacts', 'phoneNumber']) &&
-             data.uid == request.auth.uid &&
+             data.uid == userId &&
              data.displayName is string && data.displayName.size() > 0 && data.displayName.size() < 100 &&
              isValidEmail(data.email) &&
              data.role in ['user', 'expert', 'admin'] &&
@@ -90,9 +91,9 @@ service cloud.firestore {
              (!('expertJoinedAt' in data) || data.expertJoinedAt is string);
     }
 
-    function isValidPublicProfile(data) {
+    function isValidPublicProfile(data, userId) {
       return hasOnlyAllowedFields(['uid', 'displayName', 'role', 'expertise', 'academics', 'bio', 'photoURL', 'expertJoinedAt', 'isApproved', 'showContacts', 'phoneNumber']) &&
-             data.uid == request.auth.uid &&
+             data.uid == userId &&
              data.displayName is string && data.displayName.size() > 0 && data.displayName.size() < 100 &&
              data.role == 'expert' &&
              data.isApproved is bool &&
@@ -106,11 +107,12 @@ service cloud.firestore {
     }
 
     function isValidProduct(data) {
-      return hasOnlyAllowedFields(['name', 'description', 'price', 'category', 'imageUrl', 'createdAt']) &&
+      return hasOnlyAllowedFields(['name', 'description', 'price', 'category', 'subCategory', 'imageUrl', 'createdAt']) &&
              data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
              data.description is string && data.description.size() < 5000 &&
              data.price is number && data.price >= 0 &&
-             data.category in ['Solar', 'Water', 'Sanitation'] &&
+             data.category in ['Solar', 'Water Treatment', 'Sanitation'] &&
+             (!('subCategory' in data) || data.subCategory in ['Fluoride Removal', 'Filtration', 'Chlorination', 'Solar Panels', 'Batteries', 'Charge Controller', 'Inverter', 'Accessories', 'Exhaust Services', 'None']) &&
              (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() < 1000)) &&
              (!('createdAt' in data) || data.createdAt is timestamp);
     }
@@ -123,7 +125,7 @@ service cloud.firestore {
              data.ownerName is string && data.ownerName.size() > 0 && data.ownerName.size() < 100 &&
              data.targetFunding is number && data.targetFunding > 0 &&
              data.currentFunding is number && data.currentFunding >= 0 &&
-             data.category in ['Solar', 'Water', 'Sanitation'] &&
+             data.category in ['Solar', 'Water Treatment', 'Sanitation'] &&
              (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() < 1000)) &&
              (!('milestones' in data) || data.milestones is list) &&
              (!('createdAt' in data) || data.createdAt is timestamp) &&
@@ -154,25 +156,39 @@ service cloud.firestore {
              (!('paidAt' in data) || data.paidAt is timestamp);
     }
 
+    function isValidServiceProvider(data) {
+      return hasOnlyAllowedFields(['name', 'category', 'subCategory', 'description', 'imageUrl', 'contactEmail', 'contactPhone', 'location', 'createdAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
+             data.category in ['Installation', 'Maintenance', 'Consulting', 'Engineering', 'Drilling', 'Water Treatment', 'Solar', 'Sanitation'] &&
+             (!('subCategory' in data) || data.subCategory in ['Fluoride Removal', 'Filtration', 'Chlorination', 'Solar Panels', 'Batteries', 'Charge Controller', 'Inverter', 'Accessories', 'Exhaust Services', 'None']) &&
+             data.description is string && data.description.size() < 5000 &&
+             data.imageUrl is string && data.imageUrl.size() < 1000 &&
+             isValidEmail(data.contactEmail) &&
+             data.contactPhone is string && data.contactPhone.size() < 20 &&
+             data.location is string && data.location.size() < 200 &&
+             (!('createdAt' in data) || data.createdAt is timestamp);
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
 
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      allow create: if isOwner(userId) && isValidUser(request.resource.data) && 
+      allow create: if isOwner(userId) && isValidUser(request.resource.data, userId) && 
                       request.resource.data.isApproved == false && 
                       (request.resource.data.role != 'admin' || isAdmin());
-      allow update: if (isOwner(userId) && isValidUser(request.resource.data) && 
+      allow update: if (isOwner(userId) && isValidUser(request.resource.data, userId) && 
                         request.resource.data.isApproved == resource.data.isApproved && 
                         (request.resource.data.role == resource.data.role || isAdmin())) || 
-                      (isAdmin() && isValidUser(request.resource.data));
+                      (isAdmin() && isValidUser(request.resource.data, userId));
       allow delete: if isAdmin();
     }
 
     match /public_profiles/{userId} {
       allow read: if true;
-      allow create, update: if isOwner(userId) && isValidPublicProfile(request.resource.data);
+      allow create: if isOwner(userId) && isValidPublicProfile(request.resource.data, userId);
+      allow update: if (isOwner(userId) && isValidPublicProfile(request.resource.data, userId)) || isAdmin();
       allow delete: if isOwner(userId) || isAdmin();
     }
 
@@ -205,6 +221,11 @@ service cloud.firestore {
       allow create: if isAuthenticated() && isValidOrder(request.resource.data);
       allow update: if isAuthenticated() && (isAdmin() || (request.auth.uid == resource.data.userId && isValidOrder(request.resource.data)));
       allow delete: if isAdmin();
+    }
+
+    match /service_providers/{serviceId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidServiceProvider(request.resource.data);
     }
   }
 }

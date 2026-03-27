@@ -6,12 +6,14 @@ interface ProtectedRouteProps {
   children: React.ReactNode;
   allowedRoles?: string[];
   requireAuth?: boolean;
+  requireVerification?: boolean;
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
   children, 
   allowedRoles, 
-  requireAuth = true 
+  requireAuth = true,
+  requireVerification = false
 }) => {
   const { user, profile, loading } = useAuth();
   const location = useLocation();
@@ -26,6 +28,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   if (requireAuth && !user) {
     return <Navigate to="/signin" state={{ from: location }} replace />;
+  }
+
+  if (requireVerification && user && !user.emailVerified && !user.isAnonymous) {
+    return <Navigate to="/profile" replace />;
   }
 
   if (allowedRoles && profile) {

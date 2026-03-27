@@ -3,13 +3,15 @@ import { collection, getDocs, query, where, doc, updateDoc, deleteDoc, orderBy }
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { Users, ShoppingBag, Droplets, Shield, CheckCircle2, XCircle, Search, Filter, Edit, Trash2, Plus, Eye, EyeOff, Key, Package, TrendingUp, DollarSign, PieChart, Check, X, BarChart as BarChartIcon, Activity } from 'lucide-react';
+import { Users, ShoppingBag, Droplets, Shield, CheckCircle2, XCircle, Search, Filter, Edit, Trash2, Plus, Eye, EyeOff, Key, Package, TrendingUp, DollarSign, PieChart, Check, X, BarChart as BarChartIcon, Activity, Briefcase } from 'lucide-react';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   BarChart, Bar, Legend, AreaChart, Area, PieChart as RePieChart, Pie, Cell 
 } from 'recharts';
 import EditProductModal from '../components/EditProductModal';
 import AddProductModal from '../components/AddProductModal';
+import EditServiceModal from '../components/EditServiceModal';
+import AddServiceModal from '../components/AddServiceModal';
 
 const AdminDashboard = () => {
   const { user, profile, resetPassword } = useAuth();
@@ -18,10 +20,17 @@ const AdminDashboard = () => {
   const [orders, setOrders] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'users' | 'products' | 'projects' | 'orders' | 'analytics'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'products' | 'projects' | 'orders' | 'analytics' | 'services'>('users');
+  const [productView, setProductView] = useState<'table' | 'grid'>('table');
+  const [productSearch, setProductSearch] = useState('');
+  const [productFilter, setProductFilter] = useState('All');
+  const [services, setServices] = useState<any[]>([]);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditServiceModalOpen, setIsEditServiceModalOpen] = useState(false);
+  const [isAddServiceModalOpen, setIsAddServiceModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [selectedService, setSelectedService] = useState<any>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [analyticsData, setAnalyticsData] = useState<{
     revenueByMonth: any[];
@@ -51,6 +60,9 @@ const AdminDashboard = () => {
       } else if (activeTab === 'products') {
         const querySnapshot = await getDocs(collection(db, 'products'));
         setProducts(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      } else if (activeTab === 'services') {
+        const querySnapshot = await getDocs(collection(db, 'service_providers'));
+        setServices(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       } else if (activeTab === 'orders') {
         const querySnapshot = await getDocs(collection(db, 'orders'));
         const fetchedOrders = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
@@ -187,7 +199,17 @@ const AdminDashboard = () => {
   const handleToggleApproval = async (userId: string, currentStatus: boolean) => {
     try {
       const userRef = doc(db, 'users', userId);
+      const publicRef = doc(db, 'public_profiles', userId);
+      
       await updateDoc(userRef, { isApproved: !currentStatus });
+      
+      // Also update public profile if it exists
+      try {
+        await updateDoc(publicRef, { isApproved: !currentStatus });
+      } catch (e) {
+        console.log("No public profile to update approval for");
+      }
+      
       setUsers(users.map(u => u.id === userId ? { ...u, isApproved: !currentStatus } : u));
       setMessage({ type: 'success', text: `User ${!currentStatus ? 'approved' : 'unapproved'} successfully` });
     } catch (error) {
@@ -249,6 +271,23 @@ const AdminDashboard = () => {
     setIsEditModalOpen(true);
   };
 
+  const handleDeleteService = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this service provider?')) return;
+    try {
+      await deleteDoc(doc(db, 'service_providers', id));
+      fetchData();
+      setMessage({ type: 'success', text: 'Service provider deleted successfully' });
+    } catch (error) {
+      console.error("Error deleting service provider:", error);
+      setMessage({ type: 'error', text: 'Failed to delete service provider' });
+    }
+  };
+
+  const handleEditService = (service: any) => {
+    setSelectedService(service);
+    setIsEditServiceModalOpen(true);
+  };
+
   const handleUpdateOrderStatus = async (orderId: string, newStatus: string) => {
     try {
       const orderRef = doc(db, 'orders', orderId);
@@ -307,6 +346,7 @@ const AdminDashboard = () => {
           {[
             { id: 'users', label: 'Users', icon: Users },
             { id: 'products', label: 'Products', icon: ShoppingBag },
+            { id: 'services', label: 'Services', icon: Briefcase },
             { id: 'orders', label: 'Orders', icon: Package },
             { id: 'projects', label: 'Projects', icon: Droplets },
             { id: 'analytics', label: 'Analytics', icon: BarChartIcon }
@@ -427,6 +467,16 @@ const AdminDashboard = () => {
                         <div>
                           <p className="font-bold text-sm">{u.displayName}</p>
                           <p className="text-xs text-black/40">{u.email}</p>
+                          {u.role === 'expert' && (
+                            <div className="mt-1 flex flex-col gap-1">
+                              <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-tighter bg-emerald-50 px-1.5 py-0.5 rounded w-fit">
+                                {u.expertise || 'No expertise set'}
+                              </span>
+                              <p className="text-[9px] text-black/30 line-clamp-1 max-w-[200px] italic">
+                                {u.bio || 'No bio provided'}
+                              </p>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -493,70 +543,256 @@ const AdminDashboard = () => {
         )}
 
         {activeTab === 'products' && (
-          <div className="overflow-x-auto">
-            <div className="p-8 border-b border-black/5 flex justify-between items-center bg-stone-50/30">
-              <h3 className="font-bold">Product Catalog</h3>
-              <button
-                onClick={() => setIsAddModalOpen(true)}
-                className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-all flex items-center space-x-2"
-              >
-                <Plus size={14} />
-                <span>Add Product</span>
-              </button>
+          <div className="space-y-6">
+            <div className="p-8 border-b border-black/5 flex flex-col md:flex-row justify-between items-start md:items-center bg-stone-50/30 gap-4">
+              <div>
+                <h3 className="font-bold text-xl">Product Catalog</h3>
+                <p className="text-xs text-black/40">Manage your marketplace inventory</p>
+              </div>
+              
+              <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
+                <div className="relative flex-1 md:flex-none">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-black/20" size={16} />
+                  <input
+                    type="text"
+                    placeholder="Search products..."
+                    value={productSearch}
+                    onChange={(e) => setProductSearch(e.target.value)}
+                    className="pl-10 pr-4 py-2 bg-white border border-black/5 rounded-xl text-sm focus:outline-none focus:border-emerald-600 w-full md:w-64"
+                  />
+                </div>
+                
+                <select
+                  value={productFilter}
+                  onChange={(e) => setProductFilter(e.target.value)}
+                  className="px-4 py-2 bg-white border border-black/5 rounded-xl text-sm focus:outline-none focus:border-emerald-600"
+                >
+                  <option value="All">All Categories</option>
+                  <option value="Solar">Solar</option>
+                  <option value="Water">Water</option>
+                  <option value="Sanitation">Sanitation</option>
+                </select>
+
+                <div className="flex bg-white border border-black/5 p-1 rounded-xl">
+                  <button
+                    onClick={() => setProductView('table')}
+                    className={`p-1.5 rounded-lg transition-all ${productView === 'table' ? 'bg-stone-100 text-black' : 'text-black/20 hover:text-black'}`}
+                    title="Table View"
+                  >
+                    <Filter size={16} />
+                  </button>
+                  <button
+                    onClick={() => setProductView('grid')}
+                    className={`p-1.5 rounded-lg transition-all ${productView === 'grid' ? 'bg-stone-100 text-black' : 'text-black/20 hover:text-black'}`}
+                    title="Grid View"
+                  >
+                    <ShoppingBag size={16} />
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="px-6 py-2 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition-all flex items-center space-x-2 shadow-lg shadow-emerald-600/20"
+                >
+                  <Plus size={16} />
+                  <span>Add Product</span>
+                </button>
+              </div>
             </div>
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-stone-50 border-b border-black/5">
-                  <th className="px-8 py-6 text-[10px] font-bold uppercase tracking-widest text-black/40">Product</th>
-                  <th className="px-8 py-6 text-[10px] font-bold uppercase tracking-widest text-black/40">Category</th>
-                  <th className="px-8 py-6 text-[10px] font-bold uppercase tracking-widest text-black/40">Price</th>
-                  <th className="px-8 py-6 text-[10px] font-bold uppercase tracking-widest text-black/40">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-black/5">
-                {products.map((product) => (
-                  <tr key={product.id} className="hover:bg-stone-50/50 transition-colors">
-                    <td className="px-8 py-6">
-                      <div className="flex items-center space-x-4">
-                        <img 
-                          src={product.imageUrl} 
-                          className="w-12 h-12 rounded-xl object-cover bg-stone-100"
-                          alt=""
+
+            {productView === 'table' ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="bg-stone-50 border-b border-black/5">
+                      <th className="px-8 py-6 text-[10px] font-bold uppercase tracking-widest text-black/40">Product</th>
+                      <th className="px-8 py-6 text-[10px] font-bold uppercase tracking-widest text-black/40">Category</th>
+                      <th className="px-8 py-6 text-[10px] font-bold uppercase tracking-widest text-black/40">Price</th>
+                      <th className="px-8 py-6 text-[10px] font-bold uppercase tracking-widest text-black/40">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-black/5">
+                    {products
+                      .filter(p => 
+                        (productFilter === 'All' || p.category === productFilter) &&
+                        (p.name.toLowerCase().includes(productSearch.toLowerCase()) || p.description.toLowerCase().includes(productSearch.toLowerCase()))
+                      )
+                      .map((product) => (
+                        <tr key={product.id} className="hover:bg-stone-50/50 transition-colors">
+                          <td className="px-8 py-6">
+                            <div className="flex items-center space-x-4">
+                              <img 
+                                src={product.imageUrl} 
+                                className="w-12 h-12 rounded-xl object-cover bg-stone-100"
+                                alt=""
+                              />
+                              <div>
+                                <p className="font-bold text-sm">{product.name}</p>
+                                <p className="text-xs text-black/40 line-clamp-1 max-w-xs">{product.description}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-8 py-6">
+                            <span className="px-3 py-1 bg-stone-100 rounded-full text-[10px] font-bold uppercase tracking-widest">
+                              {product.category}
+                            </span>
+                          </td>
+                          <td className="px-8 py-6">
+                            <p className="text-sm font-bold tracking-tight">KSh {product.price.toLocaleString()}</p>
+                          </td>
+                          <td className="px-8 py-6">
+                            <div className="flex items-center space-x-2">
+                              <button
+                                onClick={() => handleEditProduct(product)}
+                                className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                              >
+                                <Edit size={18} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteProduct(product.id)}
+                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="p-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {products
+                  .filter(p => 
+                    (productFilter === 'All' || p.category === productFilter) &&
+                    (p.name.toLowerCase().includes(productSearch.toLowerCase()) || p.description.toLowerCase().includes(productSearch.toLowerCase()))
+                  )
+                  .map((product) => (
+                    <motion.div
+                      key={product.id}
+                      layout
+                      className="group bg-white rounded-3xl border border-black/5 overflow-hidden hover:shadow-xl transition-all flex flex-col"
+                    >
+                      <div className="aspect-square overflow-hidden bg-stone-100 relative">
+                        <img
+                          src={product.imageUrl}
+                          alt={product.name}
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                         />
-                        <div>
-                          <p className="font-bold text-sm">{product.name}</p>
-                          <p className="text-xs text-black/40 line-clamp-1 max-w-xs">{product.description}</p>
+                        <div className="absolute top-4 left-4">
+                          <span className="px-3 py-1 bg-white/90 backdrop-blur-md rounded-full text-[9px] font-bold uppercase tracking-widest shadow-sm">
+                            {product.category}
+                          </span>
+                        </div>
+                        <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => handleEditProduct(product)}
+                            className="p-2 bg-white rounded-full text-emerald-600 shadow-lg hover:bg-emerald-600 hover:text-white transition-all"
+                          >
+                            <Edit size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteProduct(product.id)}
+                            className="p-2 bg-white rounded-full text-red-600 shadow-lg hover:bg-red-600 hover:text-white transition-all"
+                          >
+                            <Trash2 size={14} />
+                          </button>
                         </div>
                       </div>
-                    </td>
-                    <td className="px-8 py-6">
-                      <span className="px-3 py-1 bg-stone-100 rounded-full text-[10px] font-bold uppercase tracking-widest">
-                        {product.category}
-                      </span>
-                    </td>
-                    <td className="px-8 py-6">
-                      <p className="text-sm font-bold tracking-tight">KSh {product.price.toLocaleString()}</p>
-                    </td>
-                    <td className="px-8 py-6">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => handleEditProduct(product)}
-                          className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                        >
-                          <Edit size={18} />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteProduct(product.id)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        >
-                          <Trash2 size={18} />
-                        </button>
+                      <div className="p-6 flex flex-col flex-grow">
+                        <h4 className="font-bold text-lg mb-1 line-clamp-1">{product.name}</h4>
+                        <p className="text-black/40 text-xs mb-4 line-clamp-2 leading-relaxed">{product.description}</p>
+                        <div className="mt-auto flex items-center justify-between">
+                          <span className="text-lg font-bold tracking-tighter">KSh {product.price.toLocaleString()}</span>
+                        </div>
                       </div>
-                    </td>
+                    </motion.div>
+                  ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'services' && (
+          <div className="space-y-6">
+            <div className="p-8 border-b border-black/5 flex flex-col md:flex-row justify-between items-start md:items-center bg-stone-50/30 gap-4">
+              <div>
+                <h3 className="font-bold text-xl">Service Providers</h3>
+                <p className="text-xs text-black/40">Manage professional WASH services</p>
+              </div>
+              
+              <button
+                onClick={() => setIsAddServiceModalOpen(true)}
+                className="px-6 py-2 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition-all flex items-center space-x-2 shadow-lg shadow-emerald-600/20"
+              >
+                <Plus size={16} />
+                <span>Add Provider</span>
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-stone-50 border-b border-black/5">
+                    <th className="px-8 py-6 text-[10px] font-bold uppercase tracking-widest text-black/40">Provider</th>
+                    <th className="px-8 py-6 text-[10px] font-bold uppercase tracking-widest text-black/40">Category</th>
+                    <th className="px-8 py-6 text-[10px] font-bold uppercase tracking-widest text-black/40">Location</th>
+                    <th className="px-8 py-6 text-[10px] font-bold uppercase tracking-widest text-black/40">Contact</th>
+                    <th className="px-8 py-6 text-[10px] font-bold uppercase tracking-widest text-black/40">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-black/5">
+                  {services.map((service) => (
+                    <tr key={service.id} className="hover:bg-stone-50/50 transition-colors">
+                      <td className="px-8 py-6">
+                        <div className="flex items-center space-x-4">
+                          <img 
+                            src={service.imageUrl} 
+                            className="w-12 h-12 rounded-xl object-cover bg-stone-100"
+                            alt=""
+                          />
+                          <div>
+                            <p className="font-bold text-sm">{service.name}</p>
+                            <p className="text-xs text-black/40 line-clamp-1 max-w-xs">{service.description}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-8 py-6">
+                        <span className="px-3 py-1 bg-stone-100 rounded-full text-[10px] font-bold uppercase tracking-widest">
+                          {service.category}
+                        </span>
+                      </td>
+                      <td className="px-8 py-6">
+                        <p className="text-sm font-medium">{service.location}</p>
+                      </td>
+                      <td className="px-8 py-6">
+                        <div className="text-xs space-y-1">
+                          <p className="text-black/60">{service.contactEmail}</p>
+                          <p className="text-black/60">{service.contactPhone}</p>
+                        </div>
+                      </td>
+                      <td className="px-8 py-6">
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => handleEditService(service)}
+                            className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                          >
+                            <Edit size={18} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteService(service.id)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
@@ -951,6 +1187,19 @@ const AdminDashboard = () => {
         isOpen={isAddModalOpen} 
         onClose={() => setIsAddModalOpen(false)} 
         onSuccess={fetchData} 
+      />
+
+      <AddServiceModal
+        isOpen={isAddServiceModalOpen}
+        onClose={() => setIsAddServiceModalOpen(false)}
+        onSuccess={fetchData}
+      />
+
+      <EditServiceModal
+        isOpen={isEditServiceModalOpen}
+        onClose={() => setIsEditServiceModalOpen(false)}
+        onSuccess={fetchData}
+        service={selectedService}
       />
     </div>
   );

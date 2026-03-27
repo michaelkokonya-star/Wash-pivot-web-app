@@ -1,12 +1,10 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, ArrowRight, Droplets, Zap, Users, Globe, CheckCircle2 } from 'lucide-react';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { X, ArrowRight, Droplets, Zap, Users, Globe } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const WelcomeOnboarding: React.FC = () => {
-  const { user, profile } = useAuth();
+  const { user, profile, updateProfile } = useAuth();
   const [isOpen, setIsOpen] = useState(true);
   const [currentStep, setCurrentStep] = useState(0);
 
@@ -44,10 +42,7 @@ const WelcomeOnboarding: React.FC = () => {
   const handleComplete = async () => {
     if (!user) return;
     try {
-      const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
-        hasSeenWelcome: true
-      });
+      await updateProfile({ hasSeenWelcome: true });
       setIsOpen(false);
     } catch (error) {
       console.error("Error updating welcome status:", error);
@@ -73,6 +68,12 @@ const WelcomeOnboarding: React.FC = () => {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         className="bg-white w-full max-w-lg rounded-[3rem] overflow-hidden shadow-2xl relative"
       >
+        <button
+          onClick={handleComplete}
+          className="absolute top-8 right-8 p-2 text-black/20 hover:text-black transition-colors z-10"
+        >
+          <X size={24} />
+        </button>
         <div className="p-12 text-center">
           <motion.div
             key={currentStep}

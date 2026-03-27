@@ -19,7 +19,11 @@ const Recruitment = () => {
   const fetchExperts = async () => {
     setLoading(true);
     try {
-      const q = query(collection(db, 'public_profiles'), where('role', '==', 'expert'));
+      const q = query(
+        collection(db, 'public_profiles'), 
+        where('role', '==', 'expert'),
+        where('isApproved', '==', true)
+      );
       const querySnapshot = await getDocs(q);
       const expertsData = querySnapshot.docs.map(doc => ({
         id: doc.id,
@@ -134,6 +138,22 @@ const Recruitment = () => {
                   <Award size={18} className="mt-1 flex-shrink-0" />
                   <p className="line-clamp-3">{expert.bio}</p>
                 </div>
+                {(expert.contactEmail || expert.phone) && (
+                  <div className="pt-4 border-t border-black/5 space-y-2">
+                    {expert.contactEmail && (
+                      <div className="flex items-center space-x-3 text-xs text-black/50">
+                        <Mail size={14} />
+                        <span>{expert.contactEmail}</span>
+                      </div>
+                    )}
+                    {expert.phone && (
+                      <div className="flex items-center space-x-3 text-xs text-black/50">
+                        <Briefcase size={14} />
+                        <span>{expert.phone}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <button className="w-full py-4 bg-stone-100 text-black font-bold rounded-xl hover:bg-black hover:text-white transition-all flex items-center justify-center space-x-2">

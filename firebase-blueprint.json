@@ -31,7 +31,8 @@
         "name": { "type": "string" },
         "description": { "type": "string" },
         "price": { "type": "number" },
-        "category": { "type": "string", "enum": ["Solar", "Water", "Sanitation"] },
+        "category": { "type": "string", "enum": ["Solar", "Water Treatment", "Sanitation"] },
+        "subCategory": { "type": "string", "enum": ["Fluoride Removal", "Filtration", "Chlorination", "Solar Panels", "Batteries", "Charge Controller", "Inverter", "Accessories", "Exhaust Services", "None"] },
         "imageUrl": { "type": "string" }
       },
       "required": ["name", "price", "category"]
@@ -47,7 +48,7 @@
         "ownerName": { "type": "string" },
         "targetFunding": { "type": "number" },
         "currentFunding": { "type": "number" },
-        "category": { "type": "string", "enum": ["Solar", "Water", "Sanitation"] },
+        "category": { "type": "string", "enum": ["Solar", "Water Treatment", "Sanitation"] },
         "imageUrl": { "type": "string" },
         "isApproved": { "type": "boolean", "description": "Whether the project is approved by admin" },
         "status": { "type": "string", "enum": ["pending", "active", "completed", "rejected"] },
@@ -98,6 +99,23 @@
         "paidAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "items", "totalAmount", "status", "paymentMethod", "createdAt"]
+    },
+    "ServiceProvider": {
+      "title": "ServiceProvider",
+      "description": "A professional service provider listed on the marketplace",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "category": { "type": "string", "enum": ["Installation", "Maintenance", "Consulting", "Engineering", "Drilling", "Water Treatment", "Solar", "Sanitation"] },
+        "subCategory": { "type": "string", "enum": ["Fluoride Removal", "Filtration", "Chlorination", "Solar Panels", "Batteries", "Charge Controller", "Inverter", "Accessories", "Exhaust Services", "None"] },
+        "description": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "contactEmail": { "type": "string" },
+        "contactPhone": { "type": "string" },
+        "location": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "category", "description", "imageUrl", "contactEmail", "contactPhone", "location", "createdAt"]
     }
   },
   "firestore": {
@@ -120,6 +138,10 @@
     "/orders/{orderId}": {
       "schema": "Order",
       "description": "Customer orders."
+    },
+    "/service_providers/{serviceId}": {
+      "schema": "ServiceProvider",
+      "description": "Service providers listed on the marketplace."
     }
   }
 }
