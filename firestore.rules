@@ -157,7 +157,7 @@ service cloud.firestore {
     }
 
     function isValidServiceProvider(data) {
-      return hasOnlyAllowedFields(['name', 'category', 'subCategory', 'description', 'imageUrl', 'contactEmail', 'contactPhone', 'location', 'createdAt']) &&
+      return hasOnlyAllowedFields(['name', 'category', 'subCategory', 'description', 'imageUrl', 'contactEmail', 'contactPhone', 'location', 'isApproved', 'createdAt']) &&
              data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
              data.category in ['Installation', 'Maintenance', 'Consulting', 'Engineering', 'Drilling', 'Water Treatment', 'Solar', 'Sanitation'] &&
              (!('subCategory' in data) || data.subCategory in ['Fluoride Removal', 'Filtration', 'Chlorination', 'Solar Panels', 'Batteries', 'Charge Controller', 'Inverter', 'Accessories', 'Exhaust Services', 'None']) &&
@@ -166,6 +166,7 @@ service cloud.firestore {
              isValidEmail(data.contactEmail) &&
              data.contactPhone is string && data.contactPhone.size() < 20 &&
              data.location is string && data.location.size() < 200 &&
+             data.isApproved is bool &&
              (!('createdAt' in data) || data.createdAt is timestamp);
     }
 

@@ -49,19 +49,9 @@ const About = () => {
       <div className="bg-black text-white p-8 sm:p-16 rounded-[2.5rem] sm:rounded-[40px] overflow-hidden relative">
         <div className="relative z-10 max-w-2xl">
           <h2 className="text-3xl sm:text-4xl font-bold tracking-tighter mb-6">OUR STORY</h2>
-          <p className="text-white/60 text-base sm:text-lg leading-relaxed mb-8">
-            Founded in 2020, Wash Pivot started as a small initiative to provide solar lighting to rural schools. Today, we have expanded into a multi-faceted platform connecting experts, funders, and communities to build a better future.
+          <p className="text-white/60 text-base sm:text-lg leading-relaxed">
+            WASH Pivot was founded in 2025 as an initiative to provide sustainable solutions in solar energy, water treatment, and sanitation.
           </p>
-          <div className="flex flex-wrap gap-8 sm:gap-12">
-            <div>
-              <div className="text-3xl sm:text-4xl font-bold text-emerald-500 mb-2">50+</div>
-              <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Projects Completed</div>
-            </div>
-            <div>
-              <div className="text-3xl sm:text-4xl font-bold text-emerald-500 mb-2">10k+</div>
-              <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Lives Impacted</div>
-            </div>
-          </div>
         </div>
         <div className="absolute top-0 right-0 w-1/2 h-full bg-emerald-500/10 blur-[80px] sm:blur-[120px] rounded-full -translate-y-1/2 translate-x-1/4"></div>
       </div>

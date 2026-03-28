@@ -1,26 +1,92 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { collection, getDocs, query, where, doc, updateDoc, deleteDoc, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { Users, ShoppingBag, Droplets, Shield, CheckCircle2, XCircle, Search, Filter, Edit, Trash2, Plus, Eye, EyeOff, Key, Package, TrendingUp, DollarSign, PieChart, Check, X, BarChart as BarChartIcon, Activity, Briefcase } from 'lucide-react';
+import { Users, ShoppingBag, Droplets, Shield, CheckCircle2, XCircle, Search, Filter, Edit, Trash2, Plus, Eye, EyeOff, Key, Package, TrendingUp, DollarSign, PieChart, Check, X, BarChart as BarChartIcon, Activity, Briefcase, Award, Mail } from 'lucide-react';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  BarChart, Bar, Legend, AreaChart, Area, PieChart as RePieChart, Pie, Cell 
+  BarChart, Bar, Legend, AreaChart, Area, PieChart as RePieChart, Pie, Cell, LabelList, Sector 
 } from 'recharts';
 import EditProductModal from '../components/EditProductModal';
 import AddProductModal from '../components/AddProductModal';
 import EditServiceModal from '../components/EditServiceModal';
 import AddServiceModal from '../components/AddServiceModal';
 
+const renderActiveShape = (props: any) => {
+  const RADIAN = Math.PI / 180;
+  const { cx, cy, midAngle, innerRadius, outerRadius, startAngle, endAngle, fill, payload, percent, value } = props;
+  const sin = Math.sin(-RADIAN * midAngle);
+  const cos = Math.cos(-RADIAN * midAngle);
+  const sx = cx + (outerRadius + 10) * cos;
+  const sy = cy + (outerRadius + 10) * sin;
+  const mx = cx + (outerRadius + 30) * cos;
+  const my = cy + (outerRadius + 30) * sin;
+  const ex = mx + (cos >= 0 ? 1 : -1) * 22;
+  const ey = my;
+  const textAnchor = cos >= 0 ? 'start' : 'end';
+
+  return (
+    <g>
+      <text x={cx} y={cy} dy={8} textAnchor="middle" fill={fill} style={{ fontSize: '12px', fontWeight: 'bold' }}>
+        {payload.name}
+      </text>
+      <Sector
+        cx={cx}
+        cy={cy}
+        innerRadius={innerRadius}
+        outerRadius={outerRadius}
+        startAngle={startAngle}
+        endAngle={endAngle}
+        fill={fill}
+      />
+      <Sector
+        cx={cx}
+        cy={cy}
+        startAngle={startAngle}
+        endAngle={endAngle}
+        innerRadius={outerRadius + 6}
+        outerRadius={outerRadius + 10}
+        fill={fill}
+      />
+      <path d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`} stroke={fill} fill="none" />
+      <circle cx={ex} cy={ey} r={2} fill={fill} stroke="none" />
+      <text x={ex + (cos >= 0 ? 1 : -1) * 12} y={ey} textAnchor={textAnchor} fill="#333" style={{ fontSize: '10px', fontWeight: 'bold' }}>{`KSh ${value.toLocaleString()}`}</text>
+      <text x={ex + (cos >= 0 ? 1 : -1) * 12} y={ey} dy={18} textAnchor={textAnchor} fill="#999" style={{ fontSize: '10px' }}>
+        {`(${(percent * 100).toFixed(2)}%)`}
+      </text>
+    </g>
+  );
+};
+
+const CustomTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white p-4 rounded-2xl shadow-xl border border-black/5">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-black/40 mb-1">{payload[0].name}</p>
+        <p className="text-sm font-bold text-emerald-600">KSh {payload[0].value.toLocaleString()}</p>
+        {payload[0].payload.percent && (
+          <p className="text-[10px] text-black/40 mt-1">{(payload[0].payload.percent * 100).toFixed(1)}% of total</p>
+        )}
+      </div>
+    );
+  }
+  return null;
+};
+
 const AdminDashboard = () => {
+  const navigate = useNavigate();
   const { user, profile, resetPassword } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'users' | 'products' | 'projects' | 'orders' | 'analytics' | 'services'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'products' | 'projects' | 'orders' | 'analytics' | 'services' | 'experts'>('users');
+  const [userFilter, setUserFilter] = useState<'all' | 'pending' | 'approved'>('all');
+  const [serviceFilter, setServiceFilter] = useState<'all' | 'pending' | 'approved'>('all');
+  const [projectFilter, setProjectFilter] = useState<'all' | 'pending' | 'active' | 'completed' | 'rejected'>('all');
   const [productView, setProductView] = useState<'table' | 'grid'>('table');
   const [productSearch, setProductSearch] = useState('');
   const [productFilter, setProductFilter] = useState('All');
@@ -39,6 +105,7 @@ const AdminDashboard = () => {
     salesByRegion: any[];
   }>({ revenueByMonth: [], userGrowthByMonth: [], salesByProduct: [], salesByRegion: [] });
 
+  const [activePieIndex, setActivePieIndex] = useState(0);
   const [stats, setStats] = useState({
     totalRevenue: 0,
     orderCount: 0,
@@ -47,7 +114,7 @@ const AdminDashboard = () => {
     categorySales: { Solar: 0, Water: 0, Sanitation: 0 }
   });
 
-  const isAdmin = user?.email?.toLowerCase() === 'michael.kokonya@washpivot.com';
+  const isAdmin = user?.email?.toLowerCase() === 'michael.kokonya@washpivot.com' || profile?.role === 'admin';
 
   const fetchData = async () => {
     setLoading(true);
@@ -140,8 +207,13 @@ const AdminDashboard = () => {
           }
         });
 
+        const totalRegionSales = Object.values(regionSalesMap).reduce((a, b) => a + b, 0);
         const regionSalesData = Object.entries(regionSalesMap)
-          .map(([name, value]) => ({ name, value }))
+          .map(([name, value]) => ({ 
+            name, 
+            value,
+            percent: totalRegionSales > 0 ? value / totalRegionSales : 0
+          }))
           .sort((a, b) => b.value - a.value);
 
         // Process User Growth by Month
@@ -177,6 +249,9 @@ const AdminDashboard = () => {
   }, [activeTab]);
 
   const handleUpdateRole = async (userId: string, newRole: string) => {
+    const previousUsers = [...users];
+    setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
+
     try {
       const userRef = doc(db, 'users', userId);
       const publicRef = doc(db, 'public_profiles', userId);
@@ -185,13 +260,17 @@ const AdminDashboard = () => {
       
       // If demoted from expert, remove public profile
       if (newRole !== 'expert') {
-        await deleteDoc(publicRef);
+        try {
+          await deleteDoc(publicRef);
+        } catch (e) {
+          // Public profile might not exist, ignore error
+        }
       }
       
-      setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
       setMessage({ type: 'success', text: 'User role updated successfully' });
     } catch (error) {
       console.error("Error updating role:", error);
+      setUsers(previousUsers);
       setMessage({ type: 'error', text: 'Failed to update user role' });
     }
   };
@@ -215,6 +294,18 @@ const AdminDashboard = () => {
     } catch (error) {
       console.error("Error toggling approval:", error);
       setMessage({ type: 'error', text: 'Failed to update approval status' });
+    }
+  };
+
+  const handleToggleServiceApproval = async (serviceId: string, currentStatus: boolean) => {
+    try {
+      const serviceRef = doc(db, 'service_providers', serviceId);
+      await updateDoc(serviceRef, { isApproved: !currentStatus });
+      setServices(services.map(s => s.id === serviceId ? { ...s, isApproved: !currentStatus } : s));
+      setMessage({ type: 'success', text: `Service provider ${!currentStatus ? 'approved' : 'unapproved'} successfully` });
+    } catch (error) {
+      console.error("Error toggling service approval:", error);
+      setMessage({ type: 'error', text: 'Failed to update service approval status' });
     }
   };
 
@@ -334,6 +425,18 @@ const AdminDashboard = () => {
     }
   }, [message]);
 
+  if (!isAdmin) {
+    return (
+      <div className="pt-40 pb-20 text-center">
+        <div className="w-20 h-20 bg-red-50 text-red-600 rounded-[2rem] flex items-center justify-center mx-auto mb-6">
+          <Shield size={40} />
+        </div>
+        <h2 className="text-3xl font-bold mb-4">Unauthorized Access</h2>
+        <p className="text-black/40">You do not have permission to view the admin console.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="pt-32 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
       <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
@@ -344,22 +447,28 @@ const AdminDashboard = () => {
         
         <div className="flex bg-stone-100 p-1.5 rounded-2xl">
           {[
-            { id: 'users', label: 'Users', icon: Users },
+            { id: 'users', label: 'Users', icon: Users, count: users.filter(u => u.role !== 'expert' && !u.isApproved).length },
+            { id: 'experts', label: 'Experts', icon: Award, count: users.filter(u => u.role === 'expert' && !u.isApproved).length },
             { id: 'products', label: 'Products', icon: ShoppingBag },
-            { id: 'services', label: 'Services', icon: Briefcase },
+            { id: 'services', label: 'Services', icon: Briefcase, count: services.filter(s => !s.isApproved).length },
             { id: 'orders', label: 'Orders', icon: Package },
-            { id: 'projects', label: 'Projects', icon: Droplets },
+            { id: 'projects', label: 'Projects', icon: Droplets, count: projects.filter(p => !p.isApproved).length },
             { id: 'analytics', label: 'Analytics', icon: BarChartIcon }
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-bold text-sm transition-all ${
+              className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-bold text-sm transition-all relative ${
                 activeTab === tab.id ? 'bg-white text-black shadow-sm' : 'text-black/40 hover:text-black'
               }`}
             >
               <tab.icon size={18} />
               <span>{tab.label}</span>
+              {tab.count !== undefined && tab.count > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] flex items-center justify-center rounded-full border-2 border-white">
+                  {tab.count}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -443,20 +552,55 @@ const AdminDashboard = () => {
 
       <div className="bg-white rounded-[3rem] border border-black/5 overflow-hidden shadow-sm">
         {activeTab === 'users' && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-stone-50 border-b border-black/5">
-                  <th className="px-8 py-6 text-[10px] font-bold uppercase tracking-widest text-black/40">User</th>
-                  <th className="px-8 py-6 text-[10px] font-bold uppercase tracking-widest text-black/40">Role</th>
-                  <th className="px-8 py-6 text-[10px] font-bold uppercase tracking-widest text-black/40">Approval</th>
-                  <th className="px-8 py-6 text-[10px] font-bold uppercase tracking-widest text-black/40">Visibility</th>
-                  <th className="px-8 py-6 text-[10px] font-bold uppercase tracking-widest text-black/40">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-black/5">
-                {users.map((u) => (
-                  <tr key={u.id} className="hover:bg-stone-50/50 transition-colors">
+          <div className="space-y-6">
+            <div className="p-8 border-b border-black/5 flex flex-col md:flex-row justify-between items-start md:items-center bg-stone-50/30 gap-4">
+              <div>
+                <h3 className="font-bold text-xl">User Management</h3>
+                <p className="text-xs text-black/40">Manage platform users and approval status</p>
+              </div>
+              
+              <div className="flex bg-white border border-black/5 p-1 rounded-xl">
+                {[
+                  { id: 'all', label: 'All Users' },
+                  { id: 'pending', label: 'Pending Approval' },
+                  { id: 'approved', label: 'Approved' }
+                ].map((filter) => (
+                  <button
+                    key={filter.id}
+                    onClick={() => setUserFilter(filter.id as any)}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                      userFilter === filter.id ? 'bg-stone-100 text-black' : 'text-black/40 hover:text-black'
+                    }`}
+                  >
+                    {filter.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-stone-50 border-b border-black/5">
+                    <th className="px-8 py-6 text-[10px] font-bold uppercase tracking-widest text-black/40">User</th>
+                    <th className="px-8 py-6 text-[10px] font-bold uppercase tracking-widest text-black/40">Role</th>
+                    <th className="px-8 py-6 text-[10px] font-bold uppercase tracking-widest text-black/40">Joined</th>
+                    <th className="px-8 py-6 text-[10px] font-bold uppercase tracking-widest text-black/40">Last Login</th>
+                    <th className="px-8 py-6 text-[10px] font-bold uppercase tracking-widest text-black/40">Approval</th>
+                    <th className="px-8 py-6 text-[10px] font-bold uppercase tracking-widest text-black/40">Visibility</th>
+                    <th className="px-8 py-6 text-[10px] font-bold uppercase tracking-widest text-black/40">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-black/5">
+                  {users
+                    .filter(u => u.role !== 'expert')
+                    .filter(u => {
+                      if (userFilter === 'pending') return !u.isApproved;
+                      if (userFilter === 'approved') return u.isApproved;
+                      return true;
+                    })
+                    .map((u) => (
+                      <tr key={u.id} className="hover:bg-stone-50/50 transition-colors">
                     <td className="px-8 py-6">
                       <div className="flex items-center space-x-4">
                         <img 
@@ -482,7 +626,7 @@ const AdminDashboard = () => {
                     </td>
                     <td className="px-8 py-6">
                       <select
-                        value={u.role}
+                        value={u.role || 'user'}
                         onChange={(e) => handleUpdateRole(u.id, e.target.value)}
                         className="text-[10px] font-bold uppercase tracking-widest bg-stone-100 border-none rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-emerald-600 outline-none"
                       >
@@ -490,6 +634,16 @@ const AdminDashboard = () => {
                         <option value="expert">Expert</option>
                         <option value="admin">Admin</option>
                       </select>
+                    </td>
+                    <td className="px-8 py-6">
+                      <p className="text-[10px] font-medium text-black/60">
+                        {u.createdAt ? (u.createdAt.toDate ? u.createdAt.toDate().toLocaleDateString() : new Date(u.createdAt).toLocaleDateString()) : 'N/A'}
+                      </p>
+                    </td>
+                    <td className="px-8 py-6">
+                      <p className="text-[10px] font-medium text-black/60">
+                        {u.lastLogin ? (u.lastLogin.toDate ? u.lastLogin.toDate().toLocaleString() : new Date(u.lastLogin).toLocaleString()) : 'N/A'}
+                      </p>
                     </td>
                     <td className="px-8 py-6">
                       <button
@@ -527,6 +681,13 @@ const AdminDashboard = () => {
                           <Key size={16} />
                         </button>
                         <button
+                          onClick={() => handleUpdateRole(u.id, 'user')}
+                          className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                          title="Reject/Reset Role"
+                        >
+                          <XCircle size={16} />
+                        </button>
+                        <button
                           onClick={() => handleDeleteUser(u.id)}
                           className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           title="Delete User"
@@ -540,8 +701,157 @@ const AdminDashboard = () => {
               </tbody>
             </table>
           </div>
-        )}
+        </div>
+      )}
 
+        {activeTab === 'experts' && (
+          <div className="space-y-6">
+            <div className="p-8 border-b border-black/5 flex flex-col md:flex-row justify-between items-start md:items-center bg-stone-50/30 gap-4">
+              <div>
+                <h3 className="font-bold text-xl">Expert Applications</h3>
+                <p className="text-xs text-black/40">Review and verify professional credentials</p>
+              </div>
+              
+              <div className="flex bg-white border border-black/5 p-1 rounded-xl">
+                {[
+                  { id: 'all', label: 'All Experts' },
+                  { id: 'pending', label: 'Pending Verification' },
+                  { id: 'approved', label: 'Verified' }
+                ].map((filter) => (
+                  <button
+                    key={filter.id}
+                    onClick={() => setUserFilter(filter.id as any)}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                      userFilter === filter.id ? 'bg-stone-100 text-black' : 'text-black/40 hover:text-black'
+                    }`}
+                  >
+                    {filter.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="p-8 grid grid-cols-1 gap-6">
+              {users
+                .filter(u => u.role === 'expert')
+                .filter(u => {
+                  if (userFilter === 'pending') return !u.isApproved;
+                  if (userFilter === 'approved') return u.isApproved;
+                  return true;
+                })
+                .map((u) => (
+                  <div key={u.id} className="bg-stone-50 rounded-[2rem] border border-black/5 p-8 flex flex-col lg:flex-row gap-8">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-4 mb-6">
+                        <img 
+                          src={u.photoURL || `https://ui-avatars.com/api/?name=${u.displayName}`} 
+                          className="w-16 h-16 rounded-2xl object-cover"
+                          alt=""
+                        />
+                        <div>
+                          <h4 className="text-xl font-bold tracking-tight">{u.displayName}</h4>
+                          <p className="text-emerald-600 text-xs font-bold uppercase tracking-widest">
+                            {u.expertise || 'General Expert'}
+                          </p>
+                          <div className="flex items-center space-x-3 mt-2 text-black/40 text-xs">
+                            <span className="flex items-center space-x-1">
+                              <Mail size={12} />
+                              <span>{u.email}</span>
+                            </span>
+                            {u.phone && (
+                              <span className="flex items-center space-x-1">
+                                <Activity size={12} />
+                                <span>{u.phone}</span>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-black/40">Academic Background</p>
+                          <p className="text-sm font-medium">{u.academics || 'Not provided'}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-black/40">Experience</p>
+                          <p className="text-sm font-medium">{u.yearsOfExperience ? `${u.yearsOfExperience} Years` : 'Not provided'}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-black/40">Availability</p>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {u.availability?.map((a: string) => (
+                              <span key={a} className="bg-stone-200 px-2 py-0.5 rounded text-[10px] font-bold">{a}</span>
+                            )) || <span className="text-xs text-black/30 italic">No regions set</span>}
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-black/40">Key Projects</p>
+                          <p className="text-sm font-medium italic">"{u.keyProjects || 'None listed'}"</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-black/40">Professional Bio</p>
+                        <p className="text-sm text-black/60 leading-relaxed">{u.bio || 'No bio provided'}</p>
+                      </div>
+                    </div>
+
+                    <div className="lg:w-64 flex flex-col justify-center gap-3 border-t lg:border-t-0 lg:border-l border-black/5 pt-6 lg:pt-0 lg:pl-8">
+                      <div className="mb-4">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-black/40 mb-2">Status</p>
+                        <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
+                          u.isApproved ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {u.isApproved ? <CheckCircle2 size={12} /> : <Activity size={12} />}
+                          <span>{u.isApproved ? 'Verified' : 'Pending Review'}</span>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleToggleApproval(u.id, u.isApproved)}
+                        className={`w-full py-3 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 transition-all ${
+                          u.isApproved 
+                            ? 'bg-red-50 text-red-600 hover:bg-red-100' 
+                            : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-600/20'
+                        }`}
+                      >
+                        {u.isApproved ? (
+                          <>
+                            <X size={16} />
+                            <span>Revoke Verification</span>
+                          </>
+                        ) : (
+                          <>
+                            <Check size={16} />
+                            <span>Approve Expert</span>
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        onClick={() => handleUpdateRole(u.id, 'user')}
+                        className="w-full py-3 bg-stone-100 text-black/60 rounded-xl font-bold text-xs hover:bg-stone-200 transition-all flex items-center justify-center space-x-2"
+                      >
+                        <XCircle size={16} />
+                        <span>Reject Application</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+              {users.filter(u => u.role === 'expert').length === 0 && (
+                <div className="p-20 text-center">
+                  <div className="w-20 h-20 bg-stone-100 rounded-[2rem] flex items-center justify-center mx-auto mb-6 text-black/20">
+                    <Award size={40} />
+                  </div>
+                  <h4 className="text-xl font-bold mb-2">No Expert Applications</h4>
+                  <p className="text-black/40">There are currently no experts in the network.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         {activeTab === 'products' && (
           <div className="space-y-6">
             <div className="p-8 border-b border-black/5 flex flex-col md:flex-row justify-between items-start md:items-center bg-stone-50/30 gap-4">
@@ -721,14 +1031,30 @@ const AdminDashboard = () => {
                 <h3 className="font-bold text-xl">Service Providers</h3>
                 <p className="text-xs text-black/40">Manage professional WASH services</p>
               </div>
-              
-              <button
-                onClick={() => setIsAddServiceModalOpen(true)}
-                className="px-6 py-2 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition-all flex items-center space-x-2 shadow-lg shadow-emerald-600/20"
-              >
-                <Plus size={16} />
-                <span>Add Provider</span>
-              </button>
+
+              <div className="flex items-center space-x-4">
+                <div className="flex bg-stone-100 p-1 rounded-lg">
+                  {(['all', 'pending', 'approved'] as const).map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setServiceFilter(f)}
+                      className={`px-4 py-2 rounded-md text-[10px] font-bold uppercase tracking-widest transition-all ${
+                        serviceFilter === f ? 'bg-white text-black shadow-sm' : 'text-black/40 hover:text-black/60'
+                      }`}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+                
+                <button
+                  onClick={() => setIsAddServiceModalOpen(true)}
+                  className="px-6 py-2 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition-all flex items-center space-x-2 shadow-lg shadow-emerald-600/20"
+                >
+                  <Plus size={16} />
+                  <span>Add Provider</span>
+                </button>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -737,14 +1063,21 @@ const AdminDashboard = () => {
                   <tr className="bg-stone-50 border-b border-black/5">
                     <th className="px-8 py-6 text-[10px] font-bold uppercase tracking-widest text-black/40">Provider</th>
                     <th className="px-8 py-6 text-[10px] font-bold uppercase tracking-widest text-black/40">Category</th>
+                    <th className="px-8 py-6 text-[10px] font-bold uppercase tracking-widest text-black/40">Approval</th>
                     <th className="px-8 py-6 text-[10px] font-bold uppercase tracking-widest text-black/40">Location</th>
                     <th className="px-8 py-6 text-[10px] font-bold uppercase tracking-widest text-black/40">Contact</th>
                     <th className="px-8 py-6 text-[10px] font-bold uppercase tracking-widest text-black/40">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-black/5">
-                  {services.map((service) => (
-                    <tr key={service.id} className="hover:bg-stone-50/50 transition-colors">
+                  {services
+                    .filter(s => {
+                      if (serviceFilter === 'pending') return !s.isApproved;
+                      if (serviceFilter === 'approved') return s.isApproved;
+                      return true;
+                    })
+                    .map((service) => (
+                      <tr key={service.id} className="hover:bg-stone-50/50 transition-colors">
                       <td className="px-8 py-6">
                         <div className="flex items-center space-x-4">
                           <img 
@@ -762,6 +1095,19 @@ const AdminDashboard = () => {
                         <span className="px-3 py-1 bg-stone-100 rounded-full text-[10px] font-bold uppercase tracking-widest">
                           {service.category}
                         </span>
+                      </td>
+                      <td className="px-8 py-6">
+                        <button
+                          onClick={() => handleToggleServiceApproval(service.id, service.isApproved)}
+                          className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-all ${
+                            service.isApproved ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
+                          }`}
+                        >
+                          {service.isApproved ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
+                          <span className="text-[10px] font-bold uppercase tracking-widest">
+                            {service.isApproved ? 'Approved' : 'Pending'}
+                          </span>
+                        </button>
                       </td>
                       <td className="px-8 py-6">
                         <p className="text-sm font-medium">{service.location}</p>
@@ -869,6 +1215,22 @@ const AdminDashboard = () => {
           <div className="overflow-x-auto">
             <div className="p-8 border-b border-black/5 flex justify-between items-center bg-stone-50/30">
               <h3 className="font-bold">Project Approvals</h3>
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center bg-white border border-black/10 rounded-xl px-4 py-2">
+                  <Filter size={16} className="text-black/40 mr-2" />
+                  <select 
+                    value={projectFilter}
+                    onChange={(e) => setProjectFilter(e.target.value as any)}
+                    className="bg-transparent text-sm font-bold focus:outline-none appearance-none pr-8 cursor-pointer"
+                  >
+                    <option value="all">All Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="active">Active</option>
+                    <option value="completed">Completed</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                </div>
+              </div>
             </div>
             <table className="w-full text-left">
               <thead>
@@ -881,7 +1243,9 @@ const AdminDashboard = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-black/5">
-                {projects.map((project) => (
+                {projects
+                  .filter(p => projectFilter === 'all' || p.status === projectFilter)
+                  .map((project) => (
                   <tr key={project.id} className="hover:bg-stone-50/50 transition-colors">
                     <td className="px-8 py-6">
                       <div className="flex items-center space-x-4">
@@ -906,6 +1270,7 @@ const AdminDashboard = () => {
                       <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
                         project.status === 'active' ? 'bg-emerald-100 text-emerald-700' :
                         project.status === 'pending' ? 'bg-amber-100 text-amber-700' :
+                        project.status === 'completed' ? 'bg-blue-100 text-blue-700' :
                         project.status === 'rejected' ? 'bg-red-100 text-red-700' :
                         'bg-stone-200 text-black/40'
                       }`}>
@@ -914,6 +1279,13 @@ const AdminDashboard = () => {
                     </td>
                     <td className="px-8 py-6">
                       <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => navigate(`/admin/projects/${project.id}`)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="View Details"
+                        >
+                          <Eye size={18} />
+                        </button>
                         {project.status === 'pending' && (
                           <>
                             <button
@@ -1095,7 +1467,7 @@ const AdminDashboard = () => {
                 </div>
                 <div className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={analyticsData.salesByProduct} layout="vertical">
+                    <BarChart data={analyticsData.salesByProduct} layout="vertical" margin={{ left: 20, right: 40 }}>
                       <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
                       <XAxis type="number" hide />
                       <YAxis 
@@ -1104,7 +1476,7 @@ const AdminDashboard = () => {
                         axisLine={false} 
                         tickLine={false} 
                         tick={{ fontSize: 10, fontWeight: 600, fill: '#141414' }}
-                        width={100}
+                        width={120}
                       />
                       <Tooltip 
                         contentStyle={{ 
@@ -1114,11 +1486,27 @@ const AdminDashboard = () => {
                           boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
                           padding: '12px'
                         }}
+                        cursor={{ fill: '#f5f5f4' }}
                         itemStyle={{ fontSize: '12px', fontWeight: 'bold', color: '#059669' }}
                         labelStyle={{ fontSize: '10px', fontWeight: 'bold', color: '#9ca3af', marginBottom: '4px' }}
                         formatter={(value: any) => `KSh ${value.toLocaleString()}`}
                       />
-                      <Bar dataKey="total" fill="#059669" radius={[0, 4, 4, 0]} barSize={20} />
+                      <Bar dataKey="total" radius={[0, 4, 4, 0]} barSize={20}>
+                        {analyticsData.salesByProduct.map((entry, index) => (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={['#059669', '#10b981', '#34d399', '#6ee7b7', '#a7f3d0'][index % 5]} 
+                            fillOpacity={0.8}
+                            className="hover:fill-opacity-100 transition-all duration-300 cursor-pointer"
+                          />
+                        ))}
+                        <LabelList 
+                          dataKey="total" 
+                          position="right" 
+                          formatter={(value: any) => `KSh ${(value / 1000).toFixed(1)}k`}
+                          style={{ fontSize: '10px', fontWeight: 'bold', fill: '#059669' }}
+                        />
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -1138,6 +1526,8 @@ const AdminDashboard = () => {
                   <ResponsiveContainer width="100%" height="100%">
                     <RePieChart>
                       <Pie
+                        activeIndex={activePieIndex}
+                        activeShape={renderActiveShape}
                         data={analyticsData.salesByRegion}
                         cx="50%"
                         cy="50%"
@@ -1145,21 +1535,14 @@ const AdminDashboard = () => {
                         outerRadius={80}
                         paddingAngle={5}
                         dataKey="value"
+                        onMouseEnter={(_, index) => setActivePieIndex(index)}
                       >
                         {analyticsData.salesByRegion.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={['#059669', '#2563eb', '#f59e0b', '#ef4444', '#8b5cf6'][index % 5]} />
                         ))}
                       </Pie>
                       <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: '#fff', 
-                          borderRadius: '16px', 
-                          border: 'none', 
-                          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-                          padding: '12px'
-                        }}
-                        itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}
-                        formatter={(value: any) => `KSh ${value.toLocaleString()}`}
+                        content={<CustomTooltip />}
                       />
                       <Legend 
                         verticalAlign="bottom" 

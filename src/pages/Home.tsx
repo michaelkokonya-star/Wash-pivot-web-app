@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Sun, Droplets, ShieldCheck, ArrowRight, Zap, Globe, Users, Sparkles, Loader2 } from 'lucide-react';
+import { Sun, Droplets, ShieldCheck, ArrowRight, Zap, Globe, Users, Sparkles, Loader2, Search, Layers } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 import OptimizedImage from '../components/OptimizedImage';
 
@@ -99,25 +99,6 @@ const Home = () => {
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section className="py-20 bg-white border-b border-black/5">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-            <div className="space-y-2">
-              <h3 className="text-5xl font-bold tracking-tighter text-black">500+</h3>
-              <p className="text-black/50 uppercase tracking-widest text-xs font-bold">Solar Installations</p>
-            </div>
-            <div className="space-y-2">
-              <h3 className="text-5xl font-bold tracking-tighter text-black">1M+</h3>
-              <p className="text-black/50 uppercase tracking-widest text-xs font-bold">Liters of Clean Water</p>
-            </div>
-            <div className="space-y-2">
-              <h3 className="text-5xl font-bold tracking-tighter text-black">10k+</h3>
-              <p className="text-black/50 uppercase tracking-widest text-xs font-bold">Lives Impacted</p>
-            </div>
-          </div>
-        </div>
-      </section>
 
       {/* Visualizing Impact Section (GenAI) */}
       <section className="py-32 bg-white">
@@ -220,6 +201,74 @@ const Home = () => {
                   <span>View Products</span>
                   <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                 </Link>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Process Section */}
+      <section className="py-32 bg-white border-t border-black/5">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-20">
+            <h2 className="text-4xl md:text-6xl font-bold tracking-tighter text-black mb-6 uppercase">
+              THE PIVOT <span className="italic font-serif">PROCESS.</span>
+            </h2>
+            <p className="text-black/40 text-lg max-w-2xl mx-auto font-medium">
+              A systematic approach to delivering sustainable infrastructure and social impact.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-12 relative">
+            {/* Connecting Line (Desktop) */}
+            <div className="hidden md:block absolute top-1/4 left-0 right-0 h-px bg-black/5 -z-0" />
+            
+            {[
+              {
+                step: '01',
+                title: 'Discovery',
+                desc: 'Deep analysis of community needs and environmental constraints.',
+                icon: <Search size={24} />,
+              },
+              {
+                step: '02',
+                title: 'Design',
+                desc: 'Engineering custom solar and water treatment prototypes.',
+                icon: <Layers size={24} />,
+              },
+              {
+                step: '03',
+                title: 'Deployment',
+                desc: 'On-site installation and technical commissioning by experts.',
+                icon: <Zap size={24} />,
+              },
+              {
+                step: '04',
+                title: 'Impact',
+                desc: 'Continuous monitoring and scaling for long-term growth.',
+                icon: <Globe size={24} />,
+              },
+            ].map((item, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.1 }}
+                viewport={{ once: true }}
+                className="relative z-10 group"
+              >
+                <div className="mb-8 flex items-center justify-between">
+                  <div className="w-16 h-16 rounded-2xl bg-stone-50 border border-black/5 flex items-center justify-center text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-500 shadow-sm">
+                    {item.icon}
+                  </div>
+                  <span className="text-4xl font-bold font-serif italic text-black/5 group-hover:text-emerald-600/20 transition-colors duration-500">
+                    {item.step}
+                  </span>
+                </div>
+                <h3 className="text-xl font-bold mb-4 uppercase tracking-tight">{item.title}</h3>
+                <p className="text-black/50 text-sm leading-relaxed font-medium">
+                  {item.desc}
+                </p>
               </motion.div>
             ))}
           </div>

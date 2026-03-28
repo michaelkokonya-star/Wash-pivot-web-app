@@ -30,6 +30,7 @@ const AddServiceModal: React.FC<AddServiceModalProps> = ({ isOpen, onClose, onSu
     try {
       await addDoc(collection(db, 'service_providers'), {
         ...formData,
+        isApproved: false,
         createdAt: serverTimestamp()
       });
       onSuccess();

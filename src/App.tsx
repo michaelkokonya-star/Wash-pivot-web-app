@@ -20,6 +20,7 @@ import Logo from './components/Logo';
 
 import Profile from './pages/Profile';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminProjectDetails from './pages/AdminProjectDetails';
 import ProvisionOwner from './pages/ProvisionOwner';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
@@ -75,6 +76,11 @@ function App() {
                   <Route path="/admin" element={
                     <ProtectedRoute allowedRoles={['admin']} requireVerification>
                       <AdminDashboard />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/admin/projects/:id" element={
+                    <ProtectedRoute allowedRoles={['admin']} requireVerification>
+                      <AdminProjectDetails />
                     </ProtectedRoute>
                   } />
                 </Routes>

@@ -19,7 +19,7 @@ interface AuthContextType {
   user: User | null;
   profile: any | null;
   loading: boolean;
-  signIn: (email?: string, password?: string) => Promise<void>;
+  signIn: (provider?: 'google' | 'facebook' | 'microsoft' | 'email', email?: string, password?: string) => Promise<void>;
   signInAsGuest: () => Promise<void>;
   signUp: (email: string, password: string, displayName: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -53,6 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setProfile(data);
           }
         } else {
+          const isGoogleUser = user.providerData.some(p => p.providerId === 'google.com');
           // Create initial profile
           const initialProfile = {
             uid: user.uid,
@@ -60,7 +61,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             email: user.email || '',
             photoURL: user.photoURL || '',
             role: user.email === 'michael.kokonya@washpivot.com' ? 'admin' : 'user',
-            isApproved: user.email === 'michael.kokonya@washpivot.com', // Admin is auto-approved
+            isApproved: user.email === 'michael.kokonya@washpivot.com' || isGoogleUser, // Admin and Google users are auto-approved
             showContacts: true,
             hasSeenWelcome: false,
             createdAt: serverTimestamp(),
@@ -77,22 +78,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, []);
 
-  const signIn = async (email?: string, password?: string) => {
-    if (email && password) {
+  const signIn = async (providerType: 'google' | 'facebook' | 'microsoft' | 'email' = 'google', email?: string, password?: string) => {
+    if (providerType === 'email' && email && password) {
       await signInWithEmailAndPassword(auth, email, password);
-    } else {
+    } else if (providerType === 'google') {
       const provider = new GoogleAuthProvider();
-      try {
-        await signInWithPopup(auth, provider);
-      } catch (error: any) {
-        if (error.code === 'auth/popup-closed-by-user') {
-          console.log('Sign-in popup closed by user');
-        } else if (error.code === 'auth/cancelled-popup-request') {
-          console.log('Sign-in request cancelled');
-        } else {
-          throw error;
-        }
-      }
+      await signInWithPopup(auth, provider);
+    } else if (providerType === 'facebook') {
+      const { FacebookAuthProvider } = await import('firebase/auth');
+      const provider = new FacebookAuthProvider();
+      await signInWithPopup(auth, provider);
+    } else if (providerType === 'microsoft') {
+      const { OAuthProvider } = await import('firebase/auth');
+      const provider = new OAuthProvider('microsoft.com');
+      await signInWithPopup(auth, provider);
     }
   };
 

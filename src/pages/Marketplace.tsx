@@ -66,10 +66,11 @@ const Marketplace = () => {
     try {
       let q;
       if (filter === 'All') {
-        q = query(collection(db, 'service_providers'), orderBy('createdAt', 'desc'));
+        q = query(collection(db, 'service_providers'), where('isApproved', '==', true), orderBy('createdAt', 'desc'));
       } else if (subFilter !== 'All') {
         q = query(
           collection(db, 'service_providers'), 
+          where('isApproved', '==', true),
           where('category', '==', filter),
           where('subCategory', '==', subFilter),
           orderBy('createdAt', 'desc')
@@ -77,6 +78,7 @@ const Marketplace = () => {
       } else {
         q = query(
           collection(db, 'service_providers'), 
+          where('isApproved', '==', true),
           where('category', '==', filter),
           orderBy('createdAt', 'desc')
         );

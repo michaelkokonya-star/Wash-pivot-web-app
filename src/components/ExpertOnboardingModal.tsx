@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, CheckCircle2, Award, GraduationCap, Briefcase, ArrowRight, ArrowLeft, Sparkles, ShieldCheck, Mail } from 'lucide-react';
-import { doc, updateDoc, setDoc } from 'firebase/firestore';
+import { X, CheckCircle2, Award, GraduationCap, Briefcase, ArrowRight, ArrowLeft, Sparkles, ShieldCheck, Mail, MapPin, Clock, ListChecks, Eye } from 'lucide-react';
+import { doc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 
@@ -14,33 +14,33 @@ interface ExpertOnboardingModalProps {
 const steps = [
   {
     id: 'welcome',
-    title: 'Welcome to the Network',
-    description: 'Join a global community of WASH professionals dedicated to sustainable impact.',
+    title: 'Welcome',
+    description: 'Join the global WASH professional network.',
     icon: Sparkles
   },
   {
-    id: 'specialization',
-    title: 'Your Expertise',
-    description: 'Tell us about your core skills and academic background.',
+    id: 'expertise',
+    title: 'Expertise',
+    description: 'Your specialization and academic background.',
     icon: GraduationCap
   },
   {
-    id: 'contact',
-    title: 'Contact Details',
-    description: 'Provide your professional contact information for the network.',
-    icon: Mail
+    id: 'experience',
+    title: 'Experience',
+    description: 'Your professional track record and availability.',
+    icon: Clock
   },
   {
     id: 'bio',
-    title: 'Professional Bio',
-    description: 'Share your journey and professional achievements with the community.',
+    title: 'Profile',
+    description: 'Your professional bio and contact details.',
     icon: Briefcase
   },
   {
-    id: 'review',
-    title: 'Review & Launch',
-    description: 'Double-check your details before going live in the network.',
-    icon: ShieldCheck
+    id: 'preview',
+    title: 'Preview',
+    description: 'Review your public profile before launching.',
+    icon: Eye
   }
 ];
 
@@ -50,12 +50,21 @@ const ExpertOnboardingModal: React.FC<ExpertOnboardingModalProps> = ({ isOpen, o
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     expertise: '',
+    subSpecialty: '',
     academics: '',
+    yearsOfExperience: '',
+    keyProjects: '',
+    availability: [] as string[],
     bio: '',
     phone: '',
     contactEmail: profile?.email || '',
     role: 'expert'
   });
+
+  const availabilityOptions = [
+    'East Africa', 'West Africa', 'Southern Africa', 'North Africa', 
+    'Middle East', 'South Asia', 'Southeast Asia', 'Latin America', 'Global (Remote)'
+  ];
 
   const handleNext = () => {
     if (currentStep < steps.length - 1) {
@@ -77,28 +86,24 @@ const ExpertOnboardingModal: React.FC<ExpertOnboardingModalProps> = ({ isOpen, o
       const userRef = doc(db, 'users', user.uid);
       const publicRef = doc(db, 'public_profiles', user.uid);
 
-      // Update private user document
-      await updateDoc(userRef, {
+      const expertData = {
         ...formData,
         role: 'expert',
         onboardingCompleted: true,
         expertJoinedAt,
-        isApproved: false
-      });
+        isApproved: false,
+        updatedAt: serverTimestamp()
+      };
+
+      // Update private user document
+      await updateDoc(userRef, expertData);
 
       // Create public profile
       await setDoc(publicRef, {
         uid: user.uid,
         displayName: profile.displayName,
         photoURL: profile.photoURL || null,
-        role: 'expert',
-        expertise: formData.expertise,
-        academics: formData.academics,
-        bio: formData.bio,
-        phone: formData.phone,
-        contactEmail: formData.contactEmail,
-        expertJoinedAt,
-        isApproved: false
+        ...expertData
       });
 
       onComplete();
@@ -110,9 +115,70 @@ const ExpertOnboardingModal: React.FC<ExpertOnboardingModalProps> = ({ isOpen, o
     }
   };
 
+  const toggleAvailability = (option: string) => {
+    setFormData(prev => ({
+      ...prev,
+      availability: prev.availability.includes(option)
+        ? prev.availability.filter(a => a !== option)
+        : [...prev.availability, option]
+    }));
+  };
+
   if (!isOpen) return null;
 
   const StepIcon = steps[currentStep].icon;
+
+  const ProfilePreview = () => (
+    <div className="bg-stone-50 rounded-3xl p-6 border border-black/5 h-full overflow-y-auto max-h-[500px]">
+      <div className="flex items-center space-x-4 mb-6">
+        <div className="w-16 h-16 rounded-2xl bg-emerald-600 flex items-center justify-center text-white text-2xl font-bold">
+          {profile?.displayName?.charAt(0) || 'E'}
+        </div>
+        <div>
+          <h4 className="font-bold text-lg">{profile?.displayName || 'Expert Name'}</h4>
+          <p className="text-emerald-600 text-xs font-bold uppercase tracking-widest">
+            {formData.expertise || 'Specialization'}
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        {formData.yearsOfExperience && (
+          <div className="flex items-center space-x-2 text-sm text-black/60">
+            <Clock size={14} />
+            <span>{formData.yearsOfExperience} Years Experience</span>
+          </div>
+        )}
+        
+        {formData.availability.length > 0 && (
+          <div className="flex items-start space-x-2 text-sm text-black/60">
+            <MapPin size={14} className="mt-1 shrink-0" />
+            <div className="flex flex-wrap gap-1">
+              {formData.availability.map(a => (
+                <span key={a} className="bg-stone-200 px-2 py-0.5 rounded text-[10px]">{a}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="pt-4 border-t border-black/5">
+          <h5 className="text-[10px] font-bold uppercase tracking-widest text-black/40 mb-2">About</h5>
+          <p className="text-xs text-black/60 leading-relaxed line-clamp-4">
+            {formData.bio || 'Your professional bio will appear here...'}
+          </p>
+        </div>
+
+        {formData.keyProjects && (
+          <div className="pt-4 border-t border-black/5">
+            <h5 className="text-[10px] font-bold uppercase tracking-widest text-black/40 mb-2">Key Projects</h5>
+            <p className="text-xs text-black/60 leading-relaxed italic">
+              {formData.keyProjects}
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -120,7 +186,7 @@ const ExpertOnboardingModal: React.FC<ExpertOnboardingModalProps> = ({ isOpen, o
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="bg-white w-full max-w-2xl rounded-[2.5rem] overflow-hidden shadow-2xl relative"
+        className="bg-white w-full max-w-5xl rounded-[2.5rem] overflow-hidden shadow-2xl relative"
       >
         {/* Progress Bar */}
         <div className="absolute top-0 left-0 w-full h-1.5 bg-stone-100">
@@ -139,186 +205,245 @@ const ExpertOnboardingModal: React.FC<ExpertOnboardingModalProps> = ({ isOpen, o
         </button>
 
         <div className="p-12">
-          <div className="flex items-center space-x-4 mb-8">
-            <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600">
-              <StepIcon size={24} />
-            </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 mb-1">
-                Step {currentStep + 1} of {steps.length}
-              </p>
-              <h2 className="text-2xl font-bold tracking-tight">{steps[currentStep].title}</h2>
-            </div>
-          </div>
-
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentStep}
-              initial={{ opacity: 0, x: 10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -10 }}
-              className="min-h-[300px]"
-            >
-              {currentStep === 0 && (
-                <div className="space-y-6">
-                  <p className="text-black/60 leading-relaxed text-lg">
-                    Welcome to the WASH Pivot Expert Network. By joining, you become part of a curated ecosystem of professionals driving sustainable water, sanitation, and hygiene solutions globally.
+              <div className="flex items-center space-x-4 mb-8">
+                <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600">
+                  <StepIcon size={24} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 mb-1">
+                    Step {currentStep + 1} of {steps.length}
                   </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-8">
-                    <div className="p-4 bg-stone-50 rounded-2xl border border-black/5">
-                      <CheckCircle2 size={20} className="text-emerald-600 mb-2" />
-                      <h4 className="font-bold text-sm mb-1">Global Visibility</h4>
-                      <p className="text-xs text-black/40">Connect with project leads worldwide.</p>
+                  <h2 className="text-2xl font-bold tracking-tight">{steps[currentStep].title}</h2>
+                </div>
+              </div>
+
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={currentStep}
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  className="min-h-[350px]"
+                >
+                  {currentStep === 0 && (
+                    <div className="space-y-6">
+                      <p className="text-black/60 leading-relaxed text-lg">
+                        Welcome to the WASH Pivot Expert Network. Join a curated ecosystem of professionals driving sustainable water, sanitation, and hygiene solutions globally.
+                      </p>
+                      <div className="grid grid-cols-1 gap-4 mt-8">
+                        <div className="p-4 bg-stone-50 rounded-2xl border border-black/5 flex items-start space-x-4">
+                          <CheckCircle2 size={20} className="text-emerald-600 shrink-0 mt-1" />
+                          <div>
+                            <h4 className="font-bold text-sm mb-1 uppercase tracking-tight">Global Visibility</h4>
+                            <p className="text-xs text-black/40">Connect with project leads and NGOs worldwide.</p>
+                          </div>
+                        </div>
+                        <div className="p-4 bg-stone-50 rounded-2xl border border-black/5 flex items-start space-x-4">
+                          <Award size={20} className="text-emerald-600 shrink-0 mt-1" />
+                          <div>
+                            <h4 className="font-bold text-sm mb-1 uppercase tracking-tight">Impact Driven</h4>
+                            <p className="text-xs text-black/40">Contribute directly to UN SDG 6 & 7 goals.</p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="p-4 bg-stone-50 rounded-2xl border border-black/5">
-                      <Award size={20} className="text-emerald-600 mb-2" />
-                      <h4 className="font-bold text-sm mb-1">Impact Driven</h4>
-                      <p className="text-xs text-black/40">Contribute to UN SDG 6 & 7 goals.</p>
+                  )}
+
+                  {currentStep === 1 && (
+                    <div className="space-y-6">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Primary Specialization</label>
+                        <select
+                          value={formData.expertise}
+                          onChange={(e) => setFormData({ ...formData, expertise: e.target.value })}
+                          className="w-full p-4 bg-stone-50 border border-black/10 rounded-2xl focus:outline-none focus:border-emerald-600 transition-colors font-medium"
+                        >
+                          <option value="">Select Specialization</option>
+                          <option value="Solar Energy Systems">Solar Energy Systems</option>
+                          <option value="Water Purification">Water Purification</option>
+                          <option value="Sanitation Engineering">Sanitation Engineering</option>
+                          <option value="Sustainable Agriculture">Sustainable Agriculture</option>
+                          <option value="WASH Policy & Advocacy">WASH Policy & Advocacy</option>
+                          <option value="Groundwater Hydrology">Groundwater Hydrology</option>
+                          <option value="Community Engagement">Community Engagement</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Academic Background</label>
+                        <input
+                          type="text"
+                          value={formData.academics}
+                          onChange={(e) => setFormData({ ...formData, academics: e.target.value })}
+                          placeholder="e.g. MSc. Environmental Engineering"
+                          className="w-full p-4 bg-stone-50 border border-black/10 rounded-2xl focus:outline-none focus:border-emerald-600 transition-colors font-medium"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Years of Experience</label>
+                        <input
+                          type="number"
+                          value={formData.yearsOfExperience}
+                          onChange={(e) => setFormData({ ...formData, yearsOfExperience: e.target.value })}
+                          placeholder="e.g. 8"
+                          className="w-full p-4 bg-stone-50 border border-black/10 rounded-2xl focus:outline-none focus:border-emerald-600 transition-colors font-medium"
+                        />
+                      </div>
                     </div>
-                  </div>
-                </div>
-              )}
+                  )}
 
-              {currentStep === 1 && (
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Primary Specialization</label>
-                    <select
-                      value={formData.expertise}
-                      onChange={(e) => setFormData({ ...formData, expertise: e.target.value })}
-                      className="w-full p-4 bg-stone-50 border border-black/10 rounded-2xl focus:outline-none focus:border-emerald-600 transition-colors font-medium"
-                    >
-                      <option value="">Select Specialization</option>
-                      <option value="Solar Energy Systems">Solar Energy Systems</option>
-                      <option value="Water Purification">Water Purification</option>
-                      <option value="Sanitation Engineering">Sanitation Engineering</option>
-                      <option value="Sustainable Agriculture">Sustainable Agriculture</option>
-                      <option value="WASH Policy & Advocacy">WASH Policy & Advocacy</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Academic Background</label>
-                    <input
-                      type="text"
-                      value={formData.academics}
-                      onChange={(e) => setFormData({ ...formData, academics: e.target.value })}
-                      placeholder="e.g. MSc. Environmental Engineering, Stanford"
-                      className="w-full p-4 bg-stone-50 border border-black/10 rounded-2xl focus:outline-none focus:border-emerald-600 transition-colors font-medium"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {currentStep === 2 && (
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Professional Email</label>
-                    <input
-                      type="email"
-                      value={formData.contactEmail}
-                      onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
-                      placeholder="e.g. expert@example.com"
-                      className="w-full p-4 bg-stone-50 border border-black/10 rounded-2xl focus:outline-none focus:border-emerald-600 transition-colors font-medium"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Phone Number</label>
-                    <input
-                      type="tel"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      placeholder="e.g. +254 700 000 000"
-                      className="w-full p-4 bg-stone-50 border border-black/10 rounded-2xl focus:outline-none focus:border-emerald-600 transition-colors font-medium"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {currentStep === 3 && (
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Professional Bio</label>
-                    <textarea
-                      value={formData.bio}
-                      onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                      placeholder="Describe your professional journey, key projects, and what drives your passion for sustainability..."
-                      className="w-full p-4 bg-stone-50 border border-black/10 rounded-2xl h-48 focus:outline-none focus:border-emerald-600 transition-colors font-medium resize-none"
-                    />
-                    <p className="text-[10px] text-black/30 text-right">Recommended: 150-300 words</p>
-                  </div>
-                </div>
-              )}
-
-              {currentStep === 4 && (
-                <div className="space-y-6">
-                  <div className="p-6 bg-emerald-50 rounded-3xl border border-emerald-100">
-                    <h4 className="font-bold text-emerald-900 mb-4 flex items-center space-x-2">
-                      <CheckCircle2 size={18} />
-                      <span>Ready to Launch</span>
-                    </h4>
-                    <ul className="space-y-3">
-                      <li className="flex items-center space-x-3 text-sm text-emerald-800/70">
-                        <div className={`w-5 h-5 rounded-full flex items-center justify-center ${formData.expertise ? 'bg-emerald-200 text-emerald-700' : 'bg-stone-200 text-stone-400'}`}>
-                          <CheckCircle2 size={14} />
+                  {currentStep === 2 && (
+                    <div className="space-y-6">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Geographical Availability</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {availabilityOptions.map(option => (
+                            <button
+                              key={option}
+                              onClick={() => toggleAvailability(option)}
+                              className={`p-3 rounded-xl text-xs font-bold transition-all border ${
+                                formData.availability.includes(option)
+                                  ? 'bg-emerald-600 text-white border-emerald-600'
+                                  : 'bg-stone-50 text-black/60 border-black/5 hover:border-black/20'
+                              }`}
+                            >
+                              {option}
+                            </button>
+                          ))}
                         </div>
-                        <span>Specialization Selected</span>
-                      </li>
-                      <li className="flex items-center space-x-3 text-sm text-emerald-800/70">
-                        <div className={`w-5 h-5 rounded-full flex items-center justify-center ${formData.contactEmail && formData.phone ? 'bg-emerald-200 text-emerald-700' : 'bg-stone-200 text-stone-400'}`}>
-                          <CheckCircle2 size={14} />
-                        </div>
-                        <span>Contact Information Provided</span>
-                      </li>
-                      <li className="flex items-center space-x-3 text-sm text-emerald-800/70">
-                        <div className={`w-5 h-5 rounded-full flex items-center justify-center ${formData.bio.length > 50 ? 'bg-emerald-200 text-emerald-700' : 'bg-stone-200 text-stone-400'}`}>
-                          <CheckCircle2 size={14} />
-                        </div>
-                        <span>Professional Bio Completed</span>
-                      </li>
-                    </ul>
-                  </div>
-                  <p className="text-sm text-black/40 leading-relaxed italic">
-                    By clicking "Complete Onboarding", your profile will be visible to the entire WASH Pivot community. You can update these details anytime from your settings.
-                  </p>
-                </div>
-              )}
-            </motion.div>
-          </AnimatePresence>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Key Projects (Brief)</label>
+                        <input
+                          type="text"
+                          value={formData.keyProjects}
+                          onChange={(e) => setFormData({ ...formData, keyProjects: e.target.value })}
+                          placeholder="e.g. Solar Borehole in Turkana, Water Kiosk in Kibera"
+                          className="w-full p-4 bg-stone-50 border border-black/10 rounded-2xl focus:outline-none focus:border-emerald-600 transition-colors font-medium"
+                        />
+                      </div>
+                    </div>
+                  )}
 
-          <div className="flex items-center justify-between mt-12 pt-8 border-t border-black/5">
-            <button
-              onClick={handleBack}
-              disabled={currentStep === 0}
-              className={`flex items-center space-x-2 font-bold text-sm transition-all ${currentStep === 0 ? 'opacity-0 pointer-events-none' : 'text-black/40 hover:text-black'}`}
-            >
-              <ArrowLeft size={18} />
-              <span>Back</span>
-            </button>
+                  {currentStep === 3 && (
+                    <div className="space-y-6">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Professional Email</label>
+                          <input
+                            type="email"
+                            value={formData.contactEmail}
+                            onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
+                            className="w-full p-4 bg-stone-50 border border-black/10 rounded-2xl text-sm focus:outline-none focus:border-emerald-600"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Phone</label>
+                          <input
+                            type="tel"
+                            value={formData.phone}
+                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                            placeholder="+254..."
+                            className="w-full p-4 bg-stone-50 border border-black/10 rounded-2xl text-sm focus:outline-none focus:border-emerald-600"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Professional Bio</label>
+                        <textarea
+                          value={formData.bio}
+                          onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+                          placeholder="Describe your professional journey..."
+                          className="w-full p-4 bg-stone-50 border border-black/10 rounded-2xl h-32 focus:outline-none focus:border-emerald-600 font-medium resize-none text-sm"
+                        />
+                      </div>
+                    </div>
+                  )}
 
-            {currentStep === steps.length - 1 ? (
-              <button
-                onClick={handleSubmit}
-                disabled={loading || !formData.expertise || !formData.academics || !formData.contactEmail || !formData.phone || formData.bio.length < 50}
-                className="px-8 py-4 bg-emerald-600 text-white font-bold rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-600/20 disabled:opacity-50 flex items-center space-x-2"
-              >
-                {loading ? (
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  {currentStep === 4 && (
+                    <div className="space-y-6">
+                      <div className="p-6 bg-emerald-50 rounded-3xl border border-emerald-100">
+                        <h4 className="font-bold text-emerald-900 mb-4 flex items-center space-x-2">
+                          <CheckCircle2 size={18} />
+                          <span>Ready to Launch</span>
+                        </h4>
+                        <ul className="space-y-3">
+                          <li className="flex items-center space-x-3 text-sm text-emerald-800/70">
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center ${formData.expertise && formData.yearsOfExperience ? 'bg-emerald-200 text-emerald-700' : 'bg-stone-200 text-stone-400'}`}>
+                              <CheckCircle2 size={14} />
+                            </div>
+                            <span>Expertise & Experience</span>
+                          </li>
+                          <li className="flex items-center space-x-3 text-sm text-emerald-800/70">
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center ${formData.availability.length > 0 ? 'bg-emerald-200 text-emerald-700' : 'bg-stone-200 text-stone-400'}`}>
+                              <CheckCircle2 size={14} />
+                            </div>
+                            <span>Availability Set</span>
+                          </li>
+                          <li className="flex items-center space-x-3 text-sm text-emerald-800/70">
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center ${formData.bio.length > 20 ? 'bg-emerald-200 text-emerald-700' : 'bg-stone-200 text-stone-400'}`}>
+                              <CheckCircle2 size={14} />
+                            </div>
+                            <span>Profile Details Completed</span>
+                          </li>
+                        </ul>
+                      </div>
+                      <p className="text-xs text-black/40 leading-relaxed italic">
+                        By completing onboarding, your profile will enter the verification queue. Once approved, you'll be visible to the global WASH Pivot community.
+                      </p>
+                    </div>
+                  )}
+                </motion.div>
+              </AnimatePresence>
+
+              <div className="flex items-center justify-between mt-12 pt-8 border-t border-black/5">
+                <button
+                  onClick={handleBack}
+                  disabled={currentStep === 0}
+                  className={`flex items-center space-x-2 font-bold text-sm transition-all ${currentStep === 0 ? 'opacity-0 pointer-events-none' : 'text-black/40 hover:text-black'}`}
+                >
+                  <ArrowLeft size={18} />
+                  <span>Back</span>
+                </button>
+
+                {currentStep === steps.length - 1 ? (
+                  <button
+                    onClick={handleSubmit}
+                    disabled={loading || !formData.expertise || !formData.yearsOfExperience || formData.availability.length === 0 || formData.bio.length < 20}
+                    className="px-8 py-4 bg-emerald-600 text-white font-bold rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-600/20 disabled:opacity-50 flex items-center space-x-2"
+                  >
+                    {loading ? (
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <span>Launch Profile</span>
+                        <Sparkles size={18} />
+                      </>
+                    )}
+                  </button>
                 ) : (
-                  <>
-                    <span>Complete Onboarding</span>
-                    <Sparkles size={18} />
-                  </>
+                  <button
+                    onClick={handleNext}
+                    className="px-8 py-4 bg-black text-white font-bold rounded-2xl hover:bg-black/80 transition-all flex items-center space-x-2 group"
+                  >
+                    <span>Continue</span>
+                    <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                  </button>
                 )}
-              </button>
-            ) : (
-              <button
-                onClick={handleNext}
-                className="px-8 py-4 bg-black text-white font-bold rounded-2xl hover:bg-black/80 transition-all flex items-center space-x-2 group"
-              >
-                <span>Continue</span>
-                <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-              </button>
-            )}
+              </div>
+            </div>
+
+            {/* Real-time Preview */}
+            <div className="hidden lg:block">
+              <div className="sticky top-0">
+                <div className="flex items-center space-x-2 mb-4 text-black/40">
+                  <Eye size={14} />
+                  <span className="text-[10px] font-bold uppercase tracking-widest">Live Network Preview</span>
+                </div>
+                <ProfilePreview />
+              </div>
+            </div>
           </div>
         </div>
       </motion.div>

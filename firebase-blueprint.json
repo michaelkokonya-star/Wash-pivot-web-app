@@ -113,9 +113,10 @@
         "contactEmail": { "type": "string" },
         "contactPhone": { "type": "string" },
         "location": { "type": "string" },
+        "isApproved": { "type": "boolean", "description": "Whether the service provider is approved by admin" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["name", "category", "description", "imageUrl", "contactEmail", "contactPhone", "location", "createdAt"]
+      "required": ["name", "category", "description", "imageUrl", "contactEmail", "contactPhone", "location", "isApproved", "createdAt"]
     }
   },
   "firestore": {
