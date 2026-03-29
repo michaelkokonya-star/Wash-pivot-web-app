@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
+import { GoogleGenAI, GenerateContentResponse, ThinkingLevel } from "@google/genai";
 import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, Zap, Battery, Sun, MapPin, Home, Tv, Loader2, Info, ExternalLink, MessageSquare, Copy, Check, Plus, X, Save } from 'lucide-react';
+import { Sparkles, Zap, Battery, Sun, MapPin, Home, Tv, Loader2, Info, ExternalLink, MessageSquare, Copy, Check, Plus, X, Save, Send, User, Bot } from 'lucide-react';
 import { toast } from 'sonner';
 import Markdown from 'react-markdown';
 import { db, auth } from '../firebase';
@@ -48,6 +48,14 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
   const [isCopied, setIsCopied] = useState(false);
   const [groundingChunks, setGroundingChunks] = useState<any[]>([]);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'model'; text: string }[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const chatEndRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
 
   useEffect(() => {
     const loadSavedPreferences = async () => {
@@ -127,9 +135,10 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
         Format the report using Markdown with clear headings and bullet points.`;
 
       const response: GenerateContentResponse = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-3.1-pro-preview",
         contents: prompt,
         config: {
+          thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
           tools: [{ googleMaps: {} }],
           toolConfig: {
             retrievalConfig: {
@@ -221,6 +230,42 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
     if (name && !selectedAppliances.find(a => a.name === name)) {
       setSelectedAppliances(prev => [...prev, { name, quantity: 1 }]);
       setCustomAppliance('');
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!chatInput.trim() || isChatLoading) return;
+
+    const userMessage = chatInput.trim();
+    setChatInput('');
+    setChatMessages(prev => [...prev, { role: 'user', text: userMessage }]);
+    setIsChatLoading(true);
+
+    try {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) throw new Error("API Key missing");
+
+      const ai = new GoogleGenAI({ apiKey });
+      const chat = ai.chats.create({
+        model: "gemini-3-flash-preview",
+        config: {
+          systemInstruction: "You are a Solar Energy Expert Assistant. You help users understand their solar requirements, explain technical terms, and provide advice on energy efficiency. Be concise, professional, and helpful. Use the context of their current project (Premises: " + inputs.premisesSize + ", Location: " + inputs.location + ") if relevant.",
+        },
+        history: chatMessages.map(msg => ({
+          role: msg.role === 'user' ? 'user' : 'model',
+          parts: [{ text: msg.text }]
+        }))
+      });
+
+      const response = await chat.sendMessage({ message: userMessage });
+      if (response.text) {
+        setChatMessages(prev => [...prev, { role: 'model', text: response.text as string }]);
+      }
+    } catch (error) {
+      console.error("Chat Error:", error);
+      toast.error("Failed to get a response from the AI assistant.");
+    } finally {
+      setIsChatLoading(false);
     }
   };
 
@@ -466,6 +511,70 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
                       </div>
                     </div>
                   )}
+
+                  {/* Chat Interface */}
+                  <div className="mt-12 pt-8 border-t border-white/10">
+                    <div className="flex items-center space-x-2 mb-6">
+                      <MessageSquare className="text-emerald-400" size={16} />
+                      <div className="text-[10px] uppercase font-bold tracking-widest text-emerald-400">Chat with Solar Expert</div>
+                    </div>
+                    
+                    <div className="bg-black/20 rounded-2xl border border-white/5 overflow-hidden flex flex-col h-[400px]">
+                      <div className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-thin scrollbar-thumb-white/10">
+                        {chatMessages.length === 0 && (
+                          <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-40">
+                            <Bot size={32} />
+                            <p className="text-sm max-w-[200px]">Ask me anything about your solar report or energy optimization.</p>
+                          </div>
+                        )}
+                        {chatMessages.map((msg, idx) => (
+                          <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                            <div className={`max-w-[85%] p-4 rounded-2xl text-sm ${
+                              msg.role === 'user' 
+                                ? 'bg-emerald-500 text-black rounded-tr-none' 
+                                : 'bg-white/5 text-white/90 border border-white/10 rounded-tl-none'
+                            }`}>
+                              <div className="flex items-center space-x-2 mb-1 opacity-60">
+                                {msg.role === 'user' ? <User size={10} /> : <Bot size={10} />}
+                                <span className="text-[10px] font-bold uppercase tracking-tighter">
+                                  {msg.role === 'user' ? 'You' : 'Solar Expert'}
+                                </span>
+                              </div>
+                              <div className="prose prose-invert prose-sm max-w-none">
+                                <Markdown>{msg.text}</Markdown>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        {isChatLoading && (
+                          <div className="flex justify-start">
+                            <div className="bg-white/5 p-4 rounded-2xl rounded-tl-none border border-white/10">
+                              <Loader2 className="animate-spin text-emerald-400" size={16} />
+                            </div>
+                          </div>
+                        )}
+                        <div ref={chatEndRef} />
+                      </div>
+                      
+                      <div className="p-4 bg-white/5 border-t border-white/5 flex items-center space-x-3">
+                        <input
+                          type="text"
+                          placeholder="Ask a follow-up question..."
+                          value={chatInput}
+                          onChange={(e) => setChatInput(e.target.value)}
+                          onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                          className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-emerald-500 outline-none transition-all"
+                        />
+                        <button
+                          onClick={handleSendMessage}
+                          disabled={isChatLoading || !chatInput.trim()}
+                          className="p-3 bg-emerald-500 text-black rounded-xl hover:bg-emerald-400 transition-all disabled:opacity-50"
+                        >
+                          <Send size={18} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </motion.div>
               )}
             </div>
