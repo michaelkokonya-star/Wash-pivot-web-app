@@ -51,7 +51,23 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
   const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'model'; text: string }[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
+  const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
   const chatEndRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const checkApiKey = async () => {
+      if (window.aistudio) {
+        const selected = await window.aistudio.hasSelectedApiKey();
+        setHasApiKey(selected || !!process.env.GEMINI_API_KEY);
+      } else {
+        setHasApiKey(!!process.env.GEMINI_API_KEY);
+      }
+    };
+    checkApiKey();
+    // Check periodically in case they select it
+    const interval = setInterval(checkApiKey, 2000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -98,6 +114,12 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
       );
     }
   }, []);
+
+  const handleOpenKeySelector = async () => {
+    if (window.aistudio) {
+      await window.aistudio.openSelectKey();
+    }
+  };
 
   const handleCalculate = async () => {
     if (!inputs.premisesSize || selectedAppliances.length === 0 || !inputs.location) {
@@ -321,6 +343,36 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
             className="overflow-hidden"
           >
             <div className="mt-4 p-8 bg-stone-900 rounded-3xl border border-white/5 space-y-8">
+              {!hasApiKey && (
+                <div className="p-6 bg-amber-500/10 border border-amber-500/20 rounded-2xl space-y-4">
+                  <div className="flex items-center space-x-3 text-amber-400">
+                    <Info size={20} />
+                    <h4 className="font-bold text-sm uppercase tracking-widest">API Key Required</h4>
+                  </div>
+                  <p className="text-sm text-white/60 leading-relaxed">
+                    To use the advanced **Gemini 3.1 Pro** model for high-thinking solar analysis, you need to select a Gemini API key from a paid Google Cloud project.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <button
+                      onClick={handleOpenKeySelector}
+                      className="px-4 py-2 bg-amber-500 text-black text-xs font-bold rounded-lg hover:bg-amber-400 transition-all flex items-center space-x-2"
+                    >
+                      <ExternalLink size={14} />
+                      <span>Select API Key</span>
+                    </button>
+                    <a 
+                      href="https://ai.google.dev/gemini-api/docs/billing" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="px-4 py-2 bg-white/5 text-white/60 text-xs font-bold rounded-lg hover:bg-white/10 transition-all flex items-center space-x-2"
+                    >
+                      <Info size={14} />
+                      <span>Billing Docs</span>
+                    </a>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-6">
                   <div className="space-y-2">
