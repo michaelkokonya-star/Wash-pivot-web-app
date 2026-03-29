@@ -113,12 +113,16 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
       // Check for API key selection if using a potentially paid model
       if (window.aistudio && !(await window.aistudio.hasSelectedApiKey())) {
         await window.aistudio.openSelectKey();
-        // After opening, we proceed. The key will be injected into process.env.API_KEY
+        // After opening, we should stop and let the user select.
+        // The user will need to click calculate again after selecting.
+        setIsLoading(false);
+        toast.info("Please select an API key in the dialog and then click Calculate again.");
+        return;
       }
 
       const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-      if (!apiKey) {
-        throw new Error("API Key is not defined. Please ensure you have selected an API key or it is set in your environment variables.");
+      if (!apiKey || apiKey === "undefined") {
+        throw new Error("API Key is not defined. Please ensure you have selected an API key from the 'Secrets' or 'Key Selection' menu and that it is correctly configured.");
       }
       
       const ai = new GoogleGenAI({ apiKey });
@@ -249,7 +253,11 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
 
     try {
       const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-      if (!apiKey) throw new Error("API Key missing");
+      if (!apiKey || apiKey === "undefined") {
+        toast.error("API Key missing. Please select a key first.");
+        setIsChatLoading(false);
+        return;
+      }
 
       const ai = new GoogleGenAI({ apiKey });
       const chat = ai.chats.create({
