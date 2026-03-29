@@ -227,7 +227,7 @@ async function startServer() {
       app.use(express.static(distPath));
       
       // Handle SPA routing - serve index.html for all non-API routes
-      app.get('*', (req, res) => {
+      app.get('*all', (req, res) => {
         const indexPath = path.join(distPath, 'index.html');
         res.sendFile(indexPath, (err) => {
           if (err) {
