@@ -29,6 +29,11 @@ interface SolarAIAdvisorProps {
   onApply?: (recommendations: any) => void;
 }
 
+interface Appliance {
+  name: string;
+  quantity: number;
+}
+
 const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -37,7 +42,7 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
     premisesSize: '',
     location: '',
   });
-  const [selectedAppliances, setSelectedAppliances] = useState<string[]>([]);
+  const [selectedAppliances, setSelectedAppliances] = useState<Appliance[]>([]);
   const [customAppliance, setCustomAppliance] = useState('');
   const [result, setResult] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
@@ -52,7 +57,13 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
           const docSnap = await getDoc(docRef);
           if (docSnap.exists()) {
             const data = docSnap.data();
-            if (data.selectedAppliances) setSelectedAppliances(data.selectedAppliances);
+            if (data.selectedAppliances) {
+              // Handle legacy format (string array) vs new format (Appliance array)
+              const formatted = data.selectedAppliances.map((item: any) => 
+                typeof item === 'string' ? { name: item, quantity: 1 } : item
+              );
+              setSelectedAppliances(formatted);
+            }
             if (data.premisesSize) setInputs(prev => ({ ...prev, premisesSize: data.premisesSize }));
             if (data.location) setInputs(prev => ({ ...prev, location: data.location }));
           }
@@ -88,29 +99,36 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
 
     setIsLoading(true);
     setGroundingChunks([]);
+    setResult(null);
+    
     try {
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
-        throw new Error("GEMINI_API_KEY is not defined in environment variables.");
+        throw new Error("GEMINI_API_KEY is not defined. Please check your environment variables.");
       }
+      
       const ai = new GoogleGenAI({ apiKey });
       
-      const appliancesList = selectedAppliances.join(', ');
+      const appliancesList = selectedAppliances
+        .map(a => `${a.quantity}x ${a.name}`)
+        .join(', ');
       
+      const prompt = `As a Solar Energy Expert, provide a comprehensive technical advisor report for:
+        Premises Size: ${inputs.premisesSize}
+        Appliances & Quantities: ${appliancesList}
+        Location: ${inputs.location}
+        
+        Your report MUST include:
+        1. **Hardware Specifications**: Recommended inverter size (kVA), battery capacity (kWh), number of solar panels, and panel wattage.
+        2. **Technical Insights**: Explain the reasoning behind these choices, considering efficiency and local climate.
+        3. **Energy Optimization**: Provide 3 actionable tips to reduce consumption and maximize solar ROI.
+        4. **Local Context**: Use Google Maps to find local solar installers or relevant geographical data for this location.
+        
+        Format the report using Markdown with clear headings and bullet points.`;
+
       const response: GenerateContentResponse = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: `As a Solar Energy Expert, provide a comprehensive technical advisor report for:
-          Premises Size: ${inputs.premisesSize}
-          Appliances: ${appliancesList}
-          Location: ${inputs.location}
-          
-          Your report MUST include:
-          1. **Hardware Specifications**: Recommended inverter size (kVA), battery capacity (kWh), number of solar panels, and panel wattage.
-          2. **Technical Insights**: Explain the reasoning behind these choices, considering efficiency and local climate.
-          3. **Energy Optimization**: Provide 3 actionable tips to reduce consumption and maximize solar ROI.
-          4. **Local Context**: Use Google Maps to find local solar installers or relevant geographical data for this location.
-          
-          Format the report using Markdown with clear headings and bullet points.`,
+        contents: prompt,
         config: {
           tools: [{ googleMaps: {} }],
           toolConfig: {
@@ -125,20 +143,31 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
       });
 
       if (!response.text) {
-        throw new Error("AI response was empty.");
-      }
-      setResult(response.text);
-
-      // Extract grounding chunks
-      const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
-      if (chunks) {
-        setGroundingChunks(chunks);
+        // Fallback if the tool call failed or returned empty
+        const fallbackResponse = await ai.models.generateContent({
+          model: "gemini-3-flash-preview",
+          contents: prompt + "\n\n(Note: Google Maps tools were unavailable, providing general technical advice based on location string.)",
+        });
+        
+        if (!fallbackResponse.text) {
+          throw new Error("AI failed to generate a response. Please try again.");
+        }
+        setResult(fallbackResponse.text);
+      } else {
+        setResult(response.text);
+        // Extract grounding chunks
+        const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+        if (chunks) {
+          setGroundingChunks(chunks);
+        }
       }
 
       toast.success("Solar requirements computed successfully!");
-    } catch (error) {
+    } catch (error: any) {
       console.error("AI Calculation Error:", error);
-      toast.error("Failed to compute requirements. Please try again.");
+      const errorMessage = error.message || "Failed to compute requirements. Please try again.";
+      toast.error(errorMessage);
+      setResult(`### Error Computing Requirements\n\n${errorMessage}\n\nPlease ensure your API key is valid and you have a stable internet connection.`);
     } finally {
       setIsLoading(false);
     }
@@ -168,14 +197,29 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
   };
 
   const toggleAppliance = (name: string) => {
-    setSelectedAppliances(prev => 
-      prev.includes(name) ? prev.filter(a => a !== name) : [...prev, name]
-    );
+    setSelectedAppliances(prev => {
+      const exists = prev.find(a => a.name === name);
+      if (exists) {
+        return prev.filter(a => a.name !== name);
+      }
+      return [...prev, { name, quantity: 1 }];
+    });
+  };
+
+  const updateQuantity = (name: string, delta: number) => {
+    setSelectedAppliances(prev => prev.map(a => {
+      if (a.name === name) {
+        const newQty = Math.max(1, a.quantity + delta);
+        return { ...a, quantity: newQty };
+      }
+      return a;
+    }));
   };
 
   const addCustomAppliance = () => {
-    if (customAppliance.trim() && !selectedAppliances.includes(customAppliance.trim())) {
-      setSelectedAppliances(prev => [...prev, customAppliance.trim()]);
+    const name = customAppliance.trim();
+    if (name && !selectedAppliances.find(a => a.name === name)) {
+      setSelectedAppliances(prev => [...prev, { name, quantity: 1 }]);
       setCustomAppliance('');
     }
   };
@@ -254,20 +298,23 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
                     <span>Appliance Library</span>
                   </label>
                   <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-2 bg-white/5 rounded-xl border border-white/10">
-                    {COMMON_APPLIANCES.map((app) => (
-                      <button
-                        key={app.id}
-                        onClick={() => toggleAppliance(app.name)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center space-x-2 ${
-                          selectedAppliances.includes(app.name)
-                            ? 'bg-emerald-500 text-black'
-                            : 'bg-white/5 text-white/60 hover:bg-white/10'
-                        }`}
-                      >
-                        <span>{app.name}</span>
-                        {selectedAppliances.includes(app.name) ? <X size={10} /> : <Plus size={10} />}
-                      </button>
-                    ))}
+                    {COMMON_APPLIANCES.map((app) => {
+                      const isSelected = selectedAppliances.some(a => a.name === app.name);
+                      return (
+                        <button
+                          key={app.id}
+                          onClick={() => toggleAppliance(app.name)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center space-x-2 ${
+                            isSelected
+                              ? 'bg-emerald-500 text-black'
+                              : 'bg-white/5 text-white/60 hover:bg-white/10'
+                          }`}
+                        >
+                          <span>{app.name}</span>
+                          {isSelected ? <Check size={10} /> : <Plus size={10} />}
+                        </button>
+                      );
+                    })}
                   </div>
                   
                   <div className="flex space-x-2">
@@ -288,16 +335,36 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
                   </div>
 
                   {selectedAppliances.length > 0 && (
-                    <div className="pt-2">
+                    <div className="pt-2 space-y-3">
                       <div className="text-[10px] uppercase tracking-widest text-white/20 font-bold mb-2">Selected ({selectedAppliances.length})</div>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedAppliances.map((name) => (
-                          <span key={name} className="px-2 py-1 bg-emerald-500/10 text-emerald-400 rounded-md text-[10px] font-bold flex items-center space-x-1">
-                            <span>{name}</span>
-                            <button onClick={() => toggleAppliance(name)} className="hover:text-white">
-                              <X size={10} />
-                            </button>
-                          </span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {selectedAppliances.map((app) => (
+                          <div key={app.name} className="flex items-center justify-between p-2 bg-white/5 border border-white/10 rounded-xl group">
+                            <span className="text-xs text-white/80 truncate font-medium">{app.name}</span>
+                            <div className="flex items-center space-x-3">
+                              <div className="flex items-center bg-black/40 rounded-lg border border-white/10 overflow-hidden">
+                                <button 
+                                  onClick={() => updateQuantity(app.name, -1)}
+                                  className="p-1 hover:bg-white/10 text-white/60 transition-colors"
+                                >
+                                  <X size={10} />
+                                </button>
+                                <span className="px-2 text-[10px] font-bold text-emerald-400 min-w-[20px] text-center">{app.quantity}</span>
+                                <button 
+                                  onClick={() => updateQuantity(app.name, 1)}
+                                  className="p-1 hover:bg-white/10 text-white/60 transition-colors"
+                                >
+                                  <Plus size={10} />
+                                </button>
+                              </div>
+                              <button 
+                                onClick={() => toggleAppliance(app.name)}
+                                className="text-white/20 hover:text-red-400 transition-colors"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          </div>
                         ))}
                       </div>
                     </div>
