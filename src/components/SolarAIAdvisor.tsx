@@ -110,9 +110,15 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
     setResult(null);
     
     try {
-      const apiKey = process.env.GEMINI_API_KEY;
+      // Check for API key selection if using a potentially paid model
+      if (window.aistudio && !(await window.aistudio.hasSelectedApiKey())) {
+        await window.aistudio.openSelectKey();
+        // After opening, we proceed. The key will be injected into process.env.API_KEY
+      }
+
+      const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
       if (!apiKey) {
-        throw new Error("GEMINI_API_KEY is not defined. Please check your environment variables.");
+        throw new Error("API Key is not defined. Please ensure you have selected an API key or it is set in your environment variables.");
       }
       
       const ai = new GoogleGenAI({ apiKey });
@@ -242,7 +248,7 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
     setIsChatLoading(true);
 
     try {
-      const apiKey = process.env.GEMINI_API_KEY;
+      const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
       if (!apiKey) throw new Error("API Key missing");
 
       const ai = new GoogleGenAI({ apiKey });
