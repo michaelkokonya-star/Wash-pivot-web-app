@@ -1,8 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
+import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, Zap, Battery, Sun, MapPin, Home, Tv, Loader2, Info, ExternalLink } from 'lucide-react';
+import { Sparkles, Zap, Battery, Sun, MapPin, Home, Tv, Loader2, Info, ExternalLink, MessageSquare, Copy, Check, Plus, X, Save } from 'lucide-react';
 import { toast } from 'sonner';
+import Markdown from 'react-markdown';
+import { db, auth } from '../firebase';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
+
+const COMMON_APPLIANCES = [
+  { id: 'led-5', name: 'LED Bulb (5W)', category: 'Lighting' },
+  { id: 'led-10', name: 'LED Bulb (10W)', category: 'Lighting' },
+  { id: 'fridge-es', name: 'Fridge (Energy Star)', category: 'Kitchen' },
+  { id: 'fridge-std', name: 'Fridge (Standard)', category: 'Kitchen' },
+  { id: 'tv-32', name: 'TV (LED 32")', category: 'Entertainment' },
+  { id: 'tv-55', name: 'TV (LED 55")', category: 'Entertainment' },
+  { id: 'laptop', name: 'Laptop', category: 'Office' },
+  { id: 'desktop', name: 'Desktop PC', category: 'Office' },
+  { id: 'microwave', name: 'Microwave', category: 'Kitchen' },
+  { id: 'kettle', name: 'Electric Kettle', category: 'Kitchen' },
+  { id: 'washing-machine', name: 'Washing Machine', category: 'Laundry' },
+  { id: 'fan', name: 'Fan', category: 'Climate' },
+  { id: 'ac-small', name: 'Air Conditioner (Small)', category: 'Climate' },
+  { id: 'pump', name: 'Water Pump (0.5 HP)', category: 'Utility' },
+  { id: 'phone', name: 'Phone Charger', category: 'Utility' },
+];
 
 interface SolarAIAdvisorProps {
   onApply?: (recommendations: any) => void;
@@ -11,14 +32,37 @@ interface SolarAIAdvisorProps {
 const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [inputs, setInputs] = useState({
     premisesSize: '',
-    appliances: '',
     location: '',
   });
-  const [result, setResult] = useState<any>(null);
+  const [selectedAppliances, setSelectedAppliances] = useState<string[]>([]);
+  const [customAppliance, setCustomAppliance] = useState('');
+  const [result, setResult] = useState<string | null>(null);
+  const [isCopied, setIsCopied] = useState(false);
   const [groundingChunks, setGroundingChunks] = useState<any[]>([]);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+
+  useEffect(() => {
+    const loadSavedPreferences = async () => {
+      if (auth.currentUser) {
+        try {
+          const docRef = doc(db, 'user_preferences', auth.currentUser.uid);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data.selectedAppliances) setSelectedAppliances(data.selectedAppliances);
+            if (data.premisesSize) setInputs(prev => ({ ...prev, premisesSize: data.premisesSize }));
+            if (data.location) setInputs(prev => ({ ...prev, location: data.location }));
+          }
+        } catch (error) {
+          console.error("Error loading preferences:", error);
+        }
+      }
+    };
+    loadSavedPreferences();
+  }, [auth.currentUser]);
 
   useEffect(() => {
     if ("geolocation" in navigator) {
@@ -37,8 +81,8 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
   }, []);
 
   const handleCalculate = async () => {
-    if (!inputs.premisesSize || !inputs.appliances || !inputs.location) {
-      toast.error("Please fill in all fields for the AI to compute requirements.");
+    if (!inputs.premisesSize || selectedAppliances.length === 0 || !inputs.location) {
+      toast.error("Please fill in all fields and select appliances for the AI to compute requirements.");
       return;
     }
 
@@ -51,15 +95,22 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
       }
       const ai = new GoogleGenAI({ apiKey });
       
+      const appliancesList = selectedAppliances.join(', ');
+      
       const response: GenerateContentResponse = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: `Compute solar hardware requirements for:
+        contents: `As a Solar Energy Expert, provide a comprehensive technical advisor report for:
           Premises Size: ${inputs.premisesSize}
-          Appliances: ${inputs.appliances}
+          Appliances: ${appliancesList}
           Location: ${inputs.location}
           
-          Provide a technical breakdown of inverter size, battery capacity, and number of solar panels. 
-          Also, use Google Maps to find local solar installers or relevant geographical data for this location.`,
+          Your report MUST include:
+          1. **Hardware Specifications**: Recommended inverter size (kVA), battery capacity (kWh), number of solar panels, and panel wattage.
+          2. **Technical Insights**: Explain the reasoning behind these choices, considering efficiency and local climate.
+          3. **Energy Optimization**: Provide 3 actionable tips to reduce consumption and maximize solar ROI.
+          4. **Local Context**: Use Google Maps to find local solar installers or relevant geographical data for this location.
+          
+          Format the report using Markdown with clear headings and bullet points.`,
         config: {
           tools: [{ googleMaps: {} }],
           toolConfig: {
@@ -69,19 +120,6 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
                 longitude: userLocation.lng
               } : undefined
             }
-          },
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              inverterSize: { type: Type.STRING, description: "Recommended inverter size (e.g., 5kVA)" },
-              batteryCapacity: { type: Type.STRING, description: "Recommended battery capacity (e.g., 10kWh)" },
-              solarPanelsCount: { type: Type.NUMBER, description: "Number of solar panels required" },
-              panelWattage: { type: Type.STRING, description: "Recommended wattage per panel" },
-              estimatedDailyYield: { type: Type.STRING, description: "Estimated daily energy yield" },
-              technicalNote: { type: Type.STRING, description: "A brief technical note on the configuration" }
-            },
-            required: ["inverterSize", "batteryCapacity", "solarPanelsCount", "panelWattage", "estimatedDailyYield", "technicalNote"]
           }
         }
       });
@@ -89,8 +127,7 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
       if (!response.text) {
         throw new Error("AI response was empty.");
       }
-      const data = JSON.parse(response.text);
-      setResult(data);
+      setResult(response.text);
 
       // Extract grounding chunks
       const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
@@ -104,6 +141,51 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
       toast.error("Failed to compute requirements. Please try again.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSavePreferences = async () => {
+    if (!auth.currentUser) {
+      toast.error("Please sign in to save your preferences.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await setDoc(doc(db, 'user_preferences', auth.currentUser.uid), {
+        selectedAppliances,
+        premisesSize: inputs.premisesSize,
+        location: inputs.location,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+      toast.success("Preferences saved successfully!");
+    } catch (error) {
+      console.error("Error saving preferences:", error);
+      toast.error("Failed to save preferences.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const toggleAppliance = (name: string) => {
+    setSelectedAppliances(prev => 
+      prev.includes(name) ? prev.filter(a => a !== name) : [...prev, name]
+    );
+  };
+
+  const addCustomAppliance = () => {
+    if (customAppliance.trim() && !selectedAppliances.includes(customAppliance.trim())) {
+      setSelectedAppliances(prev => [...prev, customAppliance.trim()]);
+      setCustomAppliance('');
+    }
+  };
+
+  const handleCopy = () => {
+    if (result) {
+      navigator.clipboard.writeText(result);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+      toast.success("Report copied to clipboard!");
     }
   };
 
@@ -136,62 +218,126 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
             className="overflow-hidden"
           >
             <div className="mt-4 p-8 bg-stone-900 rounded-3xl border border-white/5 space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] uppercase tracking-widest text-white/40 font-bold flex items-center space-x-2">
-                    <Home size={12} />
-                    <span>Premises Size</span>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 3 Bedroom House"
-                    value={inputs.premisesSize}
-                    onChange={(e) => setInputs({ ...inputs, premisesSize: e.target.value })}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-emerald-500 outline-none transition-all"
-                  />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest text-white/40 font-bold flex items-center space-x-2">
+                      <Home size={12} />
+                      <span>Premises Size</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 3 Bedroom House"
+                      value={inputs.premisesSize}
+                      onChange={(e) => setInputs({ ...inputs, premisesSize: e.target.value })}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-emerald-500 outline-none transition-all"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest text-white/40 font-bold flex items-center space-x-2">
+                      <MapPin size={12} />
+                      <span>Location</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Nairobi, Kenya"
+                      value={inputs.location}
+                      onChange={(e) => setInputs({ ...inputs, location: e.target.value })}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-emerald-500 outline-none transition-all"
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
+
+                <div className="space-y-4">
                   <label className="text-[10px] uppercase tracking-widest text-white/40 font-bold flex items-center space-x-2">
                     <Tv size={12} />
-                    <span>Appliances</span>
+                    <span>Appliance Library</span>
                   </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Fridge, TV, 10 Lights"
-                    value={inputs.appliances}
-                    onChange={(e) => setInputs({ ...inputs, appliances: e.target.value })}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-emerald-500 outline-none transition-all"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] uppercase tracking-widest text-white/40 font-bold flex items-center space-x-2">
-                    <MapPin size={12} />
-                    <span>Location</span>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Nairobi, Kenya"
-                    value={inputs.location}
-                    onChange={(e) => setInputs({ ...inputs, location: e.target.value })}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-emerald-500 outline-none transition-all"
-                  />
+                  <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-2 bg-white/5 rounded-xl border border-white/10">
+                    {COMMON_APPLIANCES.map((app) => (
+                      <button
+                        key={app.id}
+                        onClick={() => toggleAppliance(app.name)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center space-x-2 ${
+                          selectedAppliances.includes(app.name)
+                            ? 'bg-emerald-500 text-black'
+                            : 'bg-white/5 text-white/60 hover:bg-white/10'
+                        }`}
+                      >
+                        <span>{app.name}</span>
+                        {selectedAppliances.includes(app.name) ? <X size={10} /> : <Plus size={10} />}
+                      </button>
+                    ))}
+                  </div>
+                  
+                  <div className="flex space-x-2">
+                    <input
+                      type="text"
+                      placeholder="Add custom item..."
+                      value={customAppliance}
+                      onChange={(e) => setCustomAppliance(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && addCustomAppliance()}
+                      className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm text-white focus:border-emerald-500 outline-none transition-all"
+                    />
+                    <button
+                      onClick={addCustomAppliance}
+                      className="p-2 bg-white/10 hover:bg-white/20 rounded-xl text-white transition-all"
+                    >
+                      <Plus size={18} />
+                    </button>
+                  </div>
+
+                  {selectedAppliances.length > 0 && (
+                    <div className="pt-2">
+                      <div className="text-[10px] uppercase tracking-widest text-white/20 font-bold mb-2">Selected ({selectedAppliances.length})</div>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedAppliances.map((name) => (
+                          <span key={name} className="px-2 py-1 bg-emerald-500/10 text-emerald-400 rounded-md text-[10px] font-bold flex items-center space-x-1">
+                            <span>{name}</span>
+                            <button onClick={() => toggleAppliance(name)} className="hover:text-white">
+                              <X size={10} />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <button
-                onClick={handleCalculate}
-                disabled={isLoading}
-                className="w-full py-4 bg-emerald-500 text-black font-bold rounded-xl hover:bg-emerald-400 transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
-              >
-                {isLoading ? (
-                  <Loader2 className="animate-spin" />
-                ) : (
-                  <>
-                    <Zap size={18} />
-                    <span>Compute Requirements</span>
-                  </>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <button
+                  onClick={handleCalculate}
+                  disabled={isLoading}
+                  className="flex-1 py-4 bg-emerald-500 text-black font-bold rounded-xl hover:bg-emerald-400 transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
+                >
+                  {isLoading ? (
+                    <Loader2 className="animate-spin" />
+                  ) : (
+                    <>
+                      <Zap size={18} />
+                      <span>Compute Requirements</span>
+                    </>
+                  )}
+                </button>
+                
+                {auth.currentUser && (
+                  <button
+                    onClick={handleSavePreferences}
+                    disabled={isSaving}
+                    className="px-6 py-4 bg-white/5 text-white font-bold rounded-xl hover:bg-white/10 transition-all flex items-center justify-center space-x-2 disabled:opacity-50 border border-white/10"
+                  >
+                    {isSaving ? (
+                      <Loader2 className="animate-spin" size={18} />
+                    ) : (
+                      <>
+                        <Save size={18} />
+                        <span className="hidden sm:inline">Save Preferences</span>
+                      </>
+                    )}
+                  </button>
                 )}
-              </button>
+              </div>
 
               {result && (
                 <motion.div
@@ -199,38 +345,20 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
                   animate={{ opacity: 1, y: 0 }}
                   className="pt-8 border-t border-white/10"
                 >
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-                    <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
-                      <div className="flex items-center space-x-2 text-emerald-400 mb-2">
-                        <Zap size={16} />
-                        <span className="text-[10px] uppercase font-bold tracking-widest">Inverter</span>
-                      </div>
-                      <div className="text-2xl font-bold text-white">{result.inverterSize}</div>
-                    </div>
-                    <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
-                      <div className="flex items-center space-x-2 text-blue-400 mb-2">
-                        <Battery size={16} />
-                        <span className="text-[10px] uppercase font-bold tracking-widest">Storage</span>
-                      </div>
-                      <div className="text-2xl font-bold text-white">{result.batteryCapacity}</div>
-                    </div>
-                    <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
-                      <div className="flex items-center space-x-2 text-orange-400 mb-2">
-                        <Sun size={16} />
-                        <span className="text-[10px] uppercase font-bold tracking-widest">Panels</span>
-                      </div>
-                      <div className="text-2xl font-bold text-white">{result.solarPanelsCount} × {result.panelWattage}</div>
-                    </div>
+                  <div className="flex justify-between items-center mb-4">
+                    <div className="text-[10px] uppercase font-bold tracking-widest text-emerald-400">AI Technical Report</div>
+                    <button
+                      onClick={handleCopy}
+                      className="flex items-center space-x-2 text-[10px] uppercase font-bold tracking-widest text-white/40 hover:text-white transition-all"
+                    >
+                      {isCopied ? <Check size={12} /> : <Copy size={12} />}
+                      <span>{isCopied ? 'Copied' : 'Copy Report'}</span>
+                    </button>
+                  </div>
+                  <div className="prose prose-invert max-w-none mb-8 bg-white/5 p-6 rounded-2xl border border-white/5">
+                    <Markdown>{result}</Markdown>
                   </div>
 
-                  <div className="p-4 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 flex items-start space-x-3">
-                    <Info className="text-emerald-400 shrink-0 mt-1" size={18} />
-                    <div className="space-y-1">
-                      <div className="text-xs font-bold text-emerald-400 uppercase tracking-widest">AI Recommendation</div>
-                      <p className="text-sm text-white/70 leading-relaxed">{result.technicalNote}</p>
-                      <div className="text-xs text-emerald-400/60 mt-2">Estimated Daily Yield: {result.estimatedDailyYield}</div>
-                    </div>
-                  </div>
 
                   {groundingChunks.length > 0 && (
                     <div className="mt-6 space-y-4">
@@ -250,9 +378,17 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
                                   <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center shrink-0">
                                     <MapPin size={14} className="text-blue-400" />
                                   </div>
-                                  <span className="text-xs text-white/80 truncate font-medium">
-                                    {chunk.maps.title || 'View on Google Maps'}
-                                  </span>
+                                  <div className="flex flex-col space-y-1 overflow-hidden">
+                                    <span className="text-xs text-white/80 truncate font-medium">
+                                      {chunk.maps.title || 'View on Google Maps'}
+                                    </span>
+                                    {chunk.maps.placeAnswerSources?.reviewSnippets?.length > 0 && (
+                                      <div className="flex items-center space-x-1 text-[10px] text-white/40 italic">
+                                        <MessageSquare size={10} />
+                                        <span className="truncate">{chunk.maps.placeAnswerSources.reviewSnippets[0].text}</span>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                                 <ExternalLink size={12} className="text-white/20 group-hover:text-white/60 shrink-0" />
                               </a>

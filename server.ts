@@ -224,11 +224,22 @@ async function startServer() {
       const distPath = path.join(process.cwd(), 'dist');
       console.log(`Serving static files from: ${distPath}`);
       
-      app.use(express.static(distPath));
+      // Serve static files with caching for hashed assets
+      app.use(express.static(distPath, {
+        maxAge: '1y',
+        immutable: true,
+        index: false, // Don't serve index.html from here, we handle it below
+      }));
       
       // Handle SPA routing - serve index.html for all non-API routes
       app.get('*all', (req, res) => {
         const indexPath = path.join(distPath, 'index.html');
+        
+        // Prevent caching of index.html to ensure users always get the latest version
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        
         res.sendFile(indexPath, (err) => {
           if (err) {
             console.error('Error sending index.html:', err);
