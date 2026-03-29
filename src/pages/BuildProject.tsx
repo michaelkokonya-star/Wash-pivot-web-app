@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Trash2, Calculator, FileText, CheckCircle2, User, Package, Download } from 'lucide-react';
+import { Plus, Trash2, Calculator, FileText, CheckCircle2, User, Package, Download, Sparkles } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { toast } from 'sonner';
+import SolarAIAdvisor from '../components/SolarAIAdvisor';
 
 const BuildProject = () => {
   const [step, setStep] = useState(1);
@@ -17,18 +19,20 @@ const BuildProject = () => {
 
   useEffect(() => {
     const fetchData = async () => {
+      const productsPath = 'products';
       try {
-        const pSnap = await getDocs(collection(db, 'products'));
+        const pSnap = await getDocs(collection(db, productsPath));
         setProducts(pSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       } catch (error) {
-        console.error("Error fetching products:", error);
+        handleFirestoreError(error, OperationType.GET, productsPath);
       }
 
+      const expertsPath = 'public_profiles';
       try {
-        const eSnap = await getDocs(query(collection(db, 'public_profiles'), where('role', '==', 'expert')));
+        const eSnap = await getDocs(query(collection(db, expertsPath), where('role', '==', 'expert')));
         setExperts(eSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       } catch (error) {
-        console.error("Error fetching experts:", error);
+        handleFirestoreError(error, OperationType.GET, expertsPath);
       }
     };
     fetchData();
@@ -143,6 +147,9 @@ const BuildProject = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
         {/* Selection Area */}
         <div className="lg:col-span-2 space-y-12">
+          {/* AI Advisor Integration */}
+          <SolarAIAdvisor />
+
           {/* Step 1: Products */}
           <section>
             <div className="flex items-center space-x-4 mb-8">

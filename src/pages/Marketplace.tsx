@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { collection, getDocs, query, where, deleteDoc, doc, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { motion, useAnimation, AnimatePresence } from 'motion/react';
 import { ShoppingCart, Filter, Search, Sun, Droplets, ShieldCheck, ChevronLeft, ChevronRight, Check, Plus, Edit, Trash2, LogIn, Mail, Phone, MapPin, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -55,7 +56,7 @@ const Marketplace = () => {
       }));
       setProducts(productsData);
     } catch (error) {
-      console.error("Error fetching products:", error);
+      handleFirestoreError(error, OperationType.GET, 'products');
     } finally {
       setLoading(false);
     }
@@ -91,7 +92,7 @@ const Marketplace = () => {
       }));
       setServices(servicesData);
     } catch (error) {
-      console.error("Error fetching services:", error);
+      handleFirestoreError(error, OperationType.GET, 'service_providers');
     } finally {
       setServicesLoading(false);
     }
@@ -103,8 +104,7 @@ const Marketplace = () => {
       await deleteDoc(doc(db, 'products', id));
       fetchProducts();
     } catch (error) {
-      console.error("Error deleting product:", error);
-      alert("Failed to delete product.");
+      handleFirestoreError(error, OperationType.DELETE, `products/${id}`);
     }
   };
 
@@ -273,14 +273,14 @@ const Marketplace = () => {
       <div className="relative group/carousel">
         {/* Navigation Arrows - Hidden on mobile, visible on hover on desktop */}
         <button 
-          onClick={() => scroll(carouselRef, 'left')}
+          onClick={() => scroll(carouselRef as any, 'left')}
           className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 z-20 p-4 bg-white shadow-2xl rounded-full border border-black/5 opacity-0 group-hover/carousel:opacity-100 group-hover/carousel:translate-x-0 transition-all hidden md:flex items-center justify-center hover:bg-stone-50"
         >
           <ChevronLeft size={24} />
         </button>
         
         <button 
-          onClick={() => scroll(carouselRef, 'right')}
+          onClick={() => scroll(carouselRef as any, 'right')}
           className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 z-20 p-4 bg-white shadow-2xl rounded-full border border-black/5 opacity-0 group-hover/carousel:opacity-100 group-hover/carousel:translate-x-0 transition-all hidden md:flex items-center justify-center hover:bg-stone-50"
         >
           <ChevronRight size={24} />
@@ -414,14 +414,14 @@ const Marketplace = () => {
 
         <div className="relative group/services">
           <button 
-            onClick={() => scroll(servicesCarouselRef, 'left')}
+            onClick={() => scroll(servicesCarouselRef as any, 'left')}
             className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 z-20 p-4 bg-white shadow-2xl rounded-full border border-black/5 opacity-0 group-hover/services:opacity-100 group-hover/services:translate-x-0 transition-all hidden md:flex items-center justify-center hover:bg-stone-50"
           >
             <ChevronLeft size={24} />
           </button>
           
           <button 
-            onClick={() => scroll(servicesCarouselRef, 'right')}
+            onClick={() => scroll(servicesCarouselRef as any, 'right')}
             className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 z-20 p-4 bg-white shadow-2xl rounded-full border border-black/5 opacity-0 group-hover/services:opacity-100 group-hover/services:translate-x-0 transition-all hidden md:flex items-center justify-center hover:bg-stone-50"
           >
             <ChevronRight size={24} />

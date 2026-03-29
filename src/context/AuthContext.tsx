@@ -14,6 +14,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase';
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 
 interface AuthContextType {
   user: User | null;
@@ -42,32 +43,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(user);
       if (user) {
         const docRef = doc(db, 'users', user.uid);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          if (user.email === 'michael.kokonya@washpivot.com' && data.role !== 'admin') {
-            const updatedProfile = { ...data, role: 'admin', isApproved: true };
-            await setDoc(docRef, updatedProfile);
-            setProfile(updatedProfile);
+        try {
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (user.email === 'michael.kokonya@washpivot.com' && data.role !== 'admin') {
+              const updatedProfile = { ...data, role: 'admin', isApproved: true };
+              await setDoc(docRef, updatedProfile);
+              setProfile(updatedProfile);
+            } else {
+              setProfile(data);
+            }
           } else {
-            setProfile(data);
+            const isGoogleUser = user.providerData.some(p => p.providerId === 'google.com');
+            // Create initial profile
+            const initialProfile = {
+              uid: user.uid,
+              displayName: user.displayName || 'Anonymous',
+              email: user.email || '',
+              photoURL: user.photoURL || '',
+              role: user.email === 'michael.kokonya@washpivot.com' ? 'admin' : 'user',
+              isApproved: user.email === 'michael.kokonya@washpivot.com' || isGoogleUser, // Admin and Google users are auto-approved
+              showContacts: true,
+              hasSeenWelcome: false,
+              createdAt: serverTimestamp(),
+            };
+            await setDoc(docRef, initialProfile);
+            setProfile(initialProfile);
           }
-        } else {
-          const isGoogleUser = user.providerData.some(p => p.providerId === 'google.com');
-          // Create initial profile
-          const initialProfile = {
-            uid: user.uid,
-            displayName: user.displayName || 'Anonymous',
-            email: user.email || '',
-            photoURL: user.photoURL || '',
-            role: user.email === 'michael.kokonya@washpivot.com' ? 'admin' : 'user',
-            isApproved: user.email === 'michael.kokonya@washpivot.com' || isGoogleUser, // Admin and Google users are auto-approved
-            showContacts: true,
-            hasSeenWelcome: false,
-            createdAt: serverTimestamp(),
-          };
-          await setDoc(docRef, initialProfile);
-          setProfile(initialProfile);
+        } catch (error) {
+          handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
         }
       } else {
         setProfile(null);

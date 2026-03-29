@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, getDocs, query, where, doc, updateDoc, deleteDoc, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { Users, ShoppingBag, Droplets, Shield, CheckCircle2, XCircle, Search, Filter, Edit, Trash2, Plus, Eye, EyeOff, Key, Package, TrendingUp, DollarSign, PieChart, Check, X, BarChart as BarChartIcon, Activity, Briefcase, Award, Mail } from 'lucide-react';
@@ -13,6 +14,7 @@ import EditProductModal from '../components/EditProductModal';
 import AddProductModal from '../components/AddProductModal';
 import EditServiceModal from '../components/EditServiceModal';
 import AddServiceModal from '../components/AddServiceModal';
+import AddProjectModal from '../components/AddProjectModal';
 
 const renderActiveShape = (props: any) => {
   const RADIAN = Math.PI / 180;
@@ -77,7 +79,7 @@ const CustomTooltip = ({ active, payload }: any) => {
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
-  const { user, profile, resetPassword } = useAuth();
+  const { user, profile, resetPassword, loading: authLoading } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
@@ -95,6 +97,7 @@ const AdminDashboard = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditServiceModalOpen, setIsEditServiceModalOpen] = useState(false);
   const [isAddServiceModalOpen, setIsAddServiceModalOpen] = useState(false);
+  const [isAddProjectModalOpen, setIsAddProjectModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [selectedService, setSelectedService] = useState<any>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
@@ -116,126 +119,161 @@ const AdminDashboard = () => {
 
   const isAdmin = user?.email?.toLowerCase() === 'michael.kokonya@washpivot.com' || profile?.role === 'admin';
 
+  useEffect(() => {
+    if (!authLoading && !isAdmin) {
+      navigate('/');
+    }
+  }, [isAdmin, authLoading, navigate]);
+
   const fetchData = async () => {
     setLoading(true);
     try {
       if (activeTab === 'users') {
-        const querySnapshot = await getDocs(collection(db, 'users'));
-        const fetchedUsers = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setUsers(fetchedUsers);
-        setStats(prev => ({ ...prev, userCount: fetchedUsers.length }));
+        const path = 'users';
+        try {
+          const querySnapshot = await getDocs(collection(db, path));
+          const fetchedUsers = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setUsers(fetchedUsers);
+          setStats(prev => ({ ...prev, userCount: fetchedUsers.length }));
+        } catch (error) {
+          handleFirestoreError(error, OperationType.GET, path);
+        }
       } else if (activeTab === 'products') {
-        const querySnapshot = await getDocs(collection(db, 'products'));
-        setProducts(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        const path = 'products';
+        try {
+          const querySnapshot = await getDocs(collection(db, path));
+          setProducts(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        } catch (error) {
+          handleFirestoreError(error, OperationType.GET, path);
+        }
       } else if (activeTab === 'services') {
-        const querySnapshot = await getDocs(collection(db, 'service_providers'));
-        setServices(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        const path = 'service_providers';
+        try {
+          const querySnapshot = await getDocs(collection(db, path));
+          setServices(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        } catch (error) {
+          handleFirestoreError(error, OperationType.GET, path);
+        }
       } else if (activeTab === 'orders') {
-        const querySnapshot = await getDocs(collection(db, 'orders'));
-        const fetchedOrders = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
-        setOrders(fetchedOrders);
-        
-        // Calculate stats
-        const revenue = fetchedOrders.reduce((acc, order) => order.status === 'paid' ? acc + (order.totalAmount || 0) : acc, 0);
-        const catSales = { Solar: 0, Water: 0, Sanitation: 0 };
-        fetchedOrders.forEach(order => {
-          if (order.status === 'paid' && order.items) {
-            order.items.forEach((item: any) => {
-              // Try to find category in item or product
-              const cat = item.category;
-              if (cat && cat in catSales) {
-                catSales[cat as keyof typeof catSales] += (item.price || 0) * (item.quantity || 0);
-              }
-            });
-          }
-        });
+        const path = 'orders';
+        try {
+          const querySnapshot = await getDocs(collection(db, path));
+          const fetchedOrders = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+          setOrders(fetchedOrders);
+          
+          // Calculate stats
+          const revenue = fetchedOrders.reduce((acc, order) => order.status === 'paid' ? acc + (order.totalAmount || 0) : acc, 0);
+          const catSales = { Solar: 0, Water: 0, Sanitation: 0 };
+          fetchedOrders.forEach(order => {
+            if (order.status === 'paid' && order.items) {
+              order.items.forEach((item: any) => {
+                // Try to find category in item or product
+                const cat = item.category;
+                if (cat && cat in catSales) {
+                  catSales[cat as keyof typeof catSales] += (item.price || 0) * (item.quantity || 0);
+                }
+              });
+            }
+          });
 
-        setStats(prev => ({
-          ...prev,
-          totalRevenue: revenue,
-          orderCount: fetchedOrders.length,
-          categorySales: catSales
-        }));
+          setStats(prev => ({
+            ...prev,
+            totalRevenue: revenue,
+            orderCount: fetchedOrders.length,
+            categorySales: catSales
+          }));
+        } catch (error) {
+          handleFirestoreError(error, OperationType.GET, path);
+        }
       } else if (activeTab === 'projects') {
-        const querySnapshot = await getDocs(collection(db, 'projects'));
-        const fetchedProjects = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setProjects(fetchedProjects);
-        setStats(prev => ({ ...prev, projectCount: fetchedProjects.length }));
+        const path = 'projects';
+        try {
+          const querySnapshot = await getDocs(collection(db, path));
+          const fetchedProjects = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setProjects(fetchedProjects);
+          setStats(prev => ({ ...prev, projectCount: fetchedProjects.length }));
+        } catch (error) {
+          handleFirestoreError(error, OperationType.GET, path);
+        }
       } else if (activeTab === 'analytics') {
-        const ordersSnap = await getDocs(collection(db, 'orders'));
-        const usersSnap = await getDocs(collection(db, 'users'));
-        
-        const fetchedOrders = ordersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
-        const fetchedUsers = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+        try {
+          const ordersSnap = await getDocs(collection(db, 'orders'));
+          const usersSnap = await getDocs(collection(db, 'users'));
+          
+          const fetchedOrders = ordersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+          const fetchedUsers = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
 
-        // Process Revenue by Month
-        const revenueMap: { [key: string]: number } = {};
-        fetchedOrders.forEach(order => {
-          if (order.status === 'paid' && order.createdAt) {
-            const date = order.createdAt.toDate();
-            const month = date.toLocaleString('default', { month: 'short', year: 'numeric' });
-            revenueMap[month] = (revenueMap[month] || 0) + (order.totalAmount || 0);
-          }
-        });
+          // Process Revenue by Month
+          const revenueMap: { [key: string]: number } = {};
+          fetchedOrders.forEach(order => {
+            if (order.status === 'paid' && order.createdAt) {
+              const date = order.createdAt.toDate();
+              const month = date.toLocaleString('default', { month: 'short', year: 'numeric' });
+              revenueMap[month] = (revenueMap[month] || 0) + (order.totalAmount || 0);
+            }
+          });
 
-        const revenueData = Object.entries(revenueMap)
-          .map(([name, total]) => ({ name, total }))
-          .sort((a, b) => new Date(a.name).getTime() - new Date(b.name).getTime());
+          const revenueData = Object.entries(revenueMap)
+            .map(([name, total]) => ({ name, total }))
+            .sort((a, b) => new Date(a.name).getTime() - new Date(b.name).getTime());
 
-        // Process Sales by Product
-        const productSalesMap: { [key: string]: number } = {};
-        fetchedOrders.forEach(order => {
-          if (order.status === 'paid' && order.items) {
-            order.items.forEach((item: any) => {
-              const name = item.name || 'Unknown Product';
-              productSalesMap[name] = (productSalesMap[name] || 0) + (item.price || 0) * (item.quantity || 0);
-            });
-          }
-        });
+          // Process Sales by Product
+          const productSalesMap: { [key: string]: number } = {};
+          fetchedOrders.forEach(order => {
+            if (order.status === 'paid' && order.items) {
+              order.items.forEach((item: any) => {
+                const name = item.name || 'Unknown Product';
+                productSalesMap[name] = (productSalesMap[name] || 0) + (item.price || 0) * (item.quantity || 0);
+              });
+            }
+          });
 
-        const productSalesData = Object.entries(productSalesMap)
-          .map(([name, total]) => ({ name, total }))
-          .sort((a, b) => b.total - a.total)
-          .slice(0, 5); // Top 5 products
+          const productSalesData = Object.entries(productSalesMap)
+            .map(([name, total]) => ({ name, total }))
+            .sort((a, b) => b.total - a.total)
+            .slice(0, 5); // Top 5 products
 
-        // Process Sales by Region
-        const regionSalesMap: { [key: string]: number } = {};
-        fetchedOrders.forEach(order => {
-          if (order.status === 'paid' && order.shippingInfo?.city) {
-            const region = order.shippingInfo.city;
-            regionSalesMap[region] = (regionSalesMap[region] || 0) + (order.totalAmount || 0);
-          }
-        });
+          // Process Sales by Region
+          const regionSalesMap: { [key: string]: number } = {};
+          fetchedOrders.forEach(order => {
+            if (order.status === 'paid' && order.shippingInfo?.city) {
+              const region = order.shippingInfo.city;
+              regionSalesMap[region] = (regionSalesMap[region] || 0) + (order.totalAmount || 0);
+            }
+          });
 
-        const totalRegionSales = Object.values(regionSalesMap).reduce((a, b) => a + b, 0);
-        const regionSalesData = Object.entries(regionSalesMap)
-          .map(([name, value]) => ({ 
-            name, 
-            value,
-            percent: totalRegionSales > 0 ? value / totalRegionSales : 0
-          }))
-          .sort((a, b) => b.value - a.value);
+          const totalRegionSales = Object.values(regionSalesMap).reduce((a, b) => a + b, 0);
+          const regionSalesData = Object.entries(regionSalesMap)
+            .map(([name, value]) => ({ 
+              name, 
+              value,
+              percent: totalRegionSales > 0 ? value / totalRegionSales : 0
+            }))
+            .sort((a, b) => b.value - a.value);
 
-        // Process User Growth by Month
-        const userMap: { [key: string]: number } = {};
-        fetchedUsers.forEach(u => {
-          if (u.createdAt) {
-            const date = u.createdAt.toDate();
-            const month = date.toLocaleString('default', { month: 'short', year: 'numeric' });
-            userMap[month] = (userMap[month] || 0) + 1;
-          }
-        });
+          // Process User Growth by Month
+          const userMap: { [key: string]: number } = {};
+          fetchedUsers.forEach(u => {
+            if (u.createdAt) {
+              const date = u.createdAt.toDate();
+              const month = date.toLocaleString('default', { month: 'short', year: 'numeric' });
+              userMap[month] = (userMap[month] || 0) + 1;
+            }
+          });
 
-        const userData = Object.entries(userMap)
-          .map(([name, count]) => ({ name, count }))
-          .sort((a, b) => new Date(a.name).getTime() - new Date(b.name).getTime());
+          const userData = Object.entries(userMap)
+            .map(([name, count]) => ({ name, count }))
+            .sort((a, b) => new Date(a.name).getTime() - new Date(b.name).getTime());
 
-        setAnalyticsData({
-          revenueByMonth: revenueData,
-          userGrowthByMonth: userData,
-          salesByProduct: productSalesData,
-          salesByRegion: regionSalesData
-        });
+          setAnalyticsData({
+            revenueByMonth: revenueData,
+            userGrowthByMonth: userData,
+            salesByProduct: productSalesData,
+            salesByRegion: regionSalesData
+          });
+        } catch (error) {
+          handleFirestoreError(error, OperationType.GET, 'analytics');
+        }
       }
     } catch (error) {
       console.error(`Error fetching ${activeTab}:`, error);
@@ -1216,6 +1254,13 @@ const AdminDashboard = () => {
             <div className="p-8 border-b border-black/5 flex justify-between items-center bg-stone-50/30">
               <h3 className="font-bold">Project Approvals</h3>
               <div className="flex items-center space-x-4">
+                <button
+                  onClick={() => setIsAddProjectModalOpen(true)}
+                  className="flex items-center space-x-2 px-4 py-2 bg-black text-white text-xs font-bold rounded-xl hover:bg-black/80 transition-all"
+                >
+                  <Plus size={16} />
+                  <span>Create Project</span>
+                </button>
                 <div className="flex items-center bg-white border border-black/10 rounded-xl px-4 py-2">
                   <Filter size={16} className="text-black/40 mr-2" />
                   <select 
@@ -1526,16 +1571,18 @@ const AdminDashboard = () => {
                   <ResponsiveContainer width="100%" height="100%">
                     <RePieChart>
                       <Pie
-                        activeIndex={activePieIndex}
-                        activeShape={renderActiveShape}
-                        data={analyticsData.salesByRegion}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={80}
-                        paddingAngle={5}
-                        dataKey="value"
-                        onMouseEnter={(_, index) => setActivePieIndex(index)}
+                        {...({
+                          activeIndex: activePieIndex,
+                          activeShape: renderActiveShape,
+                          data: analyticsData.salesByRegion,
+                          cx: "50%",
+                          cy: "50%",
+                          innerRadius: 60,
+                          outerRadius: 80,
+                          paddingAngle: 5,
+                          dataKey: "value",
+                          onMouseEnter: (_: any, index: number) => setActivePieIndex(index)
+                        } as any)}
                       >
                         {analyticsData.salesByRegion.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={['#059669', '#2563eb', '#f59e0b', '#ef4444', '#8b5cf6'][index % 5]} />
@@ -1583,6 +1630,15 @@ const AdminDashboard = () => {
         onClose={() => setIsEditServiceModalOpen(false)}
         onSuccess={fetchData}
         service={selectedService}
+      />
+
+      <AddProjectModal
+        isOpen={isAddProjectModalOpen}
+        onClose={() => setIsAddProjectModalOpen(false)}
+        onSuccess={() => {
+          fetchData();
+          setMessage({ type: 'success', text: 'Project created successfully' });
+        }}
       />
     </div>
   );

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, addDoc, serverTimestamp, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'motion/react';
 import { Helmet } from 'react-helmet-async';
@@ -34,7 +35,7 @@ const MicroFunding = () => {
           setProjects(allProjects.filter((p: any) => p.isApproved === true));
         }
       } catch (error) {
-        console.error("Error fetching projects:", error);
+        handleFirestoreError(error, OperationType.GET, 'projects');
       }
     };
     fetchProjects();
@@ -73,7 +74,7 @@ const MicroFunding = () => {
       setMilestones([]);
       window.location.reload();
     } catch (error) {
-      console.error("Error creating project:", error);
+      handleFirestoreError(error, OperationType.CREATE, 'projects');
     }
   };
 
@@ -86,7 +87,7 @@ const MicroFunding = () => {
       });
       window.location.reload();
     } catch (error) {
-      console.error("Error supporting project:", error);
+      handleFirestoreError(error, OperationType.UPDATE, `projects/${projectId}`);
     }
   };
 

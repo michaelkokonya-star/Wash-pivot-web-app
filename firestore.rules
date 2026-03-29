@@ -58,7 +58,8 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() && 
-        request.auth.token.email.lower() == "michael.kokonya@washpivot.com" &&
+        'email' in request.auth.token &&
+        request.auth.token.email.toLower() == "michael.kokonya@washpivot.com" &&
         request.auth.token.email_verified == true;
     }
 
@@ -74,25 +75,34 @@ service cloud.firestore {
     // Domain Validators
     // ===============================================================
     function isValidUser(data, userId) {
-      return hasOnlyAllowedFields(['uid', 'displayName', 'email', 'role', 'expertise', 'academics', 'bio', 'createdAt', 'photoURL', 'hasSeenWelcome', 'onboardingCompleted', 'expertJoinedAt', 'isApproved', 'showContacts', 'phoneNumber']) &&
+      let isAnonymous = request.auth.token.firebase.sign_in_provider == 'anonymous';
+      return hasOnlyAllowedFields(['uid', 'displayName', 'email', 'role', 'expertise', 'academics', 'bio', 'createdAt', 'photoURL', 'hasSeenWelcome', 'onboardingCompleted', 'expertJoinedAt', 'isApproved', 'showContacts', 'phoneNumber', 'lastLogin', 'updatedAt', 'subSpecialty', 'yearsOfExperience', 'keyProjects', 'availability', 'phone', 'contactEmail']) &&
              data.uid == userId &&
-             data.displayName is string && data.displayName.size() > 0 && data.displayName.size() < 100 &&
-             isValidEmail(data.email) &&
+             data.displayName is string && data.displayName.size() >= 0 && data.displayName.size() < 100 &&
+             (isAnonymous ? (data.email == "" || isValidEmail(data.email)) : isValidEmail(data.email)) &&
              data.role in ['user', 'expert', 'admin'] &&
              data.isApproved is bool &&
              data.showContacts is bool &&
              (!('phoneNumber' in data) || (data.phoneNumber is string && data.phoneNumber.size() < 20)) &&
              (!('expertise' in data) || (data.expertise is string && data.expertise.size() < 200)) &&
              (!('academics' in data) || (data.academics is string && data.academics.size() < 500)) &&
-             (!('bio' in data) || (data.bio is string && data.bio.size() < 2000)) &&
+             (!('bio' in data) || (data.bio is string && data.bio.size() < 5000)) &&
              (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() < 1000)) &&
              (!('hasSeenWelcome' in data) || data.hasSeenWelcome is bool) &&
              (!('onboardingCompleted' in data) || data.onboardingCompleted is bool) &&
-             (!('expertJoinedAt' in data) || data.expertJoinedAt is string);
+             (!('expertJoinedAt' in data) || data.expertJoinedAt is string) &&
+             (!('lastLogin' in data) || data.lastLogin is timestamp) &&
+             (!('updatedAt' in data) || data.updatedAt is timestamp) &&
+             (!('subSpecialty' in data) || (data.subSpecialty is string && data.subSpecialty.size() < 200)) &&
+             (!('yearsOfExperience' in data) || (data.yearsOfExperience is string || data.yearsOfExperience is number)) &&
+             (!('keyProjects' in data) || (data.keyProjects is string && data.keyProjects.size() < 2000)) &&
+             (!('availability' in data) || data.availability is list) &&
+             (!('phone' in data) || (data.phone is string && data.phone.size() < 20)) &&
+             (!('contactEmail' in data) || isValidEmail(data.contactEmail));
     }
 
     function isValidPublicProfile(data, userId) {
-      return hasOnlyAllowedFields(['uid', 'displayName', 'role', 'expertise', 'academics', 'bio', 'photoURL', 'expertJoinedAt', 'isApproved', 'showContacts', 'phoneNumber']) &&
+      return hasOnlyAllowedFields(['uid', 'displayName', 'role', 'expertise', 'academics', 'bio', 'photoURL', 'expertJoinedAt', 'isApproved', 'showContacts', 'phoneNumber', 'updatedAt', 'subSpecialty', 'yearsOfExperience', 'keyProjects', 'availability', 'phone', 'contactEmail']) &&
              data.uid == userId &&
              data.displayName is string && data.displayName.size() > 0 && data.displayName.size() < 100 &&
              data.role == 'expert' &&
@@ -101,9 +111,16 @@ service cloud.firestore {
              (!('phoneNumber' in data) || (data.phoneNumber is string && data.phoneNumber.size() < 20)) &&
              data.expertise is string && data.expertise.size() < 200 &&
              data.academics is string && data.academics.size() < 500 &&
-             data.bio is string && data.bio.size() < 2000 &&
+             data.bio is string && data.bio.size() < 5000 &&
              (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() < 1000)) &&
-             data.expertJoinedAt is string;
+             data.expertJoinedAt is string &&
+             (!('updatedAt' in data) || data.updatedAt is timestamp) &&
+             (!('subSpecialty' in data) || (data.subSpecialty is string && data.subSpecialty.size() < 200)) &&
+             (!('yearsOfExperience' in data) || (data.yearsOfExperience is string || data.yearsOfExperience is number)) &&
+             (!('keyProjects' in data) || (data.keyProjects is string && data.keyProjects.size() < 2000)) &&
+             (!('availability' in data) || data.availability is list) &&
+             (!('phone' in data) || (data.phone is string && data.phone.size() < 20)) &&
+             (!('contactEmail' in data) || isValidEmail(data.contactEmail));
     }
 
     function isValidProduct(data) {
@@ -175,7 +192,7 @@ service cloud.firestore {
     // ===============================================================
 
     match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin() || (resource != null && resource.data.role == 'expert' && resource.data.isApproved == true));
       allow create: if isOwner(userId) && isValidUser(request.resource.data, userId) && 
                       request.resource.data.isApproved == false && 
                       (request.resource.data.role != 'admin' || isAdmin());

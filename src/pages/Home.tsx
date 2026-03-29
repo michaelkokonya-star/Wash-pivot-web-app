@@ -30,11 +30,13 @@ const Home = () => {
         },
       });
 
-      for (const part of response.candidates[0].content.parts) {
-        if (part.inlineData) {
-          const base64EncodeString = part.inlineData.data;
-          setGeneratedImage(`data:image/png;base64,${base64EncodeString}`);
-          break;
+      if (response.candidates && response.candidates[0]?.content?.parts) {
+        for (const part of response.candidates[0].content.parts) {
+          if (part.inlineData) {
+            const base64EncodeString = part.inlineData.data;
+            setGeneratedImage(`data:image/png;base64,${base64EncodeString}`);
+            break;
+          }
         }
       }
     } catch (error) {

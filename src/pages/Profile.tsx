@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { doc, updateDoc, getDoc, collection, query, where, orderBy, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, Mail, Shield, CheckCircle2, XCircle, Phone, Eye, EyeOff, Save, Loader2, Award, GraduationCap, Briefcase, Clock, Settings, LogOut, Sparkles, Package, ExternalLink } from 'lucide-react';
+import { User, Mail, Shield, CheckCircle2, XCircle, Phone, Eye, EyeOff, Save, Loader2, Award, GraduationCap, Briefcase, Clock, Settings, LogOut, Sparkles, Package, ExternalLink, Lock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 interface OrderItem {
@@ -65,8 +66,9 @@ const Profile = () => {
   useEffect(() => {
     const fetchOrders = async () => {
       if (!user) return;
+      const path = 'orders';
       try {
-        const ordersRef = collection(db, 'orders');
+        const ordersRef = collection(db, path);
         const q = query(
           ordersRef,
           where('userId', '==', user.uid),
@@ -79,7 +81,7 @@ const Profile = () => {
         })) as Order[];
         setOrders(fetchedOrders);
       } catch (error) {
-        console.error("Error fetching orders:", error);
+        handleFirestoreError(error, OperationType.GET, path);
       } finally {
         setOrdersLoading(false);
       }

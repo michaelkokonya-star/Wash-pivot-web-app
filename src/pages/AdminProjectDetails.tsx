@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'motion/react';
 import { 
@@ -14,14 +15,22 @@ import { toast } from 'sonner';
 const AdminProjectDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { profile, loading: authLoading } = useAuth();
   const [project, setProject] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const isAdmin = profile?.role === 'admin';
   const [actionLoading, setActionLoading] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && !isAdmin) {
+      navigate('/');
+    }
+  }, [isAdmin, authLoading, navigate]);
 
   useEffect(() => {
     if (!id) return;
 
+    const path = `projects/${id}`;
     const unsubscribe = onSnapshot(doc(db, 'projects', id), (docSnap) => {
       if (docSnap.exists()) {
         setProject({ id: docSnap.id, ...docSnap.data() });
@@ -30,8 +39,7 @@ const AdminProjectDetails = () => {
       }
       setLoading(false);
     }, (error) => {
-      console.error("Error fetching project:", error);
-      toast.error("Failed to load project details");
+      handleFirestoreError(error, OperationType.GET, path);
       setLoading(false);
     });
 

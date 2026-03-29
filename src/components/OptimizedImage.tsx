@@ -89,22 +89,23 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         )}
       </AnimatePresence>
       <motion.img
-        src={optimizedSrc}
-        alt={alt}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: isLoaded ? 1 : 0 }}
-        transition={{ duration: 0.5 }}
-        onLoad={() => setIsLoaded(true)}
-        onError={() => {
-          setHasError(true);
-          setIsLoaded(false);
-        }}
-        loading={priority ? "eager" : "lazy"}
-        // @ts-ignore - fetchPriority is supported in React 18.2+ but might be missing from some type definitions
-        fetchPriority={priority ? "high" : "auto"}
-        className={`w-full h-full object-cover ${className}`}
-        referrerPolicy="no-referrer"
-        {...props}
+        {...({
+          src: optimizedSrc,
+          alt: alt,
+          initial: { opacity: 0 },
+          animate: { opacity: isLoaded ? 1 : 0 },
+          transition: { duration: 0.5 },
+          onLoad: () => setIsLoaded(true),
+          onError: () => {
+            setHasError(true);
+            setIsLoaded(false);
+          },
+          loading: priority ? "eager" : "lazy",
+          fetchPriority: priority ? "high" : "auto",
+          className: `w-full h-full object-cover ${className}`,
+          referrerPolicy: "no-referrer",
+          ...props
+        } as any)}
       />
     </div>
   );

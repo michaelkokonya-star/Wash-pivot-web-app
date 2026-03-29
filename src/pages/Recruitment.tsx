@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, query, where, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'motion/react';
 import { User, Briefcase, GraduationCap, Search, Filter, Mail, Award, Sparkles, Trash2 } from 'lucide-react';
@@ -18,9 +19,10 @@ const Recruitment = () => {
 
   const fetchExperts = async () => {
     setLoading(true);
+    const path = 'public_profiles';
     try {
       const q = query(
-        collection(db, 'public_profiles'), 
+        collection(db, path), 
         where('role', '==', 'expert'),
         where('isApproved', '==', true)
       );
@@ -31,7 +33,7 @@ const Recruitment = () => {
       }));
       setExperts(expertsData);
     } catch (error) {
-      console.error("Error fetching experts:", error);
+      handleFirestoreError(error, OperationType.GET, path);
     } finally {
       setLoading(false);
     }
