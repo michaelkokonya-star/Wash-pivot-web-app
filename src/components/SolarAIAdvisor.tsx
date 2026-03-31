@@ -34,6 +34,8 @@ interface Appliance {
   quantity: number;
 }
 
+const SUPER_ADMIN_EMAIL = 'michael.kokonya@washpivot.com';
+
 const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -134,12 +136,14 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
     try {
       // Check for API key selection if using a potentially paid model
       if (window.aistudio && !(await window.aistudio.hasSelectedApiKey())) {
-        await window.aistudio.openSelectKey();
-        // After opening, we should stop and let the user select.
-        // The user will need to click calculate again after selecting.
-        setIsLoading(false);
-        toast.info("Please select an API key in the dialog and then click Calculate again.");
-        return;
+        if (auth.currentUser?.email === SUPER_ADMIN_EMAIL) {
+          await window.aistudio.openSelectKey();
+          setIsLoading(false);
+          toast.info("Please select an API key in the dialog and then click Calculate again.");
+          return;
+        } else {
+          throw new Error("Solar Advisor is currently being configured by the administrator. Please try again later.");
+        }
       }
 
       const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
@@ -343,7 +347,7 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
             className="overflow-hidden"
           >
             <div className="mt-4 p-8 bg-stone-900 rounded-3xl border border-white/5 space-y-8">
-              {!hasApiKey && (
+              {!hasApiKey && auth.currentUser?.email === SUPER_ADMIN_EMAIL && (
                 <div className="p-6 bg-amber-500/10 border border-amber-500/20 rounded-2xl space-y-4">
                   <div className="flex items-center space-x-3 text-amber-400">
                     <Info size={20} />
