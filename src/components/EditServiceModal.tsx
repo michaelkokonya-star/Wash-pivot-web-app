@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Upload, Save, Loader2, Mail, Phone, MapPin, Image as ImageIcon } from 'lucide-react';
 import { doc, updateDoc } from 'firebase/firestore';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
 import { compressImage, sanitizeFilename } from '../lib/image-utils';
 import { toast } from 'sonner';
@@ -78,33 +78,20 @@ const EditServiceModal: React.FC<EditServiceModalProps> = ({ isOpen, onClose, on
         const safeName = sanitizeFilename(imageFile.name);
         const storageRef = ref(storage, `services/${Date.now()}_${safeName}`);
         
-        const uploadTask = uploadBytesResumable(storageRef, compressedFile);
+        setUploadStatus('uploading');
+        setUploadProgress(10); // Start at 10% to show activity
         
-        // Set initial progress to 1% to show activity
-        setUploadProgress(1);
-        
-        finalImageUrl = await new Promise((resolve, reject) => {
-          uploadTask.on('state_changed', 
-            (snapshot) => {
-              if (snapshot.totalBytes > 0) {
-                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                setUploadProgress(Math.max(1, progress)); // Ensure at least 1%
-              }
-            }, 
-            (error) => {
-              console.error("Upload error:", error);
-              reject(error);
-            }
-          );
-          
-          uploadTask.then(async (snapshot) => {
-            const downloadURL = await getDownloadURL(snapshot.ref);
-            resolve(downloadURL);
-          }).catch((error) => {
-            console.error("Upload task promise error:", error);
-            reject(error);
-          });
-        });
+        try {
+          console.log("Starting upload to:", storageRef.fullPath);
+          const snapshot = await uploadBytes(storageRef, compressedFile);
+          console.log("Upload successful, getting download URL...");
+          setUploadProgress(90); // Almost done
+          finalImageUrl = await getDownloadURL(snapshot.ref);
+          setUploadProgress(100);
+        } catch (uploadError) {
+          console.error("Detailed upload error:", uploadError);
+          throw uploadError;
+        }
       }
 
       setUploadStatus('saving');
