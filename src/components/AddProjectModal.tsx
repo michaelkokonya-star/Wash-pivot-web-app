@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Upload, Plus, Loader2 } from 'lucide-react';
+import { X, Upload, Plus, Loader2, Image as ImageIcon } from 'lucide-react';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 
 interface AddProjectModalProps {
@@ -14,6 +15,10 @@ interface AddProjectModalProps {
 const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const { user, profile } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -22,14 +27,35 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSu
     imageUrl: ''
   });
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
     setLoading(true);
 
     try {
+      let finalImageUrl = formData.imageUrl;
+
+      if (imageFile) {
+        const storageRef = ref(storage, `projects/${Date.now()}_${imageFile.name}`);
+        const snapshot = await uploadBytes(storageRef, imageFile);
+        finalImageUrl = await getDownloadURL(snapshot.ref);
+      }
+
       await addDoc(collection(db, 'projects'), {
         ...formData,
+        imageUrl: finalImageUrl,
         targetFunding: parseFloat(formData.targetFunding),
         currentFunding: 0,
         status: 'active',
@@ -48,6 +74,8 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSu
         category: 'Water',
         imageUrl: ''
       });
+      setImageFile(null);
+      setImagePreview(null);
     } catch (error) {
       console.error("Error adding project:", error);
       alert("Failed to add project. Check console for details.");
@@ -128,16 +156,48 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSu
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Image URL</label>
-                <div className="relative">
-                  <input
-                    type="url"
-                    value={formData.imageUrl}
-                    onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                    className="w-full pl-12 pr-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors"
-                    placeholder="https://images.unsplash.com/..."
-                  />
-                  <Upload size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-black/20" />
+                <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Project Image</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="relative aspect-video bg-stone-50 border-2 border-dashed border-black/5 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-stone-100 hover:border-emerald-600/30 transition-all group overflow-hidden"
+                  >
+                    {imagePreview ? (
+                      <>
+                        <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <Upload className="text-white" size={24} />
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <Upload size={24} className="text-black/20 mb-2 group-hover:text-emerald-600 transition-colors" />
+                        <span className="text-[10px] font-bold text-black/40 uppercase tracking-widest group-hover:text-emerald-600 transition-colors">Upload Photo</span>
+                      </>
+                    )}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                  </div>
+                  <div className="space-y-4">
+                    <div className="relative">
+                      <input
+                        type="url"
+                        value={formData.imageUrl}
+                        onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                        className="w-full pl-10 pr-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors text-xs"
+                        placeholder="Or paste image URL..."
+                      />
+                      <ImageIcon size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-black/20" />
+                    </div>
+                    <p className="text-[9px] text-black/30 leading-relaxed">
+                      Upload a high-quality photo representing the project. If no image is provided, a placeholder will be generated.
+                    </p>
+                  </div>
                 </div>
               </div>
 
