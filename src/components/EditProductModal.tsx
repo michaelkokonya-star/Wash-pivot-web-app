@@ -76,18 +76,30 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
         
         const uploadTask = uploadBytesResumable(storageRef, compressedFile);
         
+        // Set initial progress to 1% to show activity
+        setUploadProgress(1);
+        
         finalImageUrl = await new Promise((resolve, reject) => {
           uploadTask.on('state_changed', 
             (snapshot) => {
-              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-              setUploadProgress(progress);
+              if (snapshot.totalBytes > 0) {
+                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                setUploadProgress(Math.max(1, progress)); // Ensure at least 1%
+              }
             }, 
-            (error) => reject(error), 
-            async () => {
-              const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-              resolve(downloadURL);
+            (error) => {
+              console.error("Upload error:", error);
+              reject(error);
             }
           );
+          
+          uploadTask.then(async (snapshot) => {
+            const downloadURL = await getDownloadURL(snapshot.ref);
+            resolve(downloadURL);
+          }).catch((error) => {
+            console.error("Upload task promise error:", error);
+            reject(error);
+          });
         });
       }
 

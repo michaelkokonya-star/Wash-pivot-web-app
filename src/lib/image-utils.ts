@@ -1,11 +1,17 @@
 import imageCompression from 'browser-image-compression';
 
 export const compressImage = async (file: File): Promise<File> => {
+  // If file is already small (under 400KB), skip compression to save time
+  if (file.size < 400 * 1024) {
+    return file;
+  }
+
   const options = {
-    maxSizeMB: 0.2, // Reduced from 1MB to 200KB for much faster uploads
-    maxWidthOrHeight: 1024, // Reduced from 1200 to 1024
+    maxSizeMB: 0.2,
+    maxWidthOrHeight: 1024,
     useWebWorker: true,
-    initialQuality: 0.7, // Added initial quality to speed up compression
+    initialQuality: 0.6, // Lowered initial quality for faster processing
+    maxIteration: 3, // Limit iterations to prevent hanging on compression
   };
 
   try {
