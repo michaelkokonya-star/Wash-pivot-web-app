@@ -15,3 +15,7 @@ export const compressImage = async (file: File): Promise<File> => {
     return file; // Return original file if compression fails
   }
 };
+
+export const sanitizeFilename = (filename: string): string => {
+  return filename.replace(/[^a-z0-9.]/gi, '_').toLowerCase();
+};

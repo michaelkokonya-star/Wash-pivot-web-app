@@ -4,7 +4,8 @@ import { X, Upload, Save, Loader2, Image as ImageIcon } from 'lucide-react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
-import { compressImage } from '../lib/image-utils';
+import { compressImage, sanitizeFilename } from '../lib/image-utils';
+import { toast } from 'sonner';
 
 interface EditProductModalProps {
   isOpen: boolean;
@@ -64,7 +65,8 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
 
       if (imageFile) {
         const compressedFile = await compressImage(imageFile);
-        const storageRef = ref(storage, `products/${Date.now()}_${imageFile.name}`);
+        const safeName = sanitizeFilename(imageFile.name);
+        const storageRef = ref(storage, `products/${Date.now()}_${safeName}`);
         const snapshot = await uploadBytes(storageRef, compressedFile);
         finalImageUrl = await getDownloadURL(snapshot.ref);
       }
@@ -77,9 +79,10 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
       });
       onSuccess();
       onClose();
+      toast.success("Product updated successfully!");
     } catch (error) {
       console.error("Error updating product:", error);
-      alert("Failed to update product. Check console for details.");
+      toast.error("Failed to update product. Please try again.");
     } finally {
       setLoading(false);
     }

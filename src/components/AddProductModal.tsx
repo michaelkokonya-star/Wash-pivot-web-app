@@ -4,7 +4,8 @@ import { X, Upload, Plus, Loader2, Image as ImageIcon } from 'lucide-react';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
-import { compressImage } from '../lib/image-utils';
+import { compressImage, sanitizeFilename } from '../lib/image-utils';
+import { toast } from 'sonner';
 
 interface AddProductModalProps {
   isOpen: boolean;
@@ -48,7 +49,8 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
 
       if (imageFile) {
         const compressedFile = await compressImage(imageFile);
-        const storageRef = ref(storage, `products/${Date.now()}_${imageFile.name}`);
+        const safeName = sanitizeFilename(imageFile.name);
+        const storageRef = ref(storage, `products/${Date.now()}_${safeName}`);
         const snapshot = await uploadBytes(storageRef, compressedFile);
         finalImageUrl = await getDownloadURL(snapshot.ref);
       }
@@ -61,6 +63,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
       });
       onSuccess();
       onClose();
+      toast.success("Product added successfully!");
       setFormData({
         name: '',
         price: '',
@@ -73,7 +76,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
       setImagePreview(null);
     } catch (error) {
       console.error("Error adding product:", error);
-      alert("Failed to add product. Check console for details.");
+      toast.error("Failed to add product. Please try again.");
     } finally {
       setLoading(false);
     }

@@ -4,7 +4,8 @@ import { X, Upload, Save, Loader2, Mail, Phone, MapPin, Image as ImageIcon } fro
 import { doc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
-import { compressImage } from '../lib/image-utils';
+import { compressImage, sanitizeFilename } from '../lib/image-utils';
+import { toast } from 'sonner';
 
 interface EditServiceModalProps {
   isOpen: boolean;
@@ -68,7 +69,8 @@ const EditServiceModal: React.FC<EditServiceModalProps> = ({ isOpen, onClose, on
 
       if (imageFile) {
         const compressedFile = await compressImage(imageFile);
-        const storageRef = ref(storage, `services/${Date.now()}_${imageFile.name}`);
+        const safeName = sanitizeFilename(imageFile.name);
+        const storageRef = ref(storage, `services/${Date.now()}_${safeName}`);
         const snapshot = await uploadBytes(storageRef, compressedFile);
         finalImageUrl = await getDownloadURL(snapshot.ref);
       }
@@ -80,9 +82,10 @@ const EditServiceModal: React.FC<EditServiceModalProps> = ({ isOpen, onClose, on
       });
       onSuccess();
       onClose();
+      toast.success("Service provider updated successfully!");
     } catch (error) {
       console.error("Error updating service provider:", error);
-      alert("Failed to update service provider. Check console for details.");
+      toast.error("Failed to update service provider. Please try again.");
     } finally {
       setLoading(false);
     }

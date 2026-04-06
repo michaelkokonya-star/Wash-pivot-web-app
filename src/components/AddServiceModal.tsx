@@ -4,7 +4,8 @@ import { X, Upload, Plus, Loader2, Mail, Phone, MapPin, Image as ImageIcon } fro
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
-import { compressImage } from '../lib/image-utils';
+import { compressImage, sanitizeFilename } from '../lib/image-utils';
+import { toast } from 'sonner';
 
 interface AddServiceModalProps {
   isOpen: boolean;
@@ -50,7 +51,8 @@ const AddServiceModal: React.FC<AddServiceModalProps> = ({ isOpen, onClose, onSu
 
       if (imageFile) {
         const compressedFile = await compressImage(imageFile);
-        const storageRef = ref(storage, `services/${Date.now()}_${imageFile.name}`);
+        const safeName = sanitizeFilename(imageFile.name);
+        const storageRef = ref(storage, `services/${Date.now()}_${safeName}`);
         const snapshot = await uploadBytes(storageRef, compressedFile);
         finalImageUrl = await getDownloadURL(snapshot.ref);
       }
@@ -63,6 +65,7 @@ const AddServiceModal: React.FC<AddServiceModalProps> = ({ isOpen, onClose, onSu
       });
       onSuccess();
       onClose();
+      toast.success("Service provider added successfully!");
       setFormData({
         name: '',
         category: 'Installation',
@@ -77,7 +80,7 @@ const AddServiceModal: React.FC<AddServiceModalProps> = ({ isOpen, onClose, onSu
       setImagePreview(null);
     } catch (error) {
       console.error("Error adding service provider:", error);
-      alert("Failed to add service provider. Check console for details.");
+      toast.error("Failed to add service provider. Please try again.");
     } finally {
       setLoading(false);
     }

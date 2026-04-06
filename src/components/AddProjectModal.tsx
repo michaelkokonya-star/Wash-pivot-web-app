@@ -5,7 +5,8 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
 import { useAuth } from '../context/AuthContext';
-import { compressImage } from '../lib/image-utils';
+import { compressImage, sanitizeFilename } from '../lib/image-utils';
+import { toast } from 'sonner';
 
 interface AddProjectModalProps {
   isOpen: boolean;
@@ -50,7 +51,8 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSu
 
       if (imageFile) {
         const compressedFile = await compressImage(imageFile);
-        const storageRef = ref(storage, `projects/${Date.now()}_${imageFile.name}`);
+        const safeName = sanitizeFilename(imageFile.name);
+        const storageRef = ref(storage, `projects/${Date.now()}_${safeName}`);
         const snapshot = await uploadBytes(storageRef, compressedFile);
         finalImageUrl = await getDownloadURL(snapshot.ref);
       }
@@ -63,12 +65,13 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSu
         status: 'active',
         isApproved: true,
         ownerUid: user.uid,
-        ownerName: profile?.name || user.displayName || 'Admin',
+        ownerName: profile?.displayName || user.displayName || 'Admin',
         createdAt: serverTimestamp(),
         milestones: []
       });
       onSuccess();
       onClose();
+      toast.success("Project created successfully!");
       setFormData({
         title: '',
         description: '',
@@ -80,7 +83,7 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSu
       setImagePreview(null);
     } catch (error) {
       console.error("Error adding project:", error);
-      alert("Failed to add project. Check console for details.");
+      toast.error("Failed to create project. Please try again.");
     } finally {
       setLoading(false);
     }
