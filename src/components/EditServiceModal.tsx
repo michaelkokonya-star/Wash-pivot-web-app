@@ -221,7 +221,6 @@ const EditServiceModal: React.FC<EditServiceModalProps> = ({ isOpen, onClose, on
                 <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Image URL</label>
                 <div className="relative">
                   <input
-                    required
                     type="url"
                     value={formData.imageUrl}
                     onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}

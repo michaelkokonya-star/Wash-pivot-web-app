@@ -26,7 +26,7 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
 
   // Function to optimize Unsplash/Picsum URLs
   const getOptimizedUrl = (url: string) => {
-    if (!url) return url;
+    if (!url) return `https://picsum.photos/seed/${encodeURIComponent(alt)}/800/600`;
     if (url.startsWith('data:')) return url; // Base64 images (like GenAI output)
 
     try {
