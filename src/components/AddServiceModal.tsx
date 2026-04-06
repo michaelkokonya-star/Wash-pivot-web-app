@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Upload, Plus, Loader2, Mail, Phone, MapPin, Image as ImageIcon } from 'lucide-react';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
 import { compressImage, sanitizeFilename } from '../lib/image-utils';
 import { toast } from 'sonner';
@@ -15,6 +15,8 @@ interface AddServiceModalProps {
 
 const AddServiceModal: React.FC<AddServiceModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'compressing' | 'uploading' | 'saving'>('idle');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -45,18 +47,37 @@ const AddServiceModal: React.FC<AddServiceModalProps> = ({ isOpen, onClose, onSu
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setUploadStatus('idle');
 
     try {
       let finalImageUrl = formData.imageUrl;
 
       if (imageFile) {
+        setUploadStatus('compressing');
         const compressedFile = await compressImage(imageFile);
+        
+        setUploadStatus('uploading');
         const safeName = sanitizeFilename(imageFile.name);
         const storageRef = ref(storage, `services/${Date.now()}_${safeName}`);
-        const snapshot = await uploadBytes(storageRef, compressedFile);
-        finalImageUrl = await getDownloadURL(snapshot.ref);
+        
+        const uploadTask = uploadBytesResumable(storageRef, compressedFile);
+        
+        finalImageUrl = await new Promise((resolve, reject) => {
+          uploadTask.on('state_changed', 
+            (snapshot) => {
+              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+              setUploadProgress(progress);
+            }, 
+            (error) => reject(error), 
+            async () => {
+              const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+              resolve(downloadURL);
+            }
+          );
+        });
       }
 
+      setUploadStatus('saving');
       await addDoc(collection(db, 'service_providers'), {
         ...formData,
         imageUrl: finalImageUrl,
@@ -309,7 +330,11 @@ const AddServiceModal: React.FC<AddServiceModalProps> = ({ isOpen, onClose, onSu
                 {loading ? (
                   <>
                     <Loader2 className="animate-spin" size={20} />
-                    <span>{imageFile ? 'Optimizing & Uploading...' : 'Adding Service Provider...'}</span>
+                    <span>
+                      {uploadStatus === 'compressing' ? 'Optimizing...' : 
+                       uploadStatus === 'uploading' ? `Uploading ${Math.round(uploadProgress)}%` : 
+                       uploadStatus === 'saving' ? 'Saving...' : 'Processing...'}
+                    </span>
                   </>
                 ) : (
                   <>
