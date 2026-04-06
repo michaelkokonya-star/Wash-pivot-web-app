@@ -59,8 +59,7 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() && 
         'email' in request.auth.token &&
-        request.auth.token.email == "michael.kokonya@washpivot.com" &&
-        request.auth.token.email_verified == true;
+        request.auth.token.email.lower() == "michael.kokonya@washpivot.com";
     }
 
     function isValidEmail(email) {
@@ -194,11 +193,11 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin() || (resource != null && resource.data.role == 'expert' && resource.data.isApproved == true));
       allow create: if isOwner(userId) && isValidUser(request.resource.data, userId) && 
-                      request.resource.data.isApproved == false && 
+                      (isAdmin() || request.resource.data.isApproved == false || request.auth.token.firebase.sign_in_provider == 'google.com') && 
                       (request.resource.data.role != 'admin' || isAdmin());
       allow update: if (isOwner(userId) && isValidUser(request.resource.data, userId) && 
-                        request.resource.data.isApproved == resource.data.isApproved && 
-                        (request.resource.data.role == resource.data.role || isAdmin())) || 
+                        (isAdmin() || (request.resource.data.isApproved == resource.data.isApproved && 
+                         (request.resource.data.role == resource.data.role || request.resource.data.role == 'expert')))) || 
                       (isAdmin() && isValidUser(request.resource.data, userId));
       allow delete: if isAdmin();
     }
@@ -218,8 +217,7 @@ service cloud.firestore {
     match /projects/{projectId} {
       allow read: if true;
       allow create: if isAuthenticated() && isValidProject(request.resource.data) && 
-                      request.resource.data.isApproved == false && 
-                      request.resource.data.status == 'pending';
+                      (isAdmin() || (request.resource.data.isApproved == false && request.resource.data.status == 'pending'));
       allow update: if isAuthenticated() && (isAdmin() || (request.auth.uid == resource.data.ownerUid && 
                                                           isValidProject(request.resource.data) && 
                                                           request.resource.data.isApproved == resource.data.isApproved && 

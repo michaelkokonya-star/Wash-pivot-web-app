@@ -1,6 +1,6 @@
 [
   {
-    "origin": ["https://www.washpivot.com", "https://washpivot.com", "http://localhost:3000"],
+    "origin": ["https://www.washpivot.com", "https://washpivot.com", "http://localhost:3000", "https://ais-dev-3kodjpnxnbg2zdw6yssdb6-144546841933.europe-west1.run.app", "https://ais-pre-3kodjpnxnbg2zdw6yssdb6-144546841933.europe-west1.run.app"],
     "method": ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"],
     "responseHeader": ["Content-Type", "Authorization", "x-goog-resumable"],
     "maxAgeSeconds": 3600
