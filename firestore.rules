@@ -59,7 +59,7 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() && 
         'email' in request.auth.token &&
-        request.auth.token.email.toLower() == "michael.kokonya@washpivot.com" &&
+        request.auth.token.email == "michael.kokonya@washpivot.com" &&
         request.auth.token.email_verified == true;
     }
 
