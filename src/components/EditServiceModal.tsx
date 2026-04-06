@@ -4,6 +4,7 @@ import { X, Upload, Save, Loader2, Mail, Phone, MapPin, Image as ImageIcon } fro
 import { doc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
+import { compressImage } from '../lib/image-utils';
 
 interface EditServiceModalProps {
   isOpen: boolean;
@@ -66,8 +67,9 @@ const EditServiceModal: React.FC<EditServiceModalProps> = ({ isOpen, onClose, on
       let finalImageUrl = formData.imageUrl;
 
       if (imageFile) {
+        const compressedFile = await compressImage(imageFile);
         const storageRef = ref(storage, `services/${Date.now()}_${imageFile.name}`);
-        const snapshot = await uploadBytes(storageRef, imageFile);
+        const snapshot = await uploadBytes(storageRef, compressedFile);
         finalImageUrl = await getDownloadURL(snapshot.ref);
       }
 
@@ -307,7 +309,10 @@ const EditServiceModal: React.FC<EditServiceModalProps> = ({ isOpen, onClose, on
                 className="w-full py-4 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all flex items-center justify-center space-x-2 shadow-xl shadow-emerald-600/20 disabled:opacity-50"
               >
                 {loading ? (
-                  <Loader2 className="animate-spin" size={20} />
+                  <>
+                    <Loader2 className="animate-spin" size={20} />
+                    <span>{imageFile ? 'Optimizing & Uploading...' : 'Saving Changes...'}</span>
+                  </>
                 ) : (
                   <>
                     <Save size={20} />

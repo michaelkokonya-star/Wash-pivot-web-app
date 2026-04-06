@@ -5,6 +5,7 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
 import { useAuth } from '../context/AuthContext';
+import { compressImage } from '../lib/image-utils';
 
 interface AddProjectModalProps {
   isOpen: boolean;
@@ -48,8 +49,9 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSu
       let finalImageUrl = formData.imageUrl;
 
       if (imageFile) {
+        const compressedFile = await compressImage(imageFile);
         const storageRef = ref(storage, `projects/${Date.now()}_${imageFile.name}`);
-        const snapshot = await uploadBytes(storageRef, imageFile);
+        const snapshot = await uploadBytes(storageRef, compressedFile);
         finalImageUrl = await getDownloadURL(snapshot.ref);
       }
 
@@ -218,7 +220,10 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSu
                 className="w-full py-4 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all flex items-center justify-center space-x-2 shadow-xl shadow-emerald-600/20 disabled:opacity-50"
               >
                 {loading ? (
-                  <Loader2 className="animate-spin" size={20} />
+                  <>
+                    <Loader2 className="animate-spin" size={20} />
+                    <span>{imageFile ? 'Optimizing & Uploading...' : 'Creating Project...'}</span>
+                  </>
                 ) : (
                   <>
                     <Plus size={20} />
