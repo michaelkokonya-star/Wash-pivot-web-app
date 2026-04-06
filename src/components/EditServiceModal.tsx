@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Upload, Save, Loader2, Mail, Phone, MapPin, Image as ImageIcon } from 'lucide-react';
 import { doc, updateDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
-import { compressImage, sanitizeFilename } from '../lib/image-utils';
+import { compressImage, sanitizeFilename, fileToDataUrl } from '../lib/image-utils';
 import { toast } from 'sonner';
 
 interface EditServiceModalProps {
@@ -83,7 +83,11 @@ const EditServiceModal: React.FC<EditServiceModalProps> = ({ isOpen, onClose, on
         
         try {
           console.log("Starting upload to:", storageRef.fullPath);
-          const snapshot = await uploadBytes(storageRef, compressedFile);
+          const dataUrl = await fileToDataUrl(compressedFile);
+          const base64Data = dataUrl.split(',')[1];
+          const snapshot = await uploadString(storageRef, base64Data, 'base64', {
+            contentType: compressedFile.type
+          });
           console.log("Upload successful, getting download URL...");
           setUploadProgress(90); // Almost done
           finalImageUrl = await getDownloadURL(snapshot.ref);

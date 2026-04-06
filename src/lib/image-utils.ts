@@ -28,3 +28,12 @@ export const compressImage = async (file: File): Promise<File> => {
 export const sanitizeFilename = (filename: string): string => {
   return filename.replace(/[^a-z0-9.]/gi, '_').toLowerCase();
 };
+
+export const fileToDataUrl = (file: File | Blob): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+};
