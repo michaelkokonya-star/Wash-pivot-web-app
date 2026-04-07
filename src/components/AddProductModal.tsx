@@ -44,6 +44,10 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!auth.currentUser) {
+      toast.error("You must be logged in to perform this action.");
+      return;
+    }
     setLoading(true);
     setUploadStatus('idle');
 
@@ -63,6 +67,11 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
         
         try {
           console.log("Starting upload to:", storageRef.fullPath);
+          console.log("File details:", {
+            name: compressedFile.name,
+            type: compressedFile.type,
+            size: compressedFile.size
+          });
           const snapshot = await uploadBytes(storageRef, compressedFile, {
             contentType: compressedFile.type
           });
@@ -70,8 +79,19 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
           setUploadProgress(90); // Almost done
           finalImageUrl = await getDownloadURL(snapshot.ref);
           setUploadProgress(100);
-        } catch (uploadError) {
+        } catch (uploadError: any) {
           console.error("Detailed upload error:", uploadError);
+          let errorMessage = "Upload failed. ";
+          if (uploadError.code === 'storage/unauthorized') {
+            errorMessage += "Permission denied. Please ensure you are logged in as an admin.";
+          } else if (uploadError.code === 'storage/retry-limit-exceeded') {
+            errorMessage += "Network timeout. Please check your connection.";
+          } else if (uploadError.code === 'storage/canceled') {
+            errorMessage += "Upload canceled.";
+          } else {
+            errorMessage += uploadError.message || "Unknown error.";
+          }
+          toast.error(errorMessage);
           throw uploadError;
         }
       }
