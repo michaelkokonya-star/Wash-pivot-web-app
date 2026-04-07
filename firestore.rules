@@ -58,8 +58,8 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() && 
-        'email' in request.auth.token &&
-        request.auth.token.email.lower() == "michael.kokonya@washpivot.com";
+        (request.auth.uid == "4bR0uGO1auPi2ftCvnnfR9cUtJD3" || 
+         request.auth.token.email == "michael.kokonya@washpivot.com");
     }
 
     function isValidEmail(email) {

@@ -67,6 +67,8 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
         
         try {
           console.log("Starting upload to:", storageRef.fullPath);
+          console.log("Current user UID:", auth.currentUser?.uid);
+          console.log("Current user Email:", auth.currentUser?.email);
           console.log("File details:", {
             name: compressedFile.name,
             type: compressedFile.type,

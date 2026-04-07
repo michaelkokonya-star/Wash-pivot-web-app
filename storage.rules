@@ -1,9 +1,28 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.email == "michael.kokonya@washpivot.com";
+    }
+
     match /{allPaths=**} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAuthenticated();
+    }
+    
+    // Explicitly allow products, services, and projects for authenticated users
+    match /products/{allPaths=**} {
+      allow write: if isAuthenticated();
+    }
+    match /services/{allPaths=**} {
+      allow write: if isAuthenticated();
+    }
+    match /projects/{allPaths=**} {
+      allow write: if isAuthenticated();
     }
   }
 }
