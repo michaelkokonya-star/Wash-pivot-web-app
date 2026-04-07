@@ -57,9 +57,9 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isAuthenticated() && 
+      return request.auth != null && 
         (request.auth.uid == "4bR0uGO1auPi2ftCvnnfR9cUtJD3" || 
-         request.auth.token.email == "michael.kokonya@washpivot.com");
+         ('email' in request.auth.token && request.auth.token.email == "michael.kokonya@washpivot.com"));
     }
 
     function isValidEmail(email) {
@@ -191,14 +191,10 @@ service cloud.firestore {
     // ===============================================================
 
     match /users/{userId} {
-      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin() || (resource != null && resource.data.role == 'expert' && resource.data.isApproved == true));
-      allow create: if isOwner(userId) && isValidUser(request.resource.data, userId) && 
-                      (isAdmin() || request.resource.data.isApproved == false || request.auth.token.firebase.sign_in_provider == 'google.com') && 
-                      (request.resource.data.role != 'admin' || isAdmin());
-      allow update: if (isOwner(userId) && isValidUser(request.resource.data, userId) && 
-                        (isAdmin() || (request.resource.data.isApproved == resource.data.isApproved && 
-                         (request.resource.data.role == resource.data.role || request.resource.data.role == 'expert')))) || 
-                      (isAdmin() && isValidUser(request.resource.data, userId));
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow read: if resource != null && resource.data.role == 'expert' && resource.data.isApproved == true;
+      allow create: if isOwner(userId) && isValidUser(request.resource.data, userId);
+      allow update: if (isOwner(userId) && isValidUser(request.resource.data, userId)) || isAdmin();
       allow delete: if isAdmin();
     }
 
