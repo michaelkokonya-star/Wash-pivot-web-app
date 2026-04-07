@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, Upload, Plus, Loader2, Image as ImageIcon } from 'lucide-react';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../firebase';
+import { db, storage, auth } from '../firebase';
 import { compressImage, sanitizeFilename, fileToDataUrl } from '../lib/image-utils';
 import { toast } from 'sonner';
 

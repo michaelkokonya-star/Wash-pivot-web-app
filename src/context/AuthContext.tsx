@@ -40,9 +40,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      console.log("Auth state changed, user:", user?.uid, user?.email);
       setUser(user);
       if (user) {
         const docRef = doc(db, 'users', user.uid);
+        console.log("Fetching profile for:", user.uid, "from path:", docRef.path);
         try {
           const docSnap = await getDoc(docRef);
           if (docSnap.exists()) {
