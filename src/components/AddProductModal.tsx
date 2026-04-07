@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Upload, Plus, Loader2, Image as ImageIcon } from 'lucide-react';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
 import { compressImage, sanitizeFilename, fileToDataUrl } from '../lib/image-utils';
 import { toast } from 'sonner';
@@ -63,9 +63,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
         
         try {
           console.log("Starting upload to:", storageRef.fullPath);
-          const dataUrl = await fileToDataUrl(compressedFile);
-          const base64Data = dataUrl.split(',')[1];
-          const snapshot = await uploadString(storageRef, base64Data, 'base64', {
+          const snapshot = await uploadBytes(storageRef, compressedFile, {
             contentType: compressedFile.type
           });
           console.log("Upload successful, getting download URL...");
