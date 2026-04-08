@@ -19,6 +19,7 @@ const Navbar = () => {
     { name: 'Experts', path: '/recruitment' },
     { name: 'Funding', path: '/funding' },
     { name: 'Build', path: '/build' },
+    { name: 'AI Studio', path: '/ai-studio' },
   ];
 
   const isSuperAdmin = user?.email?.toLowerCase() === 'michael.kokonya@washpivot.com';

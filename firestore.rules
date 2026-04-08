@@ -186,6 +186,17 @@ service cloud.firestore {
              (!('createdAt' in data) || data.createdAt is timestamp);
     }
 
+    function isValidSolarKit(data) {
+      return hasOnlyAllowedFields(['userId', 'kitName', 'loadRequirements', 'totalDailyLoadWh', 'totalPeakLoadW', 'recommendations', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.kitName is string && data.kitName.size() > 0 && data.kitName.size() < 200 &&
+             data.loadRequirements is list &&
+             data.totalDailyLoadWh is number &&
+             data.totalPeakLoadW is number &&
+             (!('recommendations' in data) || data.recommendations is map) &&
+             (!('createdAt' in data) || data.createdAt is timestamp);
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -234,6 +245,13 @@ service cloud.firestore {
     match /service_providers/{serviceId} {
       allow read: if true;
       allow write: if isAdmin() && isValidServiceProvider(request.resource.data);
+    }
+
+    match /solar_kits/{kitId} {
+      allow read: if isAuthenticated() && (isAdmin() || request.auth.uid == resource.data.userId);
+      allow create: if isAuthenticated() && isValidSolarKit(request.resource.data);
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.userId && isValidSolarKit(request.resource.data);
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
     }
   }
 }

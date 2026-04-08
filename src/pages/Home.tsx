@@ -5,6 +5,7 @@ import { Helmet } from 'react-helmet-async';
 import { Sun, Droplets, ShieldCheck, ArrowRight, Zap, Globe, Users, Sparkles, Loader2, Search, Layers } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 import OptimizedImage from '../components/OptimizedImage';
+import { toast } from 'sonner';
 
 const Home = () => {
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
@@ -13,7 +14,12 @@ const Home = () => {
   const generateImpactImage = async () => {
     setIsGenerating(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+      if (!apiKey || apiKey === "undefined") {
+        throw new Error("API Key is not defined. Please ensure your Gemini API key is configured in the Secrets panel.");
+      }
+      
+      const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
         contents: {
@@ -39,8 +45,10 @@ const Home = () => {
           }
         }
       }
-    } catch (error) {
+      toast.success("Impact visualization generated!");
+    } catch (error: any) {
       console.error("Error generating image:", error);
+      toast.error(error.message || "Failed to generate visualization. Please check your API key.");
     } finally {
       setIsGenerating(false);
     }

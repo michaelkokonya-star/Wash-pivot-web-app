@@ -26,6 +26,7 @@ import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
 import CheckoutSuccess from './pages/CheckoutSuccess';
 import Auth from './pages/Auth';
+import CreativeStudio from './pages/CreativeStudio';
 import WelcomeOnboarding from './components/WelcomeOnboarding';
 import ProtectedRoute from './components/ProtectedRoute';
 import VerificationBanner from './components/VerificationBanner';
@@ -71,6 +72,11 @@ function App() {
                       <Route path="/team" element={<Team />} />
                       <Route path="/contact" element={<Contact />} />
                       <Route path="/privacy" element={<Privacy />} />
+                      <Route path="/ai-studio" element={
+                        <ProtectedRoute requireVerification>
+                          <CreativeStudio />
+                        </ProtectedRoute>
+                      } />
                       <Route path="/profile" element={
                         <ProtectedRoute>
                           <Profile />
@@ -107,7 +113,8 @@ function App() {
                           <li><Link to="/marketplace" className="hover:text-emerald-500 transition-colors">Marketplace</Link></li>
                           <li><Link to="/recruitment" className="hover:text-emerald-500 transition-colors">Expert Network</Link></li>
                           <li><Link to="/funding" className="hover:text-emerald-500 transition-colors">Micro Funding</Link></li>
-                          <li><Link to="/build" className="hover:text-emerald-500 transition-colors">Project Builder</Link></li>
+                          <li><Link to="/build" className="hover:text-emerald-500 transition-colors">Project & Kit Builder</Link></li>
+                          <li><Link to="/ai-studio" className="hover:text-emerald-500 transition-colors">AI Creative Studio</Link></li>
                         </ul>
                       </div>
                       <div>

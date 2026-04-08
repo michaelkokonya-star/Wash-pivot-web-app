@@ -176,14 +176,7 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
         config: {
           thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
           tools: [{ googleMaps: {} }],
-          toolConfig: {
-            retrievalConfig: {
-              latLng: userLocation ? {
-                latitude: userLocation.lat,
-                longitude: userLocation.lng
-              } : undefined
-            }
-          }
+          toolConfig: { includeServerSideToolInvocations: true }
         }
       });
 
@@ -318,10 +311,15 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
     }
   };
 
+  const toggleOpen = () => {
+    console.log("Toggling SolarAIAdvisor:", !isOpen);
+    setIsOpen(!isOpen);
+  };
+
   return (
     <div className="mb-12">
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={toggleOpen}
         className="w-full p-6 bg-gradient-to-r from-emerald-900 to-black text-white rounded-3xl flex items-center justify-between group hover:shadow-2xl hover:shadow-emerald-500/10 transition-all border border-emerald-500/20"
       >
         <div className="flex items-center space-x-4">

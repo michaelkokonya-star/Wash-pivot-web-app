@@ -117,6 +117,39 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["name", "category", "description", "imageUrl", "contactEmail", "contactPhone", "location", "isApproved", "createdAt"]
+    },
+    "SolarKit": {
+      "title": "Custom Solar Kit",
+      "description": "A customized solar kit built based on load requirements.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "kitName": { "type": "string" },
+        "loadRequirements": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "wattage": { "type": "number" },
+              "quantity": { "type": "number" },
+              "hoursPerDay": { "type": "number" }
+            }
+          }
+        },
+        "totalDailyLoadWh": { "type": "number" },
+        "totalPeakLoadW": { "type": "number" },
+        "recommendations": {
+          "type": "object",
+          "properties": {
+            "panelW": { "type": "number" },
+            "batteryWh": { "type": "number" },
+            "inverterW": { "type": "number" }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "kitName", "loadRequirements", "totalDailyLoadWh", "totalPeakLoadW", "createdAt"]
     }
   },
   "firestore": {
@@ -143,6 +176,10 @@
     "/service_providers/{serviceId}": {
       "schema": "ServiceProvider",
       "description": "Service providers listed on the marketplace."
+    },
+    "/solar_kits/{kitId}": {
+      "schema": "SolarKit",
+      "description": "Customized solar kits."
     }
   }
 }
