@@ -27,7 +27,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { toast } from 'sonner';
 import { auth, db } from '../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, getDocs, query, where } from 'firebase/firestore';
 
 interface Appliance {
   id: string;
@@ -36,6 +36,16 @@ interface Appliance {
   quantity: number;
   hoursPerDay: number;
   icon?: any;
+}
+
+interface MarketplaceProduct {
+  id: string;
+  name: string;
+  price: number;
+  category: string;
+  subCategory: string;
+  imageUrl?: string;
+  description?: string;
 }
 
 const PRESET_APPLIANCES = [
@@ -51,6 +61,9 @@ const SolarKitBuilder: React.FC = () => {
   const [step, setStep] = useState(1);
   const [kitName, setKitName] = useState('My Custom Solar Kit');
   const [loadItems, setLoadItems] = useState<Appliance[]>([]);
+  const [marketplaceProducts, setMarketplaceProducts] = useState<MarketplaceProduct[]>([]);
+  const [selectedHardware, setSelectedHardware] = useState<MarketplaceProduct[]>([]);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -60,6 +73,28 @@ const SolarKitBuilder: React.FC = () => {
   const BATTERY_DOD = 0.5; // 50% Depth of Discharge for Lead Acid
   const SYSTEM_VOLTAGE = 12; // Standard 12V system
 
+  useEffect(() => {
+    const fetchSolarProducts = async () => {
+      setIsLoadingProducts(true);
+      try {
+        const q = query(collection(db, 'products'), where('category', '==', 'Solar'));
+        const querySnapshot = await getDocs(q);
+        const products = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as MarketplaceProduct[];
+        setMarketplaceProducts(products);
+      } catch (error) {
+        console.error("Error fetching solar products:", error);
+        toast.error("Failed to load marketplace products.");
+      } finally {
+        setIsLoadingProducts(false);
+      }
+    };
+
+    fetchSolarProducts();
+  }, []);
+
   const totalDailyLoadWh = loadItems.reduce((sum, item) => sum + (item.wattage * item.quantity * item.hoursPerDay), 0);
   const totalPeakLoadW = loadItems.reduce((sum, item) => sum + (item.wattage * item.quantity), 0);
 
@@ -67,6 +102,8 @@ const SolarKitBuilder: React.FC = () => {
   const recommendedPanelW = Math.ceil((totalDailyLoadWh / PEAK_SUN_HOURS) / SYSTEM_EFFICIENCY);
   const recommendedBatteryWh = Math.ceil((totalDailyLoadWh * 1.5) / BATTERY_DOD); // 1.5 days autonomy
   const recommendedInverterW = Math.ceil(totalPeakLoadW * 1.25); // 25% safety margin
+
+  const totalPriceEstimate = selectedHardware.reduce((sum, p) => sum + p.price, 0);
 
   const addAppliance = (preset?: typeof PRESET_APPLIANCES[0]) => {
     const newItem: Appliance = {
@@ -152,13 +189,40 @@ const SolarKitBuilder: React.FC = () => {
 
       const recTableEndY = (doc as any).lastAutoTable.finalY;
 
+      // Selected Hardware
+      if (selectedHardware.length > 0) {
+        doc.setFontSize(14);
+        doc.text('3. Selected Hardware (Marketplace)', 14, recTableEndY + 15);
+        
+        autoTable(doc, {
+          startY: recTableEndY + 20,
+          head: [['Category', 'Product Name', 'Price (KSh)']],
+          body: selectedHardware.map(p => [
+            p.subCategory,
+            p.name,
+            p.price.toLocaleString()
+          ]),
+          theme: 'striped',
+          headStyles: { fillColor: [0, 0, 0] },
+          margin: { left: 14, right: 14 }
+        });
+      }
+
+      const hardwareTableEndY = selectedHardware.length > 0 ? (doc as any).lastAutoTable.finalY : recTableEndY;
+
       // Summary
       doc.setFontSize(16);
-      doc.text('Summary', 14, recTableEndY + 20);
+      doc.text('Summary', 14, hardwareTableEndY + 20);
       
       doc.setFontSize(12);
-      doc.text(`Total Daily Energy Consumption: ${totalDailyLoadWh.toLocaleString()} Wh`, 14, recTableEndY + 30);
-      doc.text(`Total Peak Power Requirement: ${totalPeakLoadW.toLocaleString()} W`, 14, recTableEndY + 38);
+      doc.text(`Total Daily Energy Consumption: ${totalDailyLoadWh.toLocaleString()} Wh`, 14, hardwareTableEndY + 30);
+      doc.text(`Total Peak Power Requirement: ${totalPeakLoadW.toLocaleString()} W`, 14, hardwareTableEndY + 38);
+      
+      if (selectedHardware.length > 0) {
+        doc.setFontSize(14);
+        doc.setTextColor(16, 185, 129);
+        doc.text(`TOTAL ESTIMATED COST: KSh ${totalPriceEstimate.toLocaleString()}`, 14, hardwareTableEndY + 50);
+      }
       
       // Footer
       doc.setFontSize(10);
@@ -193,8 +257,10 @@ const SolarKitBuilder: React.FC = () => {
         userId: auth.currentUser.uid,
         kitName,
         loadRequirements: loadItems.map(({ id, icon, ...rest }) => rest),
+        selectedHardware: selectedHardware.map(p => ({ id: p.id, name: p.name, price: p.price, subCategory: p.subCategory })),
         totalDailyLoadWh,
         totalPeakLoadW,
+        totalPriceEstimate,
         recommendations: {
           panelW: recommendedPanelW,
           batteryWh: recommendedBatteryWh,
@@ -203,7 +269,7 @@ const SolarKitBuilder: React.FC = () => {
         createdAt: serverTimestamp()
       });
       toast.success("Solar Kit saved to your profile!");
-      setStep(3);
+      setStep(4);
     } catch (error) {
       console.error("Error saving kit:", error);
       toast.error("Failed to save kit.");
@@ -231,7 +297,7 @@ const SolarKitBuilder: React.FC = () => {
             />
           </div>
           <div className="flex items-center space-x-2">
-            {[1, 2, 3].map((s) => (
+            {[1, 2, 3, 4].map((s) => (
               <div 
                 key={s}
                 className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all ${
@@ -467,7 +533,7 @@ const SolarKitBuilder: React.FC = () => {
                     onClick={() => setStep(3)}
                     className="px-8 py-4 bg-black text-white font-bold rounded-2xl hover:bg-emerald-600 transition-all flex items-center space-x-2"
                   >
-                    <span>Final Summary</span>
+                    <span>Select Hardware</span>
                     <ChevronRight size={20} />
                   </button>
                 </div>
@@ -478,6 +544,136 @@ const SolarKitBuilder: React.FC = () => {
           {step === 3 && (
             <motion.div
               key="step3"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-8"
+            >
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-bold mb-2">Step 3: Hardware Selection</h3>
+                  <p className="text-black/50 text-sm">Pick actual products from our marketplace to complete your kit.</p>
+                </div>
+                <div className="bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100">
+                  <span className="text-xs font-bold text-emerald-800 uppercase tracking-widest block">Estimated Total</span>
+                  <span className="text-xl font-bold text-emerald-600">KSh {totalPriceEstimate.toLocaleString()}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Selected Items List */}
+                <div className="lg:col-span-1 space-y-4">
+                  <h4 className="text-sm font-bold uppercase tracking-widest text-black/40">Your Selection</h4>
+                  <div className="space-y-3">
+                    {selectedHardware.length === 0 && (
+                      <div className="p-6 bg-stone-50 border border-dashed border-black/10 rounded-2xl text-center">
+                        <p className="text-xs text-black/30">No hardware selected yet.</p>
+                      </div>
+                    )}
+                    {selectedHardware.map((product) => (
+                      <div key={product.id} className="p-4 bg-white border border-black/5 rounded-2xl flex justify-between items-center group">
+                        <div>
+                          <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">{product.subCategory}</p>
+                          <p className="text-sm font-bold truncate max-w-[150px]">{product.name}</p>
+                          <p className="text-xs font-bold">KSh {product.price.toLocaleString()}</p>
+                        </div>
+                        <button 
+                          onClick={() => setSelectedHardware(selectedHardware.filter(p => p.id !== product.id))}
+                          className="p-2 text-black/10 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Marketplace Browser */}
+                <div className="lg:col-span-2 space-y-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                    {isLoadingProducts ? (
+                      <div className="col-span-full py-20 flex flex-col items-center justify-center">
+                        <Loader2 className="animate-spin text-emerald-500 mb-4" size={32} />
+                        <p className="text-sm text-black/40">Loading marketplace products...</p>
+                      </div>
+                    ) : marketplaceProducts.length > 0 ? (
+                      marketplaceProducts.map((product) => (
+                        <div 
+                          key={product.id} 
+                          className="p-4 bg-stone-50 border border-black/5 rounded-2xl hover:border-emerald-500 transition-all flex flex-col justify-between"
+                        >
+                          <div>
+                            <div className="flex justify-between items-start mb-2">
+                              <span className="text-[10px] font-bold uppercase tracking-widest text-black/40 bg-white px-2 py-1 rounded-md border border-black/5">
+                                {product.subCategory}
+                              </span>
+                              <button 
+                                onClick={() => {
+                                  if (!selectedHardware.find(p => p.id === product.id)) {
+                                    setSelectedHardware([...selectedHardware, product]);
+                                    toast.success(`Added ${product.name}`);
+                                  } else {
+                                    toast.error("Already added to selection");
+                                  }
+                                }}
+                                className="p-2 bg-white rounded-xl shadow-sm hover:bg-emerald-500 hover:text-white transition-all"
+                              >
+                                <Plus size={16} />
+                              </button>
+                            </div>
+                            <h5 className="font-bold text-sm mb-1 line-clamp-2">{product.name}</h5>
+                            <p className="text-xs text-black/40 line-clamp-2 mb-3">{product.description}</p>
+                          </div>
+                          <div className="flex justify-between items-center pt-3 border-t border-black/5">
+                            <span className="text-sm font-bold">KSh {product.price.toLocaleString()}</span>
+                            <div className="flex items-center space-x-1 text-[10px] font-bold text-emerald-600">
+                              <CheckCircle2 size={12} />
+                              <span>In Stock</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="col-span-full py-20 text-center bg-stone-50 rounded-3xl border border-dashed border-black/10">
+                        <p className="text-black/40 text-sm">No solar products found in the marketplace.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center pt-8 border-t border-black/5">
+                <button
+                  onClick={() => setStep(2)}
+                  className="px-8 py-4 bg-stone-100 text-black font-bold rounded-2xl hover:bg-stone-200 transition-all flex items-center space-x-2"
+                >
+                  <ChevronLeft size={20} />
+                  <span>Back</span>
+                </button>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={saveKit}
+                    disabled={isSaving}
+                    className="px-8 py-4 bg-white border border-black/10 text-black font-bold rounded-2xl hover:bg-stone-50 transition-all flex items-center space-x-2 disabled:opacity-50"
+                  >
+                    {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
+                    <span>Save Kit</span>
+                  </button>
+                  <button
+                    onClick={() => setStep(4)}
+                    className="px-8 py-4 bg-black text-white font-bold rounded-2xl hover:bg-emerald-600 transition-all flex items-center space-x-2"
+                  >
+                    <span>Final Summary</span>
+                    <ChevronRight size={20} />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {step === 4 && (
+            <motion.div
+              key="step4"
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
@@ -488,7 +684,7 @@ const SolarKitBuilder: React.FC = () => {
                   <CheckCircle2 size={40} />
                 </div>
                 <h3 className="text-3xl font-bold tracking-tighter mb-2">Kit Configuration Ready</h3>
-                <p className="text-black/50">Your customised solar kit has been successfully configured.</p>
+                <p className="text-black/50">Your customised solar kit has been successfully configured with marketplace products.</p>
               </div>
 
               <div className="bg-stone-900 text-white p-8 rounded-[2rem] space-y-8">
@@ -497,10 +693,13 @@ const SolarKitBuilder: React.FC = () => {
                     <h4 className="text-emerald-400 text-xs font-bold uppercase tracking-widest mb-1">Unified Document</h4>
                     <h5 className="text-2xl font-bold tracking-tight">{kitName}</h5>
                   </div>
-                  <FileText className="text-white/20" size={32} />
+                  <div className="text-right">
+                    <p className="text-emerald-400 text-xs font-bold uppercase tracking-widest mb-1">Estimated Total</p>
+                    <p className="text-3xl font-bold tracking-tighter">KSh {totalPriceEstimate.toLocaleString()}</p>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                   <div className="space-y-4">
                     <h6 className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Load Summary</h6>
                     <div className="space-y-2">
@@ -511,10 +710,6 @@ const SolarKitBuilder: React.FC = () => {
                       <div className="flex justify-between text-sm">
                         <span className="text-white/60">Peak Power Demand</span>
                         <span className="font-bold">{totalPeakLoadW.toLocaleString()} W</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-white/60">Total Appliances</span>
-                        <span className="font-bold">{loadItems.length} Items</span>
                       </div>
                     </div>
                   </div>
@@ -530,10 +725,24 @@ const SolarKitBuilder: React.FC = () => {
                         <span className="text-white/60">Storage Capacity</span>
                         <span className="font-bold text-blue-400">{recommendedBatteryWh}Wh</span>
                       </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-white/60">Inverter Rating</span>
-                        <span className="font-bold text-orange-400">{recommendedInverterW}W</span>
-                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h6 className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Marketplace Selection</h6>
+                    <div className="space-y-2">
+                      {selectedHardware.slice(0, 3).map(p => (
+                        <div key={p.id} className="flex justify-between text-sm">
+                          <span className="text-white/60 truncate max-w-[120px]">{p.name}</span>
+                          <span className="font-bold">KSh {p.price.toLocaleString()}</span>
+                        </div>
+                      ))}
+                      {selectedHardware.length > 3 && (
+                        <p className="text-[10px] text-white/30">+{selectedHardware.length - 3} more items</p>
+                      )}
+                      {selectedHardware.length === 0 && (
+                        <p className="text-xs text-white/20 italic">No hardware selected</p>
+                      )}
                     </div>
                   </div>
                 </div>

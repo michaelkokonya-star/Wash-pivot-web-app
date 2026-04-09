@@ -1,14 +1,24 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { readFileSync } from 'fs';
 import cors from 'cors';
 import Stripe from 'stripe';
 import axios from 'axios';
 import dotenv from 'dotenv';
 import admin from 'firebase-admin';
-import firebaseConfig from './firebase-applet-config.json' with { type: 'json' };
 
 dotenv.config();
+
+// Load Firebase Config safely
+const firebaseConfigPath = path.join(process.cwd(), 'firebase-applet-config.json');
+let firebaseConfig: any;
+try {
+  firebaseConfig = JSON.parse(readFileSync(firebaseConfigPath, 'utf-8'));
+} catch (error) {
+  console.error('Failed to load firebase-applet-config.json:', error);
+  process.exit(1);
+}
 
 // Initialize Firebase Admin
 try {
