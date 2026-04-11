@@ -7,6 +7,7 @@ import Stripe from 'stripe';
 import axios from 'axios';
 import dotenv from 'dotenv';
 import admin from 'firebase-admin';
+import uploadRoutes from './routes/upload.ts';
 
 dotenv.config();
 
@@ -80,6 +81,9 @@ async function startServer() {
 
     app.use(cors());
     app.use(express.json());
+
+    // Upload API
+    app.use('/api', uploadRoutes);
 
     // API routes
     app.get('/api/health', (req, res) => {

@@ -4,7 +4,7 @@ import { doc, updateDoc, getDoc, collection, query, where, orderBy, getDocs, Tim
 import { db } from '../firebase';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, Mail, Shield, CheckCircle2, XCircle, Phone, Eye, EyeOff, Save, Loader2, Award, GraduationCap, Briefcase, Clock, Settings, LogOut, Sparkles, Package, ExternalLink, Lock } from 'lucide-react';
+import { User, Mail, Shield, CheckCircle2, XCircle, Phone, Eye, EyeOff, Save, Loader2, Award, GraduationCap, Briefcase, Clock, Settings, LogOut, Sparkles, Package, ExternalLink, Lock, Camera } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 interface OrderItem {
@@ -32,6 +32,7 @@ const Profile = () => {
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [formData, setFormData] = useState({
     displayName: '',
@@ -157,6 +158,62 @@ const Profile = () => {
     }
   };
 
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    // Validate file type and size
+    if (!file.type.startsWith('image/')) {
+      setMessage({ type: 'error', text: 'Please upload an image file.' });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setMessage({ type: 'error', text: 'File size must be less than 5MB.' });
+      return;
+    }
+
+    setUploadingPhoto(true);
+    setMessage(null);
+
+    const formData = new FormData();
+    formData.append('photo', file);
+
+    try {
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Upload failed');
+      }
+
+      const data = await response.json();
+      const photoURL = data.url;
+
+      // Update Firestore user document
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, { photoURL });
+
+      // Update public profile if expert
+      if (profile?.role === 'expert') {
+        const publicRef = doc(db, 'public_profiles', user.uid);
+        const publicDoc = await getDoc(publicRef);
+        if (publicDoc.exists()) {
+          await updateDoc(publicRef, { photoURL });
+        }
+      }
+
+      setMessage({ type: 'success', text: 'Profile photo updated!' });
+    } catch (error: any) {
+      console.error('Photo upload error:', error);
+      setMessage({ type: 'error', text: error.message || 'Failed to upload photo.' });
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
   if (!user || !profile) {
     return (
       <div className="pt-32 pb-20 flex justify-center">
@@ -182,14 +239,31 @@ const Profile = () => {
         <div className="lg:col-span-1 space-y-8">
           <div className="bg-stone-50 p-8 rounded-[2.5rem] border border-black/5 text-center">
             <div className="relative inline-block mb-6">
-              <img
-                src={profile.photoURL || `https://ui-avatars.com/api/?name=${profile.displayName}`}
-                alt={profile.displayName}
-                className="w-32 h-32 rounded-[2rem] object-cover border-4 border-white shadow-xl"
-                referrerPolicy="no-referrer"
-              />
+              <div className="relative">
+                <img
+                  src={profile.photoURL || `https://ui-avatars.com/api/?name=${profile.displayName}`}
+                  alt={profile.displayName}
+                  className={`w-32 h-32 rounded-[2rem] object-cover border-4 border-white shadow-xl transition-opacity ${uploadingPhoto ? 'opacity-50' : 'opacity-100'}`}
+                  referrerPolicy="no-referrer"
+                />
+                {uploadingPhoto && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Loader2 className="animate-spin text-emerald-600" size={24} />
+                  </div>
+                )}
+                <label className="absolute -bottom-2 -right-2 bg-white text-black p-2 rounded-xl shadow-lg border border-black/5 cursor-pointer hover:bg-stone-50 transition-colors">
+                  <Camera size={18} />
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                    disabled={uploadingPhoto}
+                  />
+                </label>
+              </div>
               {profile.role === 'expert' && (
-                <div className="absolute -bottom-2 -right-2 bg-emerald-600 text-white p-2 rounded-xl shadow-lg">
+                <div className="absolute -top-2 -right-2 bg-emerald-600 text-white p-2 rounded-xl shadow-lg">
                   <Award size={20} />
                 </div>
               )}
