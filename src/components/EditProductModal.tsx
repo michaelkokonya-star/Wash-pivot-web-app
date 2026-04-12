@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Upload, Save, Loader2, Image as ImageIcon } from 'lucide-react';
 import { doc, updateDoc } from 'firebase/firestore';
-import { db, auth } from '../firebase';
-import { compressImage } from '../lib/image-utils';
-import { uploadFile } from '../lib/upload';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage, auth } from '../firebase';
+import { compressImage, sanitizeFilename, fileToDataUrl } from '../lib/image-utils';
 import { toast } from 'sonner';
 
 interface EditProductModalProps {
@@ -73,15 +73,41 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
       if (imageFile) {
         setUploadStatus('compressing');
         const compressedFile = await compressImage(imageFile);
-
+        
         setUploadStatus('uploading');
-        setUploadProgress(10);
+        const safeName = sanitizeFilename(imageFile.name);
+        const storageRef = ref(storage, `products/${Date.now()}_${safeName}`);
+        
+        setUploadStatus('uploading');
+        setUploadProgress(10); // Start at 10% to show activity
+        
         try {
-          finalImageUrl = await uploadFile(compressedFile);
+          console.log("Starting upload to:", storageRef.fullPath);
+          console.log("File details:", {
+            name: compressedFile.name,
+            type: compressedFile.type,
+            size: compressedFile.size
+          });
+          const snapshot = await uploadBytes(storageRef, compressedFile, {
+            contentType: compressedFile.type
+          });
+          console.log("Upload successful, getting download URL...");
+          setUploadProgress(90); // Almost done
+          finalImageUrl = await getDownloadURL(snapshot.ref);
           setUploadProgress(100);
         } catch (uploadError: any) {
-          console.error("Upload error:", uploadError);
-          toast.error(`Upload failed. ${uploadError.message || "Unknown error."}`);
+          console.error("Detailed upload error:", uploadError);
+          let errorMessage = "Upload failed. ";
+          if (uploadError.code === 'storage/unauthorized') {
+            errorMessage += "Permission denied. Please ensure you are logged in as an admin.";
+          } else if (uploadError.code === 'storage/retry-limit-exceeded') {
+            errorMessage += "Network timeout. Please check your connection.";
+          } else if (uploadError.code === 'storage/canceled') {
+            errorMessage += "Upload canceled.";
+          } else {
+            errorMessage += uploadError.message || "Unknown error.";
+          }
+          toast.error(errorMessage);
           throw uploadError;
         }
       }
