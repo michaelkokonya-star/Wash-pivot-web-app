@@ -18,24 +18,39 @@ const s3 = new S3Client({
 });
 
 router.post('/upload', upload.single('photo'), async (req, res) => {
+  console.log('[upload] handler called — env:', {
+    ENDPOINT: process.env.ENDPOINT,
+    BUCKET: process.env.BUCKET,
+    REGION: process.env.REGION,
+  });
+
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
     const key = `photos/${Date.now()}-${req.file.originalname}`;
-    await s3.send(new PutObjectCommand({
+
+    const s3Response = await s3.send(new PutObjectCommand({
       Bucket: process.env.BUCKET,
       Key: key,
       Body: req.file.buffer,
       ContentType: req.file.mimetype,
     }));
-    
+    console.log('[upload] S3 response:', JSON.stringify(s3Response, null, 2));
+
     // Construct URL based on endpoint and bucket
     const url = `${process.env.ENDPOINT}/${process.env.BUCKET}/${key}`;
+    console.log('[upload] constructed URL:', url);
+
     res.json({ url });
   } catch (err: any) {
-    console.error('Upload error:', err);
+    console.error('[upload] error:', {
+      message: err.message,
+      code: err.Code ?? err.code,
+      statusCode: err.$metadata?.httpStatusCode,
+      stack: err.stack,
+    });
     res.status(500).json({ error: err.message });
   }
 });
