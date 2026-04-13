@@ -1,11 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, getDocs, query, where, doc, updateDoc, deleteDoc, orderBy } from 'firebase/firestore';
-import { db } from '../firebase';
-import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { Users, ShoppingBag, Droplets, Shield, CheckCircle2, XCircle, Search, Filter, Edit, Trash2, Plus, Eye, EyeOff, Key, Package, TrendingUp, DollarSign, PieChart, Check, X, BarChart as BarChartIcon, Activity, Briefcase, Award, Mail } from 'lucide-react';
+import { Users, ShoppingBag, Droplets, Shield, CheckCircle2, XCircle, Search, Filter, Edit, Trash2, Plus, Eye, EyeOff, Key, Package, TrendingUp, DollarSign, PieChart, Check, X, BarChart as BarChartIcon, Activity, Briefcase, Award, Mail, Loader2, Sun } from 'lucide-react';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   BarChart, Bar, Legend, AreaChart, Area, PieChart as RePieChart, Pie, Cell, LabelList, Sector 
@@ -77,6 +74,154 @@ const CustomTooltip = ({ active, payload }: any) => {
   return null;
 };
 
+const PricingSettings = ({ onSuccess, onError }: { onSuccess: () => void, onError: (err: string) => void }) => {
+  const [rules, setRules] = useState<any>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const fetchRules = async () => {
+      try {
+        const response = await fetch('/api/settings/pricing-rules');
+        if (response.ok) {
+          const data = await response.json();
+          setRules(data);
+        } else {
+          // Default rules if fetch fails
+          setRules({
+            'Solar Panels': 150,
+            'Batteries': 800,
+            'Inverter': 12000,
+            'Charge Controller': 500
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching pricing rules:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchRules();
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const response = await fetch('/api/settings/pricing-rules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(rules)
+      });
+      if (response.ok) {
+        onSuccess();
+      } else {
+        const err = await response.json();
+        onError(err.error || 'Failed to save rules');
+      }
+    } catch (error: any) {
+      onError(error.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <div className="p-20 text-center"><Loader2 className="animate-spin mx-auto mb-4" /> Loading rules...</div>;
+
+  return (
+    <div className="p-8 space-y-8">
+      <div>
+        <h3 className="font-bold text-xl mb-2">Pricing Rules</h3>
+        <p className="text-xs text-black/40">Set the price per unit for different product categories. These rules are used to automatically calculate product prices based on their technical ratings.</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="space-y-6">
+          <div className="p-6 bg-stone-50 rounded-3xl border border-black/5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Sun className="text-amber-500" size={20} />
+                <span className="font-bold text-sm">Solar Panels</span>
+              </div>
+              <span className="text-[10px] font-bold text-black/30 uppercase tracking-widest">KSh / Watt</span>
+            </div>
+            <input 
+              type="number" 
+              value={rules['Solar Panels'] || ''} 
+              onChange={(e) => setRules({ ...rules, 'Solar Panels': parseFloat(e.target.value) })}
+              className="w-full px-4 py-3 bg-white border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors"
+              placeholder="e.g. 150"
+            />
+          </div>
+
+          <div className="p-6 bg-stone-50 rounded-3xl border border-black/5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Activity className="text-blue-500" size={20} />
+                <span className="font-bold text-sm">Batteries</span>
+              </div>
+              <span className="text-[10px] font-bold text-black/30 uppercase tracking-widest">KSh / AH</span>
+            </div>
+            <input 
+              type="number" 
+              value={rules['Batteries'] || ''} 
+              onChange={(e) => setRules({ ...rules, 'Batteries': parseFloat(e.target.value) })}
+              className="w-full px-4 py-3 bg-white border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors"
+              placeholder="e.g. 800"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="p-6 bg-stone-50 rounded-3xl border border-black/5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <TrendingUp className="text-purple-500" size={20} />
+                <span className="font-bold text-sm">Inverters</span>
+              </div>
+              <span className="text-[10px] font-bold text-black/30 uppercase tracking-widest">KSh / KW</span>
+            </div>
+            <input 
+              type="number" 
+              value={rules['Inverter'] || ''} 
+              onChange={(e) => setRules({ ...rules, 'Inverter': parseFloat(e.target.value) })}
+              className="w-full px-4 py-3 bg-white border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors"
+              placeholder="e.g. 12000"
+            />
+          </div>
+
+          <div className="p-6 bg-stone-50 rounded-3xl border border-black/5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Shield className="text-emerald-500" size={20} />
+                <span className="font-bold text-sm">Charge Controllers</span>
+              </div>
+              <span className="text-[10px] font-bold text-black/30 uppercase tracking-widest">KSh / Ampere</span>
+            </div>
+            <input 
+              type="number" 
+              value={rules['Charge Controller'] || ''} 
+              onChange={(e) => setRules({ ...rules, 'Charge Controller': parseFloat(e.target.value) })}
+              className="w-full px-4 py-3 bg-white border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors"
+              placeholder="e.g. 500"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="pt-8 border-t border-black/5 flex justify-end">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="px-8 py-4 bg-black text-white rounded-2xl font-bold hover:bg-stone-800 transition-all flex items-center gap-2 disabled:opacity-50"
+        >
+          {saving ? <Loader2 className="animate-spin" size={18} /> : <Check size={18} />}
+          <span>Save Pricing Rules</span>
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { user, profile, resetPassword, loading: authLoading } = useAuth();
@@ -85,7 +230,7 @@ const AdminDashboard = () => {
   const [orders, setOrders] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'users' | 'products' | 'projects' | 'orders' | 'analytics' | 'services' | 'experts'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'products' | 'projects' | 'orders' | 'analytics' | 'services' | 'experts' | 'pricing'>('users');
   const [userFilter, setUserFilter] = useState<'all' | 'pending' | 'approved'>('all');
   const [serviceFilter, setServiceFilter] = useState<'all' | 'pending' | 'approved'>('all');
   const [projectFilter, setProjectFilter] = useState<'all' | 'pending' | 'active' | 'completed' | 'rejected'>('all');
@@ -129,85 +274,91 @@ const AdminDashboard = () => {
     setLoading(true);
     try {
       if (activeTab === 'users') {
-        const path = 'users';
         try {
-          const querySnapshot = await getDocs(collection(db, path));
-          const fetchedUsers = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          setUsers(fetchedUsers);
-          setStats(prev => ({ ...prev, userCount: fetchedUsers.length }));
+          const response = await fetch('/api/data/users');
+          if (response.ok) {
+            const fetchedUsers = await response.json();
+            setUsers(fetchedUsers);
+            setStats(prev => ({ ...prev, userCount: fetchedUsers.length }));
+          }
         } catch (error) {
-          handleFirestoreError(error, OperationType.GET, path);
+          console.error("Error fetching users:", error);
         }
       } else if (activeTab === 'products') {
-        const path = 'products';
         try {
-          const querySnapshot = await getDocs(collection(db, path));
-          setProducts(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+          const response = await fetch('/api/data/products');
+          if (response.ok) {
+            const fetchedProducts = await response.json();
+            setProducts(fetchedProducts);
+          }
         } catch (error) {
-          handleFirestoreError(error, OperationType.GET, path);
+          console.error("Error fetching products:", error);
         }
       } else if (activeTab === 'services') {
-        const path = 'service_providers';
         try {
-          const querySnapshot = await getDocs(collection(db, path));
-          setServices(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+          const response = await fetch('/api/data/service_providers');
+          if (response.ok) {
+            const fetchedServices = await response.json();
+            setServices(fetchedServices);
+          }
         } catch (error) {
-          handleFirestoreError(error, OperationType.GET, path);
+          console.error("Error fetching services:", error);
         }
       } else if (activeTab === 'orders') {
-        const path = 'orders';
         try {
-          const querySnapshot = await getDocs(collection(db, path));
-          const fetchedOrders = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
-          setOrders(fetchedOrders);
-          
-          // Calculate stats
-          const revenue = fetchedOrders.reduce((acc, order) => order.status === 'paid' ? acc + (order.totalAmount || 0) : acc, 0);
-          const catSales = { Solar: 0, Water: 0, Sanitation: 0 };
-          fetchedOrders.forEach(order => {
-            if (order.status === 'paid' && order.items) {
-              order.items.forEach((item: any) => {
-                // Try to find category in item or product
-                const cat = item.category;
-                if (cat && cat in catSales) {
-                  catSales[cat as keyof typeof catSales] += (item.price || 0) * (item.quantity || 0);
-                }
-              });
-            }
-          });
+          const response = await fetch('/api/data/orders');
+          if (response.ok) {
+            const fetchedOrders = await response.json();
+            setOrders(fetchedOrders);
+            
+            // Calculate stats
+            const revenue = fetchedOrders.reduce((acc: number, order: any) => order.status === 'paid' ? acc + (order.totalAmount || 0) : acc, 0);
+            const catSales = { Solar: 0, Water: 0, Sanitation: 0 };
+            fetchedOrders.forEach((order: any) => {
+              if (order.status === 'paid' && order.items) {
+                order.items.forEach((item: any) => {
+                  const cat = item.category;
+                  if (cat && cat in catSales) {
+                    catSales[cat as keyof typeof catSales] += (item.price || 0) * (item.quantity || 0);
+                  }
+                });
+              }
+            });
 
-          setStats(prev => ({
-            ...prev,
-            totalRevenue: revenue,
-            orderCount: fetchedOrders.length,
-            categorySales: catSales
-          }));
+            setStats(prev => ({
+              ...prev,
+              totalRevenue: revenue,
+              orderCount: fetchedOrders.length,
+              categorySales: catSales
+            }));
+          }
         } catch (error) {
-          handleFirestoreError(error, OperationType.GET, path);
+          console.error("Error fetching orders:", error);
         }
       } else if (activeTab === 'projects') {
-        const path = 'projects';
         try {
-          const querySnapshot = await getDocs(collection(db, path));
-          const fetchedProjects = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          setProjects(fetchedProjects);
-          setStats(prev => ({ ...prev, projectCount: fetchedProjects.length }));
+          const response = await fetch('/api/data/projects');
+          if (response.ok) {
+            const fetchedProjects = await response.json();
+            setProjects(fetchedProjects);
+            setStats(prev => ({ ...prev, projectCount: fetchedProjects.length }));
+          }
         } catch (error) {
-          handleFirestoreError(error, OperationType.GET, path);
+          console.error("Error fetching projects:", error);
         }
       } else if (activeTab === 'analytics') {
         try {
-          const ordersSnap = await getDocs(collection(db, 'orders'));
-          const usersSnap = await getDocs(collection(db, 'users'));
+          const ordersRes = await fetch('/api/data/orders');
+          const usersRes = await fetch('/api/data/users');
           
-          const fetchedOrders = ordersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
-          const fetchedUsers = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+          const fetchedOrders = await ordersRes.json();
+          const fetchedUsers = await usersRes.json();
 
           // Process Revenue by Month
           const revenueMap: { [key: string]: number } = {};
           fetchedOrders.forEach(order => {
             if (order.status === 'paid' && order.createdAt) {
-              const date = order.createdAt.toDate();
+              const date = new Date(order.createdAt);
               const month = date.toLocaleString('default', { month: 'short', year: 'numeric' });
               revenueMap[month] = (revenueMap[month] || 0) + (order.totalAmount || 0);
             }
@@ -255,7 +406,7 @@ const AdminDashboard = () => {
           const userMap: { [key: string]: number } = {};
           fetchedUsers.forEach(u => {
             if (u.createdAt) {
-              const date = u.createdAt.toDate();
+              const date = new Date(u.createdAt);
               const month = date.toLocaleString('default', { month: 'short', year: 'numeric' });
               userMap[month] = (userMap[month] || 0) + 1;
             }
@@ -272,7 +423,7 @@ const AdminDashboard = () => {
             salesByRegion: regionSalesData
           });
         } catch (error) {
-          handleFirestoreError(error, OperationType.GET, 'analytics');
+          console.error("Error fetching analytics:", error);
         }
       }
     } catch (error) {
@@ -291,21 +442,21 @@ const AdminDashboard = () => {
     setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
 
     try {
-      const userRef = doc(db, 'users', userId);
-      const publicRef = doc(db, 'public_profiles', userId);
+      const response = await fetch(`/api/data/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: newRole })
+      });
       
-      await updateDoc(userRef, { role: newRole });
-      
-      // If demoted from expert, remove public profile
-      if (newRole !== 'expert') {
-        try {
-          await deleteDoc(publicRef);
-        } catch (e) {
-          // Public profile might not exist, ignore error
+      if (response.ok) {
+        // If demoted from expert, remove public profile
+        if (newRole !== 'expert') {
+          await fetch(`/api/data/public_profiles/${userId}`, { method: 'DELETE' });
         }
+        setMessage({ type: 'success', text: 'User role updated successfully' });
+      } else {
+        throw new Error('Failed to update role');
       }
-      
-      setMessage({ type: 'success', text: 'User role updated successfully' });
     } catch (error) {
       console.error("Error updating role:", error);
       setUsers(previousUsers);
@@ -315,20 +466,23 @@ const AdminDashboard = () => {
 
   const handleToggleApproval = async (userId: string, currentStatus: boolean) => {
     try {
-      const userRef = doc(db, 'users', userId);
-      const publicRef = doc(db, 'public_profiles', userId);
+      const response = await fetch(`/api/data/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isApproved: !currentStatus })
+      });
       
-      await updateDoc(userRef, { isApproved: !currentStatus });
-      
-      // Also update public profile if it exists
-      try {
-        await updateDoc(publicRef, { isApproved: !currentStatus });
-      } catch (e) {
-        console.log("No public profile to update approval for");
+      if (response.ok) {
+        // Also update public profile if it exists
+        await fetch(`/api/data/public_profiles/${userId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ isApproved: !currentStatus })
+        });
+        
+        setUsers(users.map(u => u.id === userId ? { ...u, isApproved: !currentStatus } : u));
+        setMessage({ type: 'success', text: `User ${!currentStatus ? 'approved' : 'unapproved'} successfully` });
       }
-      
-      setUsers(users.map(u => u.id === userId ? { ...u, isApproved: !currentStatus } : u));
-      setMessage({ type: 'success', text: `User ${!currentStatus ? 'approved' : 'unapproved'} successfully` });
     } catch (error) {
       console.error("Error toggling approval:", error);
       setMessage({ type: 'error', text: 'Failed to update approval status' });
@@ -337,10 +491,15 @@ const AdminDashboard = () => {
 
   const handleToggleServiceApproval = async (serviceId: string, currentStatus: boolean) => {
     try {
-      const serviceRef = doc(db, 'service_providers', serviceId);
-      await updateDoc(serviceRef, { isApproved: !currentStatus });
-      setServices(services.map(s => s.id === serviceId ? { ...s, isApproved: !currentStatus } : s));
-      setMessage({ type: 'success', text: `Service provider ${!currentStatus ? 'approved' : 'unapproved'} successfully` });
+      const response = await fetch(`/api/data/service_providers/${serviceId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isApproved: !currentStatus })
+      });
+      if (response.ok) {
+        setServices(services.map(s => s.id === serviceId ? { ...s, isApproved: !currentStatus } : s));
+        setMessage({ type: 'success', text: `Service provider ${!currentStatus ? 'approved' : 'unapproved'} successfully` });
+      }
     } catch (error) {
       console.error("Error toggling service approval:", error);
       setMessage({ type: 'error', text: 'Failed to update service approval status' });
@@ -349,10 +508,15 @@ const AdminDashboard = () => {
 
   const handleToggleContacts = async (userId: string, currentStatus: boolean) => {
     try {
-      const userRef = doc(db, 'users', userId);
-      await updateDoc(userRef, { showContacts: !currentStatus });
-      setUsers(users.map(u => u.id === userId ? { ...u, showContacts: !currentStatus } : u));
-      setMessage({ type: 'success', text: `Contacts ${!currentStatus ? 'revealed' : 'hidden'} successfully` });
+      const response = await fetch(`/api/data/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ showContacts: !currentStatus })
+      });
+      if (response.ok) {
+        setUsers(users.map(u => u.id === userId ? { ...u, showContacts: !currentStatus } : u));
+        setMessage({ type: 'success', text: `Contacts ${!currentStatus ? 'revealed' : 'hidden'} successfully` });
+      }
     } catch (error) {
       console.error("Error toggling contacts:", error);
       setMessage({ type: 'error', text: 'Failed to update contact visibility' });
@@ -373,8 +537,8 @@ const AdminDashboard = () => {
   const handleDeleteUser = async (userId: string) => {
     if (!window.confirm('Are you sure you want to delete this user? This action is irreversible.')) return;
     try {
-      await deleteDoc(doc(db, 'users', userId));
-      await deleteDoc(doc(db, 'public_profiles', userId));
+      await fetch(`/api/data/users/${userId}`, { method: 'DELETE' });
+      await fetch(`/api/data/public_profiles/${userId}`, { method: 'DELETE' });
       setUsers(users.filter(u => u.id !== userId));
       setMessage({ type: 'success', text: 'User deleted successfully' });
     } catch (error) {
@@ -386,7 +550,7 @@ const AdminDashboard = () => {
   const handleDeleteProduct = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this product?')) return;
     try {
-      await deleteDoc(doc(db, 'products', id));
+      await fetch(`/api/data/products/${id}`, { method: 'DELETE' });
       fetchData();
       setMessage({ type: 'success', text: 'Product deleted successfully' });
     } catch (error) {
@@ -403,7 +567,7 @@ const AdminDashboard = () => {
   const handleDeleteService = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this service provider?')) return;
     try {
-      await deleteDoc(doc(db, 'service_providers', id));
+      await fetch(`/api/data/service_providers/${id}`, { method: 'DELETE' });
       fetchData();
       setMessage({ type: 'success', text: 'Service provider deleted successfully' });
     } catch (error) {
@@ -419,10 +583,15 @@ const AdminDashboard = () => {
 
   const handleUpdateOrderStatus = async (orderId: string, newStatus: string) => {
     try {
-      const orderRef = doc(db, 'orders', orderId);
-      await updateDoc(orderRef, { status: newStatus });
-      setOrders(orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
-      setMessage({ type: 'success', text: 'Order status updated successfully' });
+      const response = await fetch(`/api/data/orders/${orderId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (response.ok) {
+        setOrders(orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+        setMessage({ type: 'success', text: 'Order status updated successfully' });
+      }
     } catch (error) {
       console.error("Error updating order status:", error);
       setMessage({ type: 'error', text: 'Failed to update order status' });
@@ -432,7 +601,7 @@ const AdminDashboard = () => {
   const handleDeleteOrder = async (orderId: string) => {
     if (!window.confirm('Are you sure you want to delete this order?')) return;
     try {
-      await deleteDoc(doc(db, 'orders', orderId));
+      await fetch(`/api/data/orders/${orderId}`, { method: 'DELETE' });
       setOrders(orders.filter(o => o.id !== orderId));
       setMessage({ type: 'success', text: 'Order deleted successfully' });
     } catch (error) {
@@ -443,16 +612,38 @@ const AdminDashboard = () => {
 
   const handleApproveProject = async (projectId: string, approve: boolean) => {
     try {
-      const projectRef = doc(db, 'projects', projectId);
-      await updateDoc(projectRef, { 
-        isApproved: approve,
-        status: approve ? 'active' : 'rejected'
+      const response = await fetch(`/api/data/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          isApproved: approve,
+          status: approve ? 'active' : 'rejected'
+        })
       });
-      setProjects(projects.map(p => p.id === projectId ? { ...p, isApproved: approve, status: approve ? 'active' : 'rejected' } : p));
-      setMessage({ type: 'success', text: `Project ${approve ? 'approved' : 'rejected'} successfully` });
+      if (response.ok) {
+        setProjects(projects.map(p => p.id === projectId ? { ...p, isApproved: approve, status: approve ? 'active' : 'rejected' } : p));
+        setMessage({ type: 'success', text: `Project ${approve ? 'approved' : 'rejected'} successfully` });
+      }
     } catch (error) {
       console.error("Error updating project status:", error);
       setMessage({ type: 'error', text: 'Failed to update project status' });
+    }
+  };
+
+  const handleCertifyProject = async (projectId: string, certify: boolean) => {
+    try {
+      const response = await fetch(`/api/data/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isCertified: certify })
+      });
+      if (response.ok) {
+        setProjects(projects.map(p => p.id === projectId ? { ...p, isCertified: certify } : p));
+        setMessage({ type: 'success', text: `Project ${certify ? 'certified' : 'uncertified'} successfully` });
+      }
+    } catch (error) {
+      console.error("Error certifying project:", error);
+      setMessage({ type: 'error', text: 'Failed to certify project' });
     }
   };
 
@@ -491,6 +682,7 @@ const AdminDashboard = () => {
             { id: 'services', label: 'Services', icon: Briefcase, count: services.filter(s => !s.isApproved).length },
             { id: 'orders', label: 'Orders', icon: Package },
             { id: 'projects', label: 'Projects', icon: Droplets, count: projects.filter(p => !p.isApproved).length },
+            { id: 'pricing', label: 'Pricing', icon: DollarSign },
             { id: 'analytics', label: 'Analytics', icon: BarChartIcon }
           ].map((tab) => (
             <button
@@ -589,6 +781,13 @@ const AdminDashboard = () => {
       </AnimatePresence>
 
       <div className="bg-white rounded-[3rem] border border-black/5 overflow-hidden shadow-sm">
+        {activeTab === 'pricing' && (
+          <PricingSettings 
+            onSuccess={() => setMessage({ type: 'success', text: 'Pricing rules updated successfully' })}
+            onError={(err) => setMessage({ type: 'error', text: err })}
+          />
+        )}
+
         {activeTab === 'users' && (
           <div className="space-y-6">
             <div className="p-8 border-b border-black/5 flex flex-col md:flex-row justify-between items-start md:items-center bg-stone-50/30 gap-4">
@@ -1300,7 +1499,12 @@ const AdminDashboard = () => {
                           alt=""
                         />
                         <div>
-                          <p className="font-bold text-sm">{project.title}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-bold text-sm">{project.title}</p>
+                            {project.isCertified && (
+                              <Shield size={12} className="text-emerald-600 fill-emerald-600" />
+                            )}
+                          </div>
                           <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">{project.category}</p>
                         </div>
                       </div>
@@ -1331,6 +1535,15 @@ const AdminDashboard = () => {
                         >
                           <Eye size={18} />
                         </button>
+                        <button
+                          onClick={() => handleCertifyProject(project.id, !project.isCertified)}
+                          className={`p-2 rounded-lg transition-colors ${
+                            project.isCertified ? 'text-emerald-600 bg-emerald-50' : 'text-black/20 hover:text-emerald-600 hover:bg-emerald-50'
+                          }`}
+                          title={project.isCertified ? "Uncertify Project" : "Certify Project"}
+                        >
+                          <Shield size={18} />
+                        </button>
                         {project.status === 'pending' && (
                           <>
                             <button
@@ -1352,8 +1565,16 @@ const AdminDashboard = () => {
                         <button
                           onClick={async () => {
                             if (window.confirm('Delete this project?')) {
-                              await deleteDoc(doc(db, 'projects', project.id));
-                              fetchData();
+                              try {
+                                const response = await fetch(`/api/data/projects/${project.id}`, { method: 'DELETE' });
+                                if (response.ok) {
+                                  fetchData();
+                                  setMessage({ type: 'success', text: 'Project deleted successfully' });
+                                }
+                              } catch (error) {
+                                console.error("Error deleting project:", error);
+                                setMessage({ type: 'error', text: 'Failed to delete project' });
+                              }
                             }
                           }}
                           className="p-2 text-black/20 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"

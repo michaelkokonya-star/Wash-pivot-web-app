@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Upload, Save, Loader2, Mail, Phone, MapPin, Image as ImageIcon } from 'lucide-react';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db, auth } from '../firebase';
+import { useAuth } from '../context/AuthContext';
 import { compressImage } from '../lib/image-utils';
-import { uploadFile } from '../lib/upload';
 import { toast } from 'sonner';
 
 interface EditServiceModalProps {
@@ -77,36 +75,41 @@ const EditServiceModal: React.FC<EditServiceModalProps> = ({ isOpen, onClose, on
       if (imageFile) {
         setUploadStatus('compressing');
         const compressedFile = await compressImage(imageFile);
-
+        
         setUploadStatus('uploading');
         setUploadProgress(10);
+        
+        const uploadFormData = new FormData();
+        uploadFormData.append('file', compressedFile);
+        
+        const uploadRes = await fetch('/api/upload', {
+          method: 'POST',
+          body: uploadFormData
+        });
 
-        try {
-          console.log("Starting S3 upload for:", imageFile.name);
-          console.log("File details:", {
-            name: compressedFile.name,
-            type: compressedFile.type,
-            size: compressedFile.size
-          });
-          finalImageUrl = await uploadFile(compressedFile);
-          console.log("Upload successful, proxy URL:", finalImageUrl);
-          setUploadProgress(100);
-        } catch (uploadError: any) {
-          console.error("Upload error:", uploadError);
-          toast.error(`Upload failed: ${uploadError.message || "Unknown error."}`);
-          throw uploadError;
-        }
+        if (!uploadRes.ok) throw new Error('Upload failed');
+        const uploadData = await uploadRes.json();
+        finalImageUrl = uploadData.url;
+        setUploadProgress(100);
       }
 
       setUploadStatus('saving');
-      const serviceRef = doc(db, 'service_providers', service.id);
-      await updateDoc(serviceRef, {
-        ...formData,
-        imageUrl: finalImageUrl
+      const response = await fetch(`/api/data/service_providers/${service.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          imageUrl: finalImageUrl
+        })
       });
-      onSuccess();
-      onClose();
-      toast.success("Service provider updated successfully!");
+
+      if (response.ok) {
+        onSuccess();
+        onClose();
+        toast.success("Service provider updated successfully!");
+      } else {
+        throw new Error('Failed to update service provider');
+      }
     } catch (error) {
       console.error("Error updating service provider:", error);
       toast.error("Failed to update service provider. Please try again.");

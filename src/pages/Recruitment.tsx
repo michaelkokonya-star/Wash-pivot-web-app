@@ -1,7 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, query, where, deleteDoc, doc } from 'firebase/firestore';
-import { db } from '../firebase';
-import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'motion/react';
 import { User, Briefcase, GraduationCap, Search, Filter, Mail, Award, Sparkles, Trash2 } from 'lucide-react';
@@ -19,21 +16,15 @@ const Recruitment = () => {
 
   const fetchExperts = async () => {
     setLoading(true);
-    const path = 'public_profiles';
     try {
-      const q = query(
-        collection(db, path), 
-        where('role', '==', 'expert'),
-        where('isApproved', '==', true)
-      );
-      const querySnapshot = await getDocs(q);
-      const expertsData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setExperts(expertsData);
+      const response = await fetch('/api/data/public_profiles');
+      if (response.ok) {
+        const data = await response.json();
+        const expertsData = data.filter((p: any) => p.role === 'expert' && p.isApproved === true);
+        setExperts(expertsData);
+      }
     } catch (error) {
-      handleFirestoreError(error, OperationType.GET, path);
+      console.error("Error fetching experts:", error);
     } finally {
       setLoading(false);
     }
@@ -42,9 +33,9 @@ const Recruitment = () => {
   const handleDeleteExpert = async (expertId: string) => {
     if (!window.confirm('Are you sure you want to remove this expert?')) return;
     try {
-      // Delete from both collections
-      await deleteDoc(doc(db, 'users', expertId));
-      await deleteDoc(doc(db, 'public_profiles', expertId));
+      // Delete from both collections via API
+      await fetch(`/api/data/users/${expertId}`, { method: 'DELETE' });
+      await fetch(`/api/data/public_profiles/${expertId}`, { method: 'DELETE' });
       setExperts(experts.filter(e => e.id !== expertId));
     } catch (error) {
       console.error("Error deleting expert:", error);

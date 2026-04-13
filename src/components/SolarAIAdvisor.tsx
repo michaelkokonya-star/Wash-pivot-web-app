@@ -2,10 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { GoogleGenAI, GenerateContentResponse, ThinkingLevel } from "@google/genai";
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, Zap, Battery, Sun, MapPin, Home, Tv, Loader2, Info, ExternalLink, MessageSquare, Copy, Check, Plus, X, Save, Send, User, Bot } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
 import Markdown from 'react-markdown';
-import { db, auth } from '../firebase';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
 
 const COMMON_APPLIANCES = [
   { id: 'led-5', name: 'LED Bulb (5W)', category: 'Lighting' },
@@ -75,14 +74,15 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
+  const { user } = useAuth();
+
   useEffect(() => {
     const loadSavedPreferences = async () => {
-      if (auth.currentUser) {
+      if (user) {
         try {
-          const docRef = doc(db, 'user_preferences', auth.currentUser.uid);
-          const docSnap = await getDoc(docRef);
-          if (docSnap.exists()) {
-            const data = docSnap.data();
+          const response = await fetch(`/api/data/user_preferences/${user.uid}`);
+          if (response.ok) {
+            const data = await response.json();
             if (data.selectedAppliances) {
               // Handle legacy format (string array) vs new format (Appliance array)
               const formatted = data.selectedAppliances.map((item: any) => 
@@ -99,7 +99,7 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
       }
     };
     loadSavedPreferences();
-  }, [auth.currentUser]);
+  }, [user]);
 
   useEffect(() => {
     if ("geolocation" in navigator) {
@@ -212,20 +212,29 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
   };
 
   const handleSavePreferences = async () => {
-    if (!auth.currentUser) {
+    if (!user) {
       toast.error("Please sign in to save your preferences.");
       return;
     }
 
     setIsSaving(true);
     try {
-      await setDoc(doc(db, 'user_preferences', auth.currentUser.uid), {
-        selectedAppliances,
-        premisesSize: inputs.premisesSize,
-        location: inputs.location,
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
-      toast.success("Preferences saved successfully!");
+      const response = await fetch(`/api/data/user_preferences/${user.uid}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          selectedAppliances,
+          premisesSize: inputs.premisesSize,
+          location: inputs.location,
+          updatedAt: new Date().toISOString()
+        })
+      });
+      
+      if (response.ok) {
+        toast.success("Preferences saved successfully!");
+      } else {
+        throw new Error('Failed to save preferences');
+      }
     } catch (error) {
       console.error("Error saving preferences:", error);
       toast.error("Failed to save preferences.");

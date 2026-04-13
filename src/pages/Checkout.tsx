@@ -2,11 +2,6 @@ import React, { useState } from 'react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'motion/react';
-import { Helmet } from 'react-helmet-async';
-import { CreditCard, Truck, ShieldCheck, ArrowRight, ChevronLeft, Loader2, AlertCircle, Smartphone } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebase';
 
 const Checkout = () => {
   const { cart, cartTotal, cartCount, clearCart } = useCart();
@@ -37,7 +32,7 @@ const Checkout = () => {
     setError(null);
 
     try {
-      // 1. Save Order to Firestore (Initial state: Pending)
+      // 1. Save Order to Generic Data API (Initial state: Pending)
       const orderData = {
         userId: user?.uid,
         userEmail: user?.email,
@@ -46,14 +41,25 @@ const Checkout = () => {
         status: 'pending',
         paymentMethod: paymentMethod,
         shippingInfo: formData,
-        createdAt: serverTimestamp(),
+        createdAt: new Date().toISOString(),
       };
 
       if (paymentMethod === 'mpesa') {
         throw new Error('M-Pesa payment is currently unavailable. Please use a credit/debit card.');
       }
 
-      const orderRef = await addDoc(collection(db, 'orders'), orderData);
+      const orderResponse = await fetch('/api/data/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orderData)
+      });
+
+      if (!orderResponse.ok) {
+        throw new Error('Failed to create order');
+      }
+
+      const orderResult = await orderResponse.json();
+      const orderId = orderResult.id;
 
       if (paymentMethod === 'card') {
         // 2a. Stripe Checkout
@@ -64,7 +70,7 @@ const Checkout = () => {
           },
           body: JSON.stringify({
             items: cart,
-            successUrl: `${window.location.origin}/checkout/success?orderId=${orderRef.id}`,
+            successUrl: `${window.location.origin}/checkout/success?orderId=${orderId}`,
             cancelUrl: `${window.location.origin}/cart`,
           }),
         });
@@ -91,7 +97,7 @@ const Checkout = () => {
           body: JSON.stringify({
             phoneNumber: formData.phone,
             amount: cartTotal,
-            accountReference: `ORDER-${orderRef.id.slice(0, 8)}`,
+            accountReference: `ORDER-${orderId.slice(0, 8)}`,
             transactionDesc: `Payment for ${cartCount} items`,
           }),
         });
@@ -104,7 +110,7 @@ const Checkout = () => {
 
         // In a real app, we'd poll for status. For this demo, we'll show a success message after a delay.
         setTimeout(() => {
-          navigate(`/checkout/success?orderId=${orderRef.id}`);
+          navigate(`/checkout/success?orderId=${orderId}`);
         }, 5000);
       }
     } catch (err: any) {

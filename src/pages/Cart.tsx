@@ -56,9 +56,16 @@ const Cart = () => {
                   <div className="flex-grow text-center sm:text-left">
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 mb-2">
                       <div>
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 mb-1 block">
-                          {item.category}
-                        </span>
+                        <div className="flex items-center justify-center sm:justify-start gap-2 mb-1">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">
+                            {item.category}
+                          </span>
+                          {item.rating && (
+                            <span className="px-2 py-0.5 bg-stone-100 text-black/40 rounded text-[9px] font-bold uppercase tracking-widest">
+                              {item.rating}
+                            </span>
+                          )}
+                        </div>
                         <h3 className="font-bold text-xl tracking-tight">{item.name}</h3>
                       </div>
                       <span className="text-lg font-bold tracking-tighter">
@@ -69,14 +76,14 @@ const Cart = () => {
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4">
                       <div className="flex items-center bg-stone-100 rounded-xl p-1">
                         <button
-                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                          onClick={() => updateQuantity(item.id, item.quantity - 1, item.rating)}
                           className="p-2 hover:bg-white rounded-lg transition-all text-black/60 hover:text-black"
                         >
                           <Minus size={16} />
                         </button>
                         <span className="w-12 text-center font-bold">{item.quantity}</span>
                         <button
-                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          onClick={() => updateQuantity(item.id, item.quantity + 1, item.rating)}
                           className="p-2 hover:bg-white rounded-lg transition-all text-black/60 hover:text-black"
                         >
                           <Plus size={16} />
@@ -84,7 +91,7 @@ const Cart = () => {
                       </div>
                       
                       <button
-                        onClick={() => removeFromCart(item.id)}
+                        onClick={() => removeFromCart(item.id, item.rating)}
                         className="flex items-center space-x-2 text-sm font-bold text-red-500 hover:text-red-700 transition-colors"
                       >
                         <Trash2 size={16} />

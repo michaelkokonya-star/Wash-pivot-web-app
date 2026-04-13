@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, CheckCircle2, Award, GraduationCap, Briefcase, ArrowRight, ArrowLeft, Sparkles, ShieldCheck, Mail, MapPin, Clock, ListChecks, Eye } from 'lucide-react';
-import { doc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 
 interface ExpertOnboardingModalProps {
@@ -83,27 +81,34 @@ const ExpertOnboardingModal: React.FC<ExpertOnboardingModalProps> = ({ isOpen, o
     setLoading(true);
     try {
       const expertJoinedAt = new Date().toISOString();
-      const userRef = doc(db, 'users', user.uid);
-      const publicRef = doc(db, 'public_profiles', user.uid);
-
+      
       const expertData = {
         ...formData,
         role: 'expert',
         onboardingCompleted: true,
         expertJoinedAt,
         isApproved: false,
-        updatedAt: serverTimestamp()
+        updatedAt: new Date().toISOString()
       };
 
-      // Update private user document
-      await updateDoc(userRef, expertData);
+      // Update private user document via API
+      await fetch(`/api/data/users/${user.uid}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(expertData)
+      });
 
-      // Create public profile
-      await setDoc(publicRef, {
-        uid: user.uid,
-        displayName: profile.displayName,
-        photoURL: profile.photoURL || null,
-        ...expertData
+      // Create public profile via API
+      await fetch('/api/data/public_profiles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: user.uid,
+          uid: user.uid,
+          displayName: profile.displayName,
+          photoURL: profile.photoURL || null,
+          ...expertData
+        })
       });
 
       onComplete();

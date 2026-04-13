@@ -1,8 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { doc, updateDoc, getDoc, collection, query, where, orderBy, getDocs, Timestamp } from 'firebase/firestore';
-import { db } from '../firebase';
-import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, Mail, Shield, CheckCircle2, XCircle, Phone, Eye, EyeOff, Save, Loader2, Award, GraduationCap, Briefcase, Clock, Settings, LogOut, Sparkles, Package, ExternalLink, Lock, Camera } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -21,7 +18,7 @@ interface Order {
   totalAmount: number;
   status: 'pending' | 'paid' | 'failed' | 'shipped' | 'delivered';
   paymentMethod: 'card' | 'mpesa';
-  createdAt: Timestamp;
+  createdAt: string;
 }
 
 const Profile = () => {
@@ -67,22 +64,17 @@ const Profile = () => {
   useEffect(() => {
     const fetchOrders = async () => {
       if (!user) return;
-      const path = 'orders';
       try {
-        const ordersRef = collection(db, path);
-        const q = query(
-          ordersRef,
-          where('userId', '==', user.uid),
-          orderBy('createdAt', 'desc')
-        );
-        const querySnapshot = await getDocs(q);
-        const fetchedOrders = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Order[];
-        setOrders(fetchedOrders);
+        const response = await fetch('/api/data/orders');
+        if (response.ok) {
+          const allOrders = await response.json();
+          const userOrders = allOrders
+            .filter((o: any) => o.userId === user.uid)
+            .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          setOrders(userOrders);
+        }
       } catch (error) {
-        handleFirestoreError(error, OperationType.GET, path);
+        console.error("Error fetching orders:", error);
       } finally {
         setOrdersLoading(false);
       }
@@ -99,28 +91,34 @@ const Profile = () => {
     setMessage(null);
 
     try {
-      const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
+      const updateData = {
         displayName: formData.displayName,
         phoneNumber: formData.phoneNumber,
         showContacts: formData.showContacts
+      };
+
+      const response = await fetch(`/api/data/users/${user.uid}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateData)
       });
 
-      // Also update public profile if it exists
-      if (profile?.role === 'expert') {
-        const publicRef = doc(db, 'public_profiles', user.uid);
-        const publicDoc = await getDoc(publicRef);
-        if (publicDoc.exists()) {
-          await updateDoc(publicRef, {
-            displayName: formData.displayName,
-            phoneNumber: formData.phoneNumber,
-            showContacts: formData.showContacts
-          });
+      if (response.ok) {
+        // Also update public profile if it exists
+        if (profile?.role === 'expert') {
+          const publicRes = await fetch(`/api/data/public_profiles/${user.uid}`);
+          if (publicRes.ok) {
+            await fetch(`/api/data/public_profiles/${user.uid}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(updateData)
+            });
+          }
         }
-      }
 
-      setMessage({ type: 'success', text: 'Profile updated successfully!' });
-      setIsEditing(false);
+        setMessage({ type: 'success', text: 'Profile updated successfully!' });
+        setIsEditing(false);
+      }
     } catch (error) {
       console.error("Error updating profile:", error);
       setMessage({ type: 'error', text: 'Failed to update profile. Please try again.' });
@@ -192,16 +190,22 @@ const Profile = () => {
       const data = await response.json();
       const photoURL = data.url;
 
-      // Update Firestore user document
-      const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, { photoURL });
+      // Update user document
+      await fetch(`/api/data/users/${user.uid}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photoURL })
+      });
 
       // Update public profile if expert
       if (profile?.role === 'expert') {
-        const publicRef = doc(db, 'public_profiles', user.uid);
-        const publicDoc = await getDoc(publicRef);
-        if (publicDoc.exists()) {
-          await updateDoc(publicRef, { photoURL });
+        const publicRes = await fetch(`/api/data/public_profiles/${user.uid}`);
+        if (publicRes.ok) {
+          await fetch(`/api/data/public_profiles/${user.uid}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ photoURL })
+          });
         }
       }
 
@@ -440,7 +444,7 @@ const Profile = () => {
                     <label className="text-[10px] font-bold uppercase tracking-widest text-black/40 mb-2 block">Member Since</label>
                     <div className="flex items-center space-x-2 font-bold text-lg">
                       <Clock size={18} className="text-black/20" />
-                      <span>{profile.createdAt?.toDate().toLocaleDateString() || 'N/A'}</span>
+                      <span>{profile.createdAt ? new Date(profile.createdAt).toLocaleDateString() : 'N/A'}</span>
                     </div>
                   </div>
                 </div>
@@ -571,7 +575,7 @@ const Profile = () => {
                       </div>
                       <div className="text-right">
                         <p className="text-[10px] font-bold uppercase tracking-widest text-black/40 mb-1">Date</p>
-                        <p className="text-sm font-bold">{order.createdAt?.toDate().toLocaleDateString()}</p>
+                        <p className="text-sm font-bold">{new Date(order.createdAt).toLocaleDateString()}</p>
                       </div>
                       <div>
                         <span className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest ${

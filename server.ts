@@ -8,6 +8,8 @@ import axios from 'axios';
 import dotenv from 'dotenv';
 import admin from 'firebase-admin';
 import uploadRoutes from './routes/upload.ts';
+import settingsRoutes from './routes/settings.ts';
+import dataRoutes from './routes/data.ts';
 
 dotenv.config();
 
@@ -84,6 +86,8 @@ async function startServer() {
 
     // Upload API
     app.use('/api', uploadRoutes);
+    app.use('/api/settings', settingsRoutes);
+    app.use('/api/data', dataRoutes);
 
     // API routes
     app.get('/api/health', (req, res) => {

@@ -1,11 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, serverTimestamp, updateDoc, doc } from 'firebase/firestore';
-import { db } from '../firebase';
-import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'motion/react';
 import { Helmet } from 'react-helmet-async';
-import { Plus, Target, Users, TrendingUp, Heart, ListTodo, X } from 'lucide-react';
+import { Plus, Target, Users, TrendingUp, Heart, ListTodo, X, Shield } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 const MicroFunding = () => {
@@ -26,16 +23,18 @@ const MicroFunding = () => {
   useEffect(() => {
     const fetchProjects = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, 'projects'));
-        const allProjects = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        // Only show approved projects to regular users
-        if (profile?.role === 'admin') {
-          setProjects(allProjects);
-        } else {
-          setProjects(allProjects.filter((p: any) => p.isApproved === true));
+        const response = await fetch('/api/projects');
+        if (response.ok) {
+          const allProjects = await response.json();
+          // Only show approved projects to regular users
+          if (profile?.role === 'admin') {
+            setProjects(allProjects);
+          } else {
+            setProjects(allProjects.filter((p: any) => p.isApproved === true));
+          }
         }
       } catch (error) {
-        handleFirestoreError(error, OperationType.GET, 'projects');
+        console.error("Error fetching projects:", error);
       }
     };
     fetchProjects();
@@ -60,34 +59,44 @@ const MicroFunding = () => {
     if (!user) return;
 
     try {
-      await addDoc(collection(db, 'projects'), {
-        ...formData,
-        ownerUid: user.uid,
-        ownerName: profile?.displayName || user.displayName || 'Anonymous',
-        currentFunding: 0,
-        milestones: milestones,
-        createdAt: serverTimestamp(),
-        isApproved: false,
-        status: 'pending'
+      const response = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          ownerUid: user.uid,
+          ownerName: profile?.displayName || user.displayName || 'Anonymous',
+          currentFunding: 0,
+          milestones: milestones,
+          isApproved: false,
+          status: 'pending'
+        })
       });
-      setIsAdding(false);
-      setMilestones([]);
-      window.location.reload();
+      if (response.ok) {
+        setIsAdding(false);
+        setMilestones([]);
+        window.location.reload();
+      }
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, 'projects');
+      console.error("Error creating project:", error);
     }
   };
 
   const handleSupport = async (projectId: string, current: number) => {
     if (!user) return alert('Please sign in to support projects');
     try {
-      const projectRef = doc(db, 'projects', projectId);
-      await updateDoc(projectRef, {
-        currentFunding: current + 5000 // Mock support amount in KSh
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentFunding: current + 5000 // Mock support amount in KSh
+        })
       });
-      window.location.reload();
+      if (response.ok) {
+        window.location.reload();
+      }
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `projects/${projectId}`);
+      console.error("Error supporting project:", error);
     }
   };
 
@@ -233,10 +242,16 @@ const MicroFunding = () => {
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                     referrerPolicy="no-referrer"
                   />
-                  <div className="absolute top-4 left-4">
+                  <div className="absolute top-4 left-4 flex flex-col gap-2">
                     <span className="px-3 py-1 bg-black text-white rounded-full text-[10px] font-bold uppercase tracking-widest">
                       {project.category}
                     </span>
+                    {project.isCertified && (
+                      <span className="px-3 py-1 bg-emerald-600 text-white rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-1 shadow-lg shadow-emerald-600/20">
+                        <Shield size={10} className="fill-white" />
+                        Certified
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="p-8 md:w-3/5 flex flex-col">
