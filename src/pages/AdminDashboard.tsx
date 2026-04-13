@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { Users, ShoppingBag, Droplets, Shield, CheckCircle2, XCircle, Search, Filter, Edit, Trash2, Plus, Eye, EyeOff, Key, Package, TrendingUp, DollarSign, PieChart, Check, X, BarChart as BarChartIcon, Activity, Briefcase, Award, Mail, Loader2, Sun } from 'lucide-react';
+import { Users, ShoppingBag, Droplets, Shield, CheckCircle2, XCircle, Search, Filter, Edit, Trash2, Plus, Eye, EyeOff, Key, Package, TrendingUp, DollarSign, PieChart, Check, X, BarChart as BarChartIcon, Activity, Briefcase, Award, Mail, Loader2, Sun, Truck } from 'lucide-react';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   BarChart, Bar, Legend, AreaChart, Area, PieChart as RePieChart, Pie, Cell, LabelList, Sector 
@@ -300,6 +300,130 @@ const PricingSettings = ({ onSuccess, onError }: { onSuccess: () => void, onErro
   );
 };
 
+const DeliverySettings = ({ onSuccess, onError }: { onSuccess: () => void, onError: (err: string) => void }) => {
+  const [rules, setRules] = useState<any>({
+    baseRate: 200,
+    ratePerKm: 50,
+    freeThreshold: 50000
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const fetchRules = async () => {
+      try {
+        const response = await fetch('/api/settings/delivery-rules');
+        if (response.ok) {
+          const data = await response.json();
+          setRules(data);
+        }
+      } catch (error) {
+        console.error("Error fetching delivery rules:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchRules();
+  }, []);
+
+  const handleSave = async () => {
+    if (rules.baseRate < 200) {
+      onError('Base rate cannot be below KES 200');
+      return;
+    }
+    setSaving(true);
+    try {
+      const response = await fetch('/api/settings/delivery-rules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(rules)
+      });
+      if (response.ok) {
+        onSuccess();
+      } else {
+        const err = await response.json();
+        onError(err.error || 'Failed to save rules');
+      }
+    } catch (error: any) {
+      onError(error.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <div className="p-20 text-center"><Loader2 className="animate-spin mx-auto mb-4" /> Loading rules...</div>;
+
+  return (
+    <div className="p-8 space-y-8">
+      <div>
+        <h3 className="font-bold text-xl mb-2">Delivery Rate Calculation</h3>
+        <p className="text-xs text-black/40">Configure how delivery charges are calculated based on distance and order value.</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="p-6 bg-stone-50 rounded-3xl border border-black/5 space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="font-bold text-sm">Base Delivery Rate</span>
+            <span className="text-[10px] font-bold text-black/30 uppercase tracking-widest">KES (Min 200)</span>
+          </div>
+          <input 
+            type="number" 
+            min="200"
+            value={rules.baseRate} 
+            onChange={(e) => setRules({ ...rules, baseRate: parseFloat(e.target.value) })}
+            className="w-full px-4 py-3 bg-white border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors"
+          />
+        </div>
+
+        <div className="p-6 bg-stone-50 rounded-3xl border border-black/5 space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="font-bold text-sm">Rate per Kilometer</span>
+            <span className="text-[10px] font-bold text-black/30 uppercase tracking-widest">KES / KM</span>
+          </div>
+          <input 
+            type="number" 
+            value={rules.ratePerKm} 
+            onChange={(e) => setRules({ ...rules, ratePerKm: parseFloat(e.target.value) })}
+            className="w-full px-4 py-3 bg-white border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors"
+          />
+        </div>
+
+        <div className="p-6 bg-stone-50 rounded-3xl border border-black/5 space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="font-bold text-sm">Free Delivery Threshold</span>
+            <span className="text-[10px] font-bold text-black/30 uppercase tracking-widest">KES Order Total</span>
+          </div>
+          <input 
+            type="number" 
+            value={rules.freeThreshold} 
+            onChange={(e) => setRules({ ...rules, freeThreshold: parseFloat(e.target.value) })}
+            className="w-full px-4 py-3 bg-white border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors"
+          />
+        </div>
+      </div>
+
+      <div className="p-6 bg-emerald-50 rounded-3xl border border-emerald-100">
+        <h4 className="font-bold text-sm mb-2 text-emerald-900">Calculation Logic:</h4>
+        <p className="text-xs text-emerald-800 leading-relaxed">
+          Delivery Charge = Max({rules.baseRate}, Distance × {rules.ratePerKm})<br />
+          If Order Total ≥ {rules.freeThreshold.toLocaleString()}, Delivery is FREE.
+        </p>
+      </div>
+
+      <div className="pt-8 border-t border-black/5 flex justify-end">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="px-8 py-4 bg-black text-white rounded-2xl font-bold hover:bg-stone-800 transition-all flex items-center gap-2 disabled:opacity-50"
+        >
+          {saving ? <Loader2 className="animate-spin" size={18} /> : <Check size={18} />}
+          <span>Save Delivery Rules</span>
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { user, profile, resetPassword, loading: authLoading } = useAuth();
@@ -308,7 +432,7 @@ const AdminDashboard = () => {
   const [orders, setOrders] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'users' | 'products' | 'projects' | 'orders' | 'analytics' | 'services' | 'experts' | 'pricing'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'products' | 'projects' | 'orders' | 'analytics' | 'services' | 'experts' | 'pricing' | 'delivery'>('users');
   const [userFilter, setUserFilter] = useState<'all' | 'pending' | 'approved'>('all');
   const [serviceFilter, setServiceFilter] = useState<'all' | 'pending' | 'approved'>('all');
   const [projectFilter, setProjectFilter] = useState<'all' | 'pending' | 'active' | 'completed' | 'rejected'>('all');
@@ -761,6 +885,7 @@ const AdminDashboard = () => {
             { id: 'orders', label: 'Orders', icon: Package },
             { id: 'projects', label: 'Projects', icon: Droplets, count: projects.filter(p => !p.isApproved).length },
             { id: 'pricing', label: 'Pricing', icon: DollarSign },
+            { id: 'delivery', label: 'Delivery', icon: Truck },
             { id: 'analytics', label: 'Analytics', icon: BarChartIcon }
           ].map((tab) => (
             <button
@@ -862,6 +987,13 @@ const AdminDashboard = () => {
         {activeTab === 'pricing' && (
           <PricingSettings 
             onSuccess={() => setMessage({ type: 'success', text: 'Pricing rules updated successfully' })}
+            onError={(err) => setMessage({ type: 'error', text: err })}
+          />
+        )}
+
+        {activeTab === 'delivery' && (
+          <DeliverySettings 
+            onSuccess={() => setMessage({ type: 'success', text: 'Delivery rules updated successfully' })}
             onError={(err) => setMessage({ type: 'error', text: err })}
           />
         )}

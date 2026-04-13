@@ -22,7 +22,34 @@ const Checkout = () => {
     address: '',
     city: '',
     phone: '',
+    distance: '0',
   });
+
+  const [deliveryRules, setDeliveryRules] = useState<any>({
+    baseRate: 200,
+    ratePerKm: 50,
+    freeThreshold: 50000
+  });
+
+  React.useEffect(() => {
+    const fetchDeliveryRules = async () => {
+      try {
+        const response = await fetch('/api/settings/delivery-rules');
+        if (response.ok) {
+          const data = await response.json();
+          setDeliveryRules(data);
+        }
+      } catch (error) {
+        console.error("Error fetching delivery rules:", error);
+      }
+    };
+    fetchDeliveryRules();
+  }, []);
+
+  const distanceNum = parseFloat(formData.distance) || 0;
+  const rawDeliveryCharge = Math.max(deliveryRules.baseRate, distanceNum * deliveryRules.ratePerKm);
+  const deliveryCharge = cartTotal >= deliveryRules.freeThreshold ? 0 : rawDeliveryCharge;
+  const finalTotal = cartTotal + deliveryCharge;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -40,7 +67,9 @@ const Checkout = () => {
         userId: user?.uid,
         userEmail: user?.email,
         items: cart,
-        totalAmount: cartTotal,
+        totalAmount: finalTotal,
+        subtotal: cartTotal,
+        deliveryCharge: deliveryCharge,
         status: 'pending',
         paymentMethod: paymentMethod,
         shippingInfo: formData,
@@ -72,7 +101,16 @@ const Checkout = () => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            items: cart,
+            items: [
+              ...cart,
+              {
+                id: 'delivery-charge',
+                name: 'Delivery Charge',
+                price: deliveryCharge,
+                quantity: 1,
+                imageUrl: 'https://cdn-icons-png.flaticon.com/512/2311/2311524.png'
+              }
+            ].filter(item => item.price > 0),
             successUrl: `${window.location.origin}/checkout/success?orderId=${orderId}`,
             cancelUrl: `${window.location.origin}/cart`,
           }),
@@ -99,7 +137,7 @@ const Checkout = () => {
           },
           body: JSON.stringify({
             phoneNumber: formData.phone,
-            amount: cartTotal,
+            amount: finalTotal,
             accountReference: `ORDER-${orderId.slice(0, 8)}`,
             transactionDesc: `Payment for ${cartCount} items`,
           }),
@@ -225,6 +263,19 @@ const Checkout = () => {
                     className="w-full p-4 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600"
                   />
                 </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Distance from Nairobi (KM)</label>
+                  <input
+                    type="number"
+                    name="distance"
+                    min="0"
+                    required
+                    value={formData.distance}
+                    onChange={handleInputChange}
+                    className="w-full p-4 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600"
+                  />
+                  <p className="text-[9px] text-black/30 italic">Used to calculate delivery charges (Min KES {deliveryRules.baseRate})</p>
+                </div>
               </div>
             </section>
 
@@ -310,7 +361,7 @@ const Checkout = () => {
                 </>
               ) : (
                 <>
-                  <span>Pay KSh {cartTotal.toLocaleString()}</span>
+                  <span>Pay KSh {finalTotal.toLocaleString()}</span>
                   <ArrowRight size={20} />
                 </>
               )}
@@ -344,12 +395,16 @@ const Checkout = () => {
                 <span>KSh {cartTotal.toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-black/40 text-sm">
-                <span>Shipping</span>
-                <span className="text-emerald-600 font-bold uppercase tracking-widest text-[10px]">Free</span>
+                <span>Shipping ({distanceNum} km)</span>
+                {deliveryCharge === 0 ? (
+                  <span className="text-emerald-600 font-bold uppercase tracking-widest text-[10px]">Free</span>
+                ) : (
+                  <span>KSh {deliveryCharge.toLocaleString()}</span>
+                )}
               </div>
               <div className="pt-4 border-t border-black/10 flex justify-between items-end">
                 <span className="text-lg font-bold">Total</span>
-                <span className="text-3xl font-bold tracking-tighter">KSh {cartTotal.toLocaleString()}</span>
+                <span className="text-3xl font-bold tracking-tighter">KSh {finalTotal.toLocaleString()}</span>
               </div>
             </div>
 

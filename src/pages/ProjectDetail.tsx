@@ -83,6 +83,44 @@ const ProjectDetail = () => {
     }
   };
 
+  const renderVideo = (url: string) => {
+    // Check for YouTube
+    const ytMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/))([\w-]{11})/);
+    if (ytMatch) {
+      return (
+        <iframe
+          src={`https://www.youtube.com/embed/${ytMatch[1]}`}
+          className="w-full h-full"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
+      );
+    }
+
+    // Check for Vimeo
+    const vimeoMatch = url.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+    if (vimeoMatch) {
+      return (
+        <iframe
+          src={`https://player.vimeo.com/video/${vimeoMatch[1]}`}
+          className="w-full h-full"
+          allow="autoplay; fullscreen; picture-in-picture"
+          allowFullScreen
+        />
+      );
+    }
+
+    // Direct video file (S3 or other)
+    return (
+      <video 
+        src={url} 
+        controls 
+        className="w-full h-full object-cover"
+        poster={project.imageUrl}
+      />
+    );
+  };
+
   if (loading) {
     return (
       <div className="pt-32 flex justify-center items-center min-h-screen">
@@ -181,9 +219,9 @@ const ProjectDetail = () => {
             {project.media && project.media.length > 0 && (
               <div className="mt-12">
                 <h3 className="text-xl font-bold mb-6 tracking-tight uppercase">Project Gallery</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   {project.media.map((item: any, index: number) => (
-                    <div key={index} className="relative aspect-video rounded-2xl overflow-hidden bg-stone-100 border border-black/5 group">
+                    <div key={index} className="relative aspect-video rounded-3xl overflow-hidden bg-stone-100 border border-black/5 group shadow-sm">
                       {item.type === 'image' ? (
                         <img 
                           src={item.url} 
@@ -192,19 +230,8 @@ const ProjectDetail = () => {
                           referrerPolicy="no-referrer"
                         />
                       ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center">
-                          <div className="w-12 h-12 bg-black text-white rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                            <Play size={20} fill="currentColor" />
-                          </div>
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-black/40">Project Video</p>
-                          <a 
-                            href={item.url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="mt-2 text-xs font-bold text-emerald-600 hover:underline"
-                          >
-                            Watch Video
-                          </a>
+                        <div className="w-full h-full">
+                          {renderVideo(item.url)}
                         </div>
                       )}
                     </div>
