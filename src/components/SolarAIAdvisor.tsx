@@ -3,6 +3,7 @@ import { GoogleGenAI, GenerateContentResponse, ThinkingLevel } from "@google/gen
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, Zap, Battery, Sun, MapPin, Home, Tv, Loader2, Info, ExternalLink, MessageSquare, Copy, Check, Plus, X, Save, Send, User, Bot } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { auth } from '../firebase';
 import { toast } from 'sonner';
 import Markdown from 'react-markdown';
 

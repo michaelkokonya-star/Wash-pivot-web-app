@@ -101,6 +101,37 @@ const ProductDetail = () => {
     return `${symbol}${converted.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
   };
 
+  const getCalculationDetails = () => {
+    if (!product || !pricingRules || !currentRating) return null;
+    
+    const rule = pricingRules[product.subCategory];
+    if (!rule) return null;
+
+    let ratingValue = parseFloat(currentRating.replace(/[^\d.]/g, ''));
+    let unit = 'Watt';
+    let conversionText = '';
+
+    if (currentRating.toUpperCase().includes('KW')) {
+      const originalValue = ratingValue;
+      ratingValue = ratingValue * 1000;
+      conversionText = `(${originalValue}KW = ${ratingValue}W)`;
+    } else if (product.subCategory === 'Batteries') {
+      unit = 'AH';
+    } else if (product.subCategory === 'Charge Controller') {
+      unit = 'Ampere';
+    }
+
+    return {
+      rule,
+      ratingValue,
+      unit,
+      conversionText,
+      total: Math.round(ratingValue * rule)
+    };
+  };
+
+  const calcDetails = getCalculationDetails();
+
   useEffect(() => {
     const fetchProduct = async () => {
       try {
@@ -223,7 +254,11 @@ const ProductDetail = () => {
     if (product && pricingRules && currentRating) {
       const rule = pricingRules[product.subCategory];
       if (rule) {
-        const ratingValue = parseFloat(currentRating.replace(/[^\d.]/g, ''));
+        let ratingValue = parseFloat(currentRating.replace(/[^\d.]/g, ''));
+        // Handle KW to Watt conversion
+        if (currentRating.toUpperCase().includes('KW')) {
+          ratingValue = ratingValue * 1000;
+        }
         setCurrentPrice(Math.round(ratingValue * rule));
       }
     }
@@ -369,34 +404,49 @@ const ProductDetail = () => {
               </div>
             )}
 
-            <div className="flex items-center space-x-6 mb-8">
-              <div className="text-3xl font-bold text-black">{formatPrice(currentPrice)}</div>
-              <div className="flex items-center space-x-2">
-                <div className="flex text-emerald-600">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <Star key={star} size={16} fill={star <= Math.round(averageRating) ? "currentColor" : "none"} />
-                  ))}
+            <div className="flex flex-col mb-8">
+              <div className="flex items-center space-x-6 mb-2">
+                <div className="text-4xl font-bold text-black">{formatPrice(currentPrice)}</div>
+                <div className="flex items-center space-x-2">
+                  <div className="flex text-emerald-600">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Star key={star} size={16} fill={star <= Math.round(averageRating) ? "currentColor" : "none"} />
+                    ))}
+                  </div>
+                  <span className="text-sm font-bold text-black/40">({reviews.length})</span>
                 </div>
-                <span className="text-sm font-bold text-black/40">({reviews.length})</span>
+                <div className="relative group">
+                  <div className="flex items-center space-x-2 px-3 py-1.5 bg-stone-100 rounded-lg text-xs font-bold cursor-pointer hover:bg-stone-200 transition-colors">
+                    <Globe size={14} className="text-black/40" />
+                    <span>{currency}</span>
+                  </div>
+                  <div className="absolute top-full left-0 mt-2 w-48 bg-white border border-black/10 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 overflow-hidden">
+                    {currencies.map((c) => (
+                      <button
+                        key={c.code}
+                        onClick={() => setCurrency(c.code)}
+                        className={`w-full px-4 py-2.5 text-left text-xs font-bold hover:bg-stone-50 transition-colors flex items-center justify-between ${currency === c.code ? 'text-emerald-600 bg-emerald-50/50' : 'text-black/60'}`}
+                      >
+                        <span>{c.name}</span>
+                        <span className="opacity-40">{c.code}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
-              <div className="relative group">
-                <div className="flex items-center space-x-2 px-3 py-1.5 bg-stone-100 rounded-lg text-xs font-bold cursor-pointer hover:bg-stone-200 transition-colors">
-                  <Globe size={14} className="text-black/40" />
-                  <span>{currency}</span>
-                </div>
-                <div className="absolute top-full left-0 mt-2 w-48 bg-white border border-black/10 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 overflow-hidden">
-                  {currencies.map((c) => (
-                    <button
-                      key={c.code}
-                      onClick={() => setCurrency(c.code)}
-                      className={`w-full px-4 py-2.5 text-left text-xs font-bold hover:bg-stone-50 transition-colors flex items-center justify-between ${currency === c.code ? 'text-emerald-600 bg-emerald-50/50' : 'text-black/60'}`}
-                    >
-                      <span>{c.name}</span>
-                      <span className="opacity-40">{c.code}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+
+              {calcDetails && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-100 rounded-xl w-fit"
+                >
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">
+                    Calculation: {calcDetails.ratingValue}{calcDetails.unit.charAt(0)} {calcDetails.conversionText} × KSh {calcDetails.rule}/{calcDetails.unit}
+                  </span>
+                </motion.div>
+              )}
             </div>
           </div>
 

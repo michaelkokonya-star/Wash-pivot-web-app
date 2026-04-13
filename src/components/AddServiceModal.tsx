@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Upload, Plus, Loader2, Mail, Phone, MapPin, Image as ImageIcon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { auth } from '../firebase';
 import { compressImage } from '../lib/image-utils';
 import { toast } from 'sonner';
 
@@ -12,6 +13,7 @@ interface AddServiceModalProps {
 }
 
 const AddServiceModal: React.FC<AddServiceModalProps> = ({ isOpen, onClose, onSuccess }) => {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'compressing' | 'uploading' | 'saving'>('idle');

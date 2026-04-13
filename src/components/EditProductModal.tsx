@@ -29,6 +29,22 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
     description: '',
     imageUrl: ''
   });
+  const [pricingRules, setPricingRules] = useState<any>({});
+
+  useEffect(() => {
+    const fetchRules = async () => {
+      try {
+        const response = await fetch('/api/settings/pricing-rules');
+        if (response.ok) {
+          const data = await response.json();
+          setPricingRules(data);
+        }
+      } catch (error) {
+        console.error("Error fetching rules:", error);
+      }
+    };
+    fetchRules();
+  }, []);
 
   const calculatePrice = async () => {
     if (!formData.subCategory || !formData.rating) {
@@ -44,6 +60,11 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
         
         if (pricePerUnit) {
           let ratingValue = parseFloat(formData.rating.replace(/[^\d.]/g, ''));
+          
+          if (formData.rating.toUpperCase().includes('KW')) {
+            ratingValue = ratingValue * 1000;
+          }
+          
           const calculatedPrice = ratingValue * pricePerUnit;
           setFormData({ ...formData, price: Math.round(calculatedPrice).toString() });
           toast.success(`Price calculated based on ${formData.subCategory} rules.`);
@@ -261,6 +282,11 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
                       <option value="Charge Controller">Charge Controller</option>
                       <option value="Inverter">Inverter</option>
                       <option value="Accessories">Accessories</option>
+                      {Object.keys(pricingRules).filter(key => 
+                        !['Solar Panels', 'Batteries', 'Charge Controller', 'Inverter', 'Accessories', 'Fluoride Removal', 'Filtration', 'Chlorination', 'Exhaust Services'].includes(key)
+                      ).map(key => (
+                        <option key={key} value={key}>{key}</option>
+                      ))}
                     </select>
                   </div>
                 )}
@@ -280,19 +306,29 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
                 )}
               </div>
 
-              {ratingOptions[formData.subCategory] && (
+              {formData.subCategory !== 'None' && (
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Technical Rating / Capacity</label>
-                  <select
-                    value={formData.rating}
-                    onChange={(e) => setFormData({ ...formData, rating: e.target.value })}
-                    className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors appearance-none"
-                  >
-                    <option value="">Select Rating</option>
-                    {ratingOptions[formData.subCategory].map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
+                  {ratingOptions[formData.subCategory] ? (
+                    <select
+                      value={formData.rating}
+                      onChange={(e) => setFormData({ ...formData, rating: e.target.value })}
+                      className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors appearance-none"
+                    >
+                      <option value="">Select Rating</option>
+                      {ratingOptions[formData.subCategory].map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={formData.rating}
+                      onChange={(e) => setFormData({ ...formData, rating: e.target.value })}
+                      className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors"
+                      placeholder="e.g. 500L, 2HP, etc."
+                    />
+                  )}
                 </div>
               )}
 

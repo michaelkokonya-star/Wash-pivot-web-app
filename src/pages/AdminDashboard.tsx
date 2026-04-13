@@ -78,6 +78,10 @@ const PricingSettings = ({ onSuccess, onError }: { onSuccess: () => void, onErro
   const [rules, setRules] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [newRuleName, setNewRuleName] = useState('');
+  const [newRuleValue, setNewRuleValue] = useState('');
+
+  const HARDCODED_RULES = ['Solar Panels', 'Batteries', 'Inverter', 'Charge Controller'];
 
   useEffect(() => {
     const fetchRules = async () => {
@@ -91,7 +95,7 @@ const PricingSettings = ({ onSuccess, onError }: { onSuccess: () => void, onErro
           setRules({
             'Solar Panels': 150,
             'Batteries': 800,
-            'Inverter': 12000,
+            'Inverter': 25,
             'Charge Controller': 500
           });
         }
@@ -103,6 +107,19 @@ const PricingSettings = ({ onSuccess, onError }: { onSuccess: () => void, onErro
     };
     fetchRules();
   }, []);
+
+  const handleAddRule = () => {
+    if (!newRuleName || !newRuleValue) return;
+    setRules({ ...rules, [newRuleName]: parseFloat(newRuleValue) });
+    setNewRuleName('');
+    setNewRuleValue('');
+  };
+
+  const handleRemoveRule = (name: string) => {
+    const newRules = { ...rules };
+    delete newRules[name];
+    setRules(newRules);
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -126,6 +143,8 @@ const PricingSettings = ({ onSuccess, onError }: { onSuccess: () => void, onErro
   };
 
   if (loading) return <div className="p-20 text-center"><Loader2 className="animate-spin mx-auto mb-4" /> Loading rules...</div>;
+
+  const otherRules = Object.keys(rules).filter(key => !HARDCODED_RULES.includes(key));
 
   return (
     <div className="p-8 space-y-8">
@@ -178,14 +197,14 @@ const PricingSettings = ({ onSuccess, onError }: { onSuccess: () => void, onErro
                 <TrendingUp className="text-purple-500" size={20} />
                 <span className="font-bold text-sm">Inverters</span>
               </div>
-              <span className="text-[10px] font-bold text-black/30 uppercase tracking-widest">KSh / KW</span>
+              <span className="text-[10px] font-bold text-black/30 uppercase tracking-widest">KSh / Watt</span>
             </div>
             <input 
               type="number" 
               value={rules['Inverter'] || ''} 
               onChange={(e) => setRules({ ...rules, 'Inverter': parseFloat(e.target.value) })}
               className="w-full px-4 py-3 bg-white border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors"
-              placeholder="e.g. 12000"
+              placeholder="e.g. 25"
             />
           </div>
 
@@ -205,6 +224,65 @@ const PricingSettings = ({ onSuccess, onError }: { onSuccess: () => void, onErro
               placeholder="e.g. 500"
             />
           </div>
+        </div>
+      </div>
+
+      {/* Other Products Section */}
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h4 className="font-bold text-lg">Other Products</h4>
+          <div className="flex gap-2">
+            <input 
+              type="text" 
+              value={newRuleName}
+              onChange={(e) => setNewRuleName(e.target.value)}
+              placeholder="Product Name"
+              className="px-4 py-2 bg-stone-50 border border-black/5 rounded-xl text-sm focus:outline-none focus:border-emerald-600"
+            />
+            <input 
+              type="number" 
+              value={newRuleValue}
+              onChange={(e) => setNewRuleValue(e.target.value)}
+              placeholder="Price / Unit"
+              className="w-32 px-4 py-2 bg-stone-50 border border-black/5 rounded-xl text-sm focus:outline-none focus:border-emerald-600"
+            />
+            <button 
+              onClick={handleAddRule}
+              className="p-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all"
+            >
+              <Plus size={20} />
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {otherRules.map(ruleName => (
+            <div key={ruleName} className="p-4 bg-stone-50 rounded-2xl border border-black/5 flex items-center justify-between">
+              <div className="flex flex-col">
+                <span className="font-bold text-sm">{ruleName}</span>
+                <span className="text-[10px] text-black/30 uppercase font-bold tracking-widest">KSh / Unit</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <input 
+                  type="number" 
+                  value={rules[ruleName]}
+                  onChange={(e) => setRules({ ...rules, [ruleName]: parseFloat(e.target.value) })}
+                  className="w-24 px-3 py-1.5 bg-white border border-black/5 rounded-lg text-sm font-bold text-right"
+                />
+                <button 
+                  onClick={() => handleRemoveRule(ruleName)}
+                  className="p-1.5 text-black/20 hover:text-red-500 transition-colors"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </div>
+          ))}
+          {otherRules.length === 0 && (
+            <div className="col-span-full py-8 text-center bg-stone-50/50 rounded-2xl border border-dashed border-black/10">
+              <p className="text-xs text-black/30">No other product pricing rules added yet.</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -356,7 +434,7 @@ const AdminDashboard = () => {
 
           // Process Revenue by Month
           const revenueMap: { [key: string]: number } = {};
-          fetchedOrders.forEach(order => {
+          fetchedOrders.forEach((order: any) => {
             if (order.status === 'paid' && order.createdAt) {
               const date = new Date(order.createdAt);
               const month = date.toLocaleString('default', { month: 'short', year: 'numeric' });
@@ -370,7 +448,7 @@ const AdminDashboard = () => {
 
           // Process Sales by Product
           const productSalesMap: { [key: string]: number } = {};
-          fetchedOrders.forEach(order => {
+          fetchedOrders.forEach((order: any) => {
             if (order.status === 'paid' && order.items) {
               order.items.forEach((item: any) => {
                 const name = item.name || 'Unknown Product';
@@ -386,7 +464,7 @@ const AdminDashboard = () => {
 
           // Process Sales by Region
           const regionSalesMap: { [key: string]: number } = {};
-          fetchedOrders.forEach(order => {
+          fetchedOrders.forEach((order: any) => {
             if (order.status === 'paid' && order.shippingInfo?.city) {
               const region = order.shippingInfo.city;
               regionSalesMap[region] = (regionSalesMap[region] || 0) + (order.totalAmount || 0);
@@ -404,7 +482,7 @@ const AdminDashboard = () => {
 
           // Process User Growth by Month
           const userMap: { [key: string]: number } = {};
-          fetchedUsers.forEach(u => {
+          fetchedUsers.forEach((u: any) => {
             if (u.createdAt) {
               const date = new Date(u.createdAt);
               const month = date.toLocaleString('default', { month: 'short', year: 'numeric' });

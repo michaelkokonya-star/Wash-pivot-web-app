@@ -30,8 +30,10 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSu
     targetFunding: '',
     category: 'Water',
     imageUrl: '',
-    media: [] as {type: 'image' | 'video', url: string}[]
+    media: [] as {type: 'image' | 'video', url: string}[],
+    milestones: [] as {title: string, description: string, isCompleted: boolean}[]
   });
+  const [milestoneInput, setMilestoneInput] = useState({ title: '', description: '' });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -74,6 +76,23 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSu
       }));
       setVideoUrl('');
     }
+  };
+
+  const addMilestone = () => {
+    if (milestoneInput.title.trim()) {
+      setFormData(prev => ({
+        ...prev,
+        milestones: [...prev.milestones, { ...milestoneInput, isCompleted: false }]
+      }));
+      setMilestoneInput({ title: '', description: '' });
+    }
+  };
+
+  const removeMilestone = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      milestones: prev.milestones.filter((_, i) => i !== index)
+    }));
   };
 
   const removeMediaUrl = (index: number) => {
@@ -135,7 +154,7 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSu
       }
 
       setUploadStatus('saving');
-      const response = await fetch('/api/projects', {
+      const response = await fetch('/api/data/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -149,7 +168,6 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSu
           isCertified: false,
           ownerUid: user.uid,
           ownerName: profile?.displayName || user.displayName || 'Admin',
-          milestones: []
         })
       });
 
@@ -163,7 +181,8 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSu
           targetFunding: '',
           category: 'Water',
           imageUrl: '',
-          media: []
+          media: [],
+          milestones: []
         });
         setImageFile(null);
         setImagePreview(null);
@@ -197,20 +216,20 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSu
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
             className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl overflow-hidden"
           >
-            <div className="p-8 border-b border-black/5 flex justify-between items-center">
-              <div>
-                <h2 className="text-2xl font-bold tracking-tight">Create New Project</h2>
-                <p className="text-sm text-black/40">Fill in the details to launch a new WASH project.</p>
-              </div>
-              <button 
-                onClick={onClose}
-                className="p-2 hover:bg-stone-100 rounded-full transition-colors"
-              >
-                <X size={24} />
-              </button>
+          <div className="p-8 border-b border-black/5 flex justify-between items-center bg-white sticky top-0 z-10">
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight">Create New Project</h2>
+              <p className="text-sm text-black/40">Fill in the details to launch a new WASH project.</p>
             </div>
+            <button 
+              onClick={onClose}
+              className="p-2 hover:bg-stone-100 rounded-full transition-colors"
+            >
+              <X size={24} />
+            </button>
+          </div>
 
-            <form onSubmit={handleSubmit} className="p-8 space-y-6 max-h-[70vh] overflow-y-auto">
+          <form onSubmit={handleSubmit} className="p-8 space-y-6 max-h-[80vh] overflow-y-auto">
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Project Title</label>
                 <input
@@ -384,6 +403,52 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSu
                   className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors h-32 resize-none"
                   placeholder="Describe the project goals and impact..."
                 />
+              </div>
+
+              <div className="space-y-4 pt-4 border-t border-black/5">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Project Milestones</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      placeholder="Milestone Title"
+                      value={milestoneInput.title}
+                      onChange={(e) => setMilestoneInput({ ...milestoneInput, title: e.target.value })}
+                      className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 text-xs"
+                    />
+                    <textarea
+                      placeholder="Milestone Description"
+                      value={milestoneInput.description}
+                      onChange={(e) => setMilestoneInput({ ...milestoneInput, description: e.target.value })}
+                      className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 text-xs h-20 resize-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={addMilestone}
+                      className="w-full py-3 bg-black text-white font-bold rounded-xl hover:bg-emerald-600 transition-all text-[10px] uppercase tracking-widest"
+                    >
+                      Add Milestone
+                    </button>
+                  </div>
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
+                    {formData.milestones.map((m, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 bg-stone-50 border border-black/5 rounded-xl">
+                        <div className="truncate mr-4">
+                          <p className="font-bold text-xs">{m.title}</p>
+                          <p className="text-[10px] text-black/40 truncate">{m.description}</p>
+                        </div>
+                        <button type="button" onClick={() => removeMilestone(index)} className="text-red-500 hover:text-red-700">
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                    {formData.milestones.length === 0 && (
+                      <div className="h-full flex items-center justify-center border border-dashed border-black/10 rounded-xl p-6">
+                        <p className="text-[10px] text-black/30 italic">No milestones added yet</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               <button

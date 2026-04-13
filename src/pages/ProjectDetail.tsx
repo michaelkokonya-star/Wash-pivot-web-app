@@ -18,7 +18,7 @@ const ProjectDetail = () => {
 
     const fetchProject = async () => {
       try {
-        const response = await fetch(`/api/projects/${id}`);
+        const response = await fetch(`/api/data/projects/${id}`);
         if (response.ok) {
           const data = await response.json();
           setProject(data);
@@ -47,7 +47,7 @@ const ProjectDetail = () => {
         m.id === milestoneId ? { ...m, isCompleted: !m.isCompleted } : m
       );
 
-      const response = await fetch(`/api/projects/${project.id}`, {
+      const response = await fetch(`/api/data/projects/${project.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ milestones: updatedMilestones })
@@ -68,7 +68,7 @@ const ProjectDetail = () => {
     if (!project) return;
 
     try {
-      const response = await fetch(`/api/projects/${project.id}`, {
+      const response = await fetch(`/api/data/projects/${project.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
