@@ -125,8 +125,28 @@ const Recruitment = () => {
               <div className="space-y-4 mb-8">
                 <div className="flex items-start space-x-3 text-sm text-black/60">
                   <GraduationCap size={18} className="mt-1 flex-shrink-0" />
-                  <p>{expert.academics}</p>
+                  <div>
+                    {Array.isArray(expert.academics) ? (
+                      <div className="flex flex-wrap gap-1">
+                        {expert.academics.map((a: string) => (
+                          <span key={a} className="bg-stone-100 px-2 py-0.5 rounded text-[10px]">{a}</span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p>{expert.academics}</p>
+                    )}
+                  </div>
                 </div>
+                {expert.specialisations && expert.specialisations.length > 0 && (
+                  <div className="flex items-start space-x-3 text-sm text-black/60">
+                    <Sparkles size={18} className="mt-1 flex-shrink-0" />
+                    <div className="flex flex-wrap gap-1">
+                      {expert.specialisations.map((s: string) => (
+                        <span key={s} className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border border-emerald-100">{s}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="flex items-start space-x-3 text-sm text-black/60">
                   <Award size={18} className="mt-1 flex-shrink-0" />
                   <p className="line-clamp-3">{expert.bio}</p>

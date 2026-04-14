@@ -453,16 +453,38 @@ const Profile = () => {
                   <div className="space-y-6">
                     <div>
                       <label className="text-[10px] font-bold uppercase tracking-widest text-black/40 mb-2 block">Specialization</label>
-                      <div className="flex items-center space-x-2 font-bold text-lg text-emerald-600">
-                        <Sparkles size={18} />
-                        <span>{profile.expertise}</span>
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-2 font-bold text-lg text-emerald-600">
+                          <Sparkles size={18} />
+                          <span>{profile.expertise}</span>
+                        </div>
+                        {profile.specialisations && profile.specialisations.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {profile.specialisations.map((s: string) => (
+                              <span key={s} className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border border-emerald-100">{s}</span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div>
                       <label className="text-[10px] font-bold uppercase tracking-widest text-black/40 mb-2 block">Academics</label>
-                      <div className="flex items-center space-x-2 font-bold text-lg">
-                        <GraduationCap size={18} className="text-black/20" />
-                        <span>{profile.academics}</span>
+                      <div className="space-y-2">
+                        {Array.isArray(profile.academics) ? (
+                          <div className="flex flex-wrap gap-1">
+                            {profile.academics.map((a: string) => (
+                              <div key={a} className="flex items-center space-x-2 font-bold text-sm bg-stone-100 px-3 py-1 rounded-lg">
+                                <GraduationCap size={14} className="text-black/20" />
+                                <span>{a}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="flex items-center space-x-2 font-bold text-lg">
+                            <GraduationCap size={18} className="text-black/20" />
+                            <span>{profile.academics}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
