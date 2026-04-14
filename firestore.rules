@@ -201,12 +201,32 @@ service cloud.firestore {
     // Rules
     // ===============================================================
 
+    // Default deny: No one can read or write anything unless explicitly allowed below
     match /{allPaths=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
 
+    // Users Collection: Contains sensitive PII (email, phone)
+    match /users/{userId} {
+      // Only the owner or an admin can read the full user document
+      allow read: if isOwner(userId) || isAdmin();
+      
+      // Only the owner can create their profile. Role must be 'user' by default unless admin.
+      allow create: if isAuthenticated() && 
+                      isValidUser(request.resource.data, userId) && 
+                      (isOwner(userId) && (request.resource.data.role == 'user' || isAdmin()));
+      
+      // Only the owner or admin can update. Owner cannot change their own role.
+      allow update: if isAuthenticated() && 
+                      isValidUser(request.resource.data, userId) && 
+                      ((isOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin());
+      
+      allow delete: if isAdmin();
+    }
+
+    // Public Profiles: Subset of user data for public viewing (Experts)
     match /public_profiles/{userId} {
-      allow read: if true;
+      allow read: if true; // Publicly readable
       allow create: if isOwner(userId) && isValidPublicProfile(request.resource.data, userId);
       allow update: if (isOwner(userId) && isValidPublicProfile(request.resource.data, userId)) || isAdmin();
       allow delete: if isOwner(userId) || isAdmin();
@@ -236,9 +256,15 @@ service cloud.firestore {
     }
 
     match /orders/{orderId} {
+      // Only the customer or admin can see orders
       allow read: if isAuthenticated() && (isAdmin() || request.auth.uid == resource.data.userId);
+      
+      // Anyone authenticated can create an order for themselves
       allow create: if isAuthenticated() && isValidOrder(request.resource.data);
-      allow update: if isAuthenticated() && (isAdmin() || (request.auth.uid == resource.data.userId && isValidOrder(request.resource.data)));
+      
+      // Only admin can update order status (e.g. to 'shipped')
+      allow update: if isAdmin() && isValidOrder(request.resource.data);
+      
       allow delete: if isAdmin();
     }
 

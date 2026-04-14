@@ -1,7 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
-import { Readable } from 'stream';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
 const router = express.Router();
 const upload = multer({ 
@@ -31,42 +30,12 @@ router.post('/upload', upload.single('file'), async (req, res) => {
       Body: req.file.buffer,
       ContentType: req.file.mimetype,
     }));
-
-    // Return a proxied URL so the browser fetches through the backend,
-    // avoiding CORS issues with direct S3 access.
-    const url = `/api/image?key=${encodeURIComponent(key)}`;
-    res.json({ url, key });
+    
+    // Construct URL based on endpoint and bucket
+    const url = `${process.env.ENDPOINT}/${process.env.BUCKET}/${key}`;
+    res.json({ url });
   } catch (err: any) {
     console.error('Upload error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-router.get('/image', async (req, res) => {
-  const key = req.query.key as string;
-
-  if (!key) {
-    return res.status(400).json({ error: 'Missing key query parameter' });
-  }
-
-  try {
-    const command = new GetObjectCommand({
-      Bucket: process.env.BUCKET,
-      Key: key,
-    });
-
-    const s3Response = await s3.send(command);
-
-    res.setHeader('Content-Type', s3Response.ContentType ?? 'application/octet-stream');
-    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-
-    (s3Response.Body as Readable).pipe(res);
-  } catch (err: any) {
-    console.error('Image proxy error:', err);
-    if (err.name === 'NoSuchKey' || err.$metadata?.httpStatusCode === 404) {
-      return res.status(404).json({ error: 'Image not found' });
-    }
     res.status(500).json({ error: err.message });
   }
 });

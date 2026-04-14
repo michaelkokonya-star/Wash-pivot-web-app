@@ -34,6 +34,7 @@ import VerificationBanner from './components/VerificationBanner';
 import { Toaster } from 'sonner';
 
 import ErrorBoundary from './components/ErrorBoundary';
+import WhatsAppButton from './components/WhatsAppButton';
 
 // Main Application Component - Updated 2026-03-24
 function App() {
@@ -48,6 +49,7 @@ function App() {
                 <Navbar />
                 <VerificationBanner />
                 <WelcomeOnboarding />
+                <WhatsAppButton />
                 <main>
                   <AnimatePresence mode="wait">
                     <Routes>

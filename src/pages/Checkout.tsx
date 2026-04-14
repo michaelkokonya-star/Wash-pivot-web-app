@@ -8,10 +8,10 @@ import { ChevronLeft, CreditCard, Smartphone, Loader2, AlertCircle, ArrowRight, 
 
 const Checkout = () => {
   const { cart, cartTotal, cartCount, clearCart } = useCart();
-  const { user, profile } = useAuth();
+  const { user, profile, authFetch } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'mpesa'>('card');
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'mpesa' | 'manual_mpesa'>('card');
   const [mpesaWaiting, setMpesaWaiting] = useState(false);
   const navigate = useNavigate();
 
@@ -76,11 +76,7 @@ const Checkout = () => {
         createdAt: new Date().toISOString(),
       };
 
-      if (paymentMethod === 'mpesa') {
-        throw new Error('M-Pesa payment is currently unavailable. Please use a credit/debit card.');
-      }
-
-      const orderResponse = await fetch('/api/data/orders', {
+      const orderResponse = await authFetch('/api/data/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(orderData)
@@ -127,32 +123,12 @@ const Checkout = () => {
         } else {
           throw new Error('No checkout URL received');
         }
+      } else if (paymentMethod === 'mpesa') {
+        // 2b. M-Pesa STK Push (Currently under maintenance)
+        throw new Error('M-Pesa STK Push is currently undergoing maintenance. Please use the "Lipa na M-Pesa (Buy Goods)" option below or a credit/debit card.');
       } else {
-        // 2b. M-Pesa STK Push
-        setMpesaWaiting(true);
-        const response = await fetch('/api/mpesa/stkpush', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            phoneNumber: formData.phone,
-            amount: finalTotal,
-            accountReference: `ORDER-${orderId.slice(0, 8)}`,
-            transactionDesc: `Payment for ${cartCount} items`,
-          }),
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to trigger M-Pesa STK Push');
-        }
-
-        // In a real app, we'd poll for status. For this demo, we'll show a success message after a delay.
-        setTimeout(() => {
-          navigate(`/checkout/success?orderId=${orderId}`);
-        }, 5000);
+        // 2c. Manual M-Pesa (Buy Goods)
+        navigate(`/checkout/success?orderId=${orderId}&method=manual_mpesa`);
       }
     } catch (err: any) {
       console.error('Checkout error:', err);
@@ -331,7 +307,65 @@ const Checkout = () => {
                   </div>
                   <img src="https://upload.wikimedia.org/wikipedia/commons/1/15/M-PESA_LOGO-01.svg" alt="M-Pesa" className="h-6 grayscale opacity-30" />
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('manual_mpesa')}
+                  className={`p-6 rounded-2xl border transition-all flex items-center justify-between ${
+                    paymentMethod === 'manual_mpesa' ? 'bg-emerald-50 border-emerald-600' : 'bg-stone-50 border-black/5 hover:bg-stone-100'
+                  }`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${
+                      paymentMethod === 'manual_mpesa' ? 'bg-white border-emerald-200' : 'bg-white border-black/5'
+                    }`}>
+                      <Smartphone size={24} className={paymentMethod === 'manual_mpesa' ? 'text-emerald-600' : 'text-black/40'} />
+                    </div>
+                    <div className="text-left">
+                      <p className="font-bold">Lipa na M-Pesa (Buy Goods)</p>
+                      <p className="text-xs text-black/40">Manual payment via Till Number</p>
+                    </div>
+                  </div>
+                  <img src="https://upload.wikimedia.org/wikipedia/commons/1/15/M-PESA_LOGO-01.svg" alt="M-Pesa" className="h-6" />
+                </button>
               </div>
+
+              {paymentMethod === 'manual_mpesa' && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-6 p-8 bg-[#4CAF50] text-white rounded-3xl shadow-xl overflow-hidden relative"
+                >
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-2xl" />
+                  <div className="relative z-10 text-center">
+                    <div className="flex justify-center mb-4">
+                      <img 
+                        src="https://upload.wikimedia.org/wikipedia/commons/1/15/M-PESA_LOGO-01.svg" 
+                        alt="Lipa na M-Pesa" 
+                        className="h-10 brightness-0 invert" 
+                      />
+                    </div>
+                    <h3 className="text-2xl font-black uppercase tracking-tighter mb-6">Buy Goods Till Number</h3>
+                    
+                    <div className="flex justify-center gap-2 mb-6">
+                      {['8', '5', '0', '0', '1', '3', '2'].map((digit, i) => (
+                        <div key={i} className="w-10 h-14 bg-white text-[#4CAF50] rounded-lg flex items-center justify-center text-3xl font-black shadow-lg">
+                          {digit}
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-xl py-3 px-6 inline-block mb-6">
+                      <p className="text-sm font-bold uppercase tracking-widest opacity-80 mb-1">Account Name</p>
+                      <p className="text-xl font-black">MICHAEL KOKONYA OKUO</p>
+                    </div>
+
+                    <p className="text-[10px] font-bold uppercase tracking-widest opacity-60 leading-relaxed">
+                      Use mySafaricom App (cost calculator) or dial *234# to view applicable charges
+                    </p>
+                  </div>
+                </motion.div>
+              )}
             </section>
 
             {mpesaWaiting && (

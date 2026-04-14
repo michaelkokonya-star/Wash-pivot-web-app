@@ -27,6 +27,7 @@ interface AuthContextType {
   sendVerification: () => Promise<void>;
   refreshUser: () => Promise<void>;
   updateProfile: (data: any) => Promise<void>;
+  authFetch: (url: string, options?: RequestInit) => Promise<Response>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -170,16 +171,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateProfile = async (data: any) => {
     if (!user) return;
+    const token = await user.getIdToken();
     await fetch(`/api/data/users/${user.uid}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify(data)
     });
     setProfile((prev: any) => ({ ...prev, ...data }));
   };
 
+  const authFetch = async (url: string, options: RequestInit = {}) => {
+    if (!user) throw new Error('Not authenticated');
+    const token = await user.getIdToken();
+    return fetch(url, {
+      ...options,
+      headers: {
+        ...options.headers,
+        'Authorization': `Bearer ${token}`
+      }
+    });
+  };
+
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signIn, signInAsGuest, signUp, logout, resetPassword, changePassword, sendVerification, refreshUser, updateProfile }}>
+    <AuthContext.Provider value={{ user, profile, loading, signIn, signInAsGuest, signUp, logout, resetPassword, changePassword, sendVerification, refreshUser, updateProfile, authFetch } as any}>
       {children}
     </AuthContext.Provider>
   );

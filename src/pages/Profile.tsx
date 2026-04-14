@@ -22,7 +22,7 @@ interface Order {
 }
 
 const Profile = () => {
-  const { user, profile, logout, changePassword } = useAuth();
+  const { user, profile, logout, changePassword, authFetch } = useAuth();
   const [loading, setLoading] = useState(false);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -65,7 +65,7 @@ const Profile = () => {
     const fetchOrders = async () => {
       if (!user) return;
       try {
-        const response = await fetch('/api/data/orders');
+        const response = await authFetch('/api/data/orders');
         if (response.ok) {
           const allOrders = await response.json();
           const userOrders = allOrders
@@ -97,7 +97,7 @@ const Profile = () => {
         showContacts: formData.showContacts
       };
 
-      const response = await fetch(`/api/data/users/${user.uid}`, {
+      const response = await authFetch(`/api/data/users/${user.uid}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updateData)
@@ -106,9 +106,9 @@ const Profile = () => {
       if (response.ok) {
         // Also update public profile if it exists
         if (profile?.role === 'expert') {
-          const publicRes = await fetch(`/api/data/public_profiles/${user.uid}`);
+          const publicRes = await authFetch(`/api/data/public_profiles/${user.uid}`);
           if (publicRes.ok) {
-            await fetch(`/api/data/public_profiles/${user.uid}`, {
+            await authFetch(`/api/data/public_profiles/${user.uid}`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(updateData)
@@ -191,7 +191,7 @@ const Profile = () => {
       const photoURL = data.url;
 
       // Update user document
-      await fetch(`/api/data/users/${user.uid}`, {
+      await authFetch(`/api/data/users/${user.uid}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ photoURL })
@@ -199,9 +199,9 @@ const Profile = () => {
 
       // Update public profile if expert
       if (profile?.role === 'expert') {
-        const publicRes = await fetch(`/api/data/public_profiles/${user.uid}`);
+        const publicRes = await authFetch(`/api/data/public_profiles/${user.uid}`);
         if (publicRes.ok) {
-          await fetch(`/api/data/public_profiles/${user.uid}`, {
+          await authFetch(`/api/data/public_profiles/${user.uid}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ photoURL })
