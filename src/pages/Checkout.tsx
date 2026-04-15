@@ -283,8 +283,8 @@ const Checkout = () => {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/5/5e/Visa_Inc._logo.svg" alt="Visa" className="h-4 opacity-50" />
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg" alt="Mastercard" className="h-4 opacity-50" />
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/5/5e/Visa_Inc._logo.svg" alt="Visa" className="h-4 opacity-50" referrerPolicy="no-referrer" />
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg" alt="Mastercard" className="h-4 opacity-50" referrerPolicy="no-referrer" />
                   </div>
                 </button>
 
@@ -305,7 +305,7 @@ const Checkout = () => {
                       <p className="text-xs text-black/20">Mobile money (STK Push)</p>
                     </div>
                   </div>
-                  <img src="https://upload.wikimedia.org/wikipedia/commons/1/15/M-PESA_LOGO-01.svg" alt="M-Pesa" className="h-6 grayscale opacity-30" />
+                  <img src="https://upload.wikimedia.org/wikipedia/commons/1/15/M-PESA_LOGO-01.svg" alt="M-Pesa" className="h-6 grayscale opacity-30" referrerPolicy="no-referrer" />
                 </button>
 
                 <button
@@ -326,7 +326,7 @@ const Checkout = () => {
                       <p className="text-xs text-black/40">Manual payment via Till Number</p>
                     </div>
                   </div>
-                  <img src="https://upload.wikimedia.org/wikipedia/commons/1/15/M-PESA_LOGO-01.svg" alt="M-Pesa" className="h-6" />
+                  <img src="https://upload.wikimedia.org/wikipedia/commons/1/15/M-PESA_LOGO-01.svg" alt="M-Pesa" className="h-6" referrerPolicy="no-referrer" />
                 </button>
               </div>
 
@@ -343,6 +343,7 @@ const Checkout = () => {
                         src="https://upload.wikimedia.org/wikipedia/commons/1/15/M-PESA_LOGO-01.svg" 
                         alt="Lipa na M-Pesa" 
                         className="h-10 brightness-0 invert" 
+                        referrerPolicy="no-referrer"
                       />
                     </div>
                     <h3 className="text-2xl font-black uppercase tracking-tighter mb-6">Buy Goods Till Number</h3>
