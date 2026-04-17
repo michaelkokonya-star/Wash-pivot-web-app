@@ -7,24 +7,24 @@ import { Helmet } from 'react-helmet-async';
 import { ChevronLeft, CreditCard, Smartphone, Loader2, AlertCircle, ArrowRight, ShieldCheck, Truck } from 'lucide-react';
 
 const VisaIcon = () => (
-  <svg viewBox="0 0 32 11" className="h-4 w-auto" fill="#1434CB" xmlns="http://www.w3.org/2000/svg">
-    <path d="M12.9 10.82h2.36l1.47-9.35h-2.36l-1.47 9.35zM22.84 1.63c-.5-.22-1.28-.46-2.25-.46-2.38 0-4.06 1.27-4.07 3.09 0 1.34 1.2 2.09 2.12 2.54.94.46 1.26.75 1.25 1.16-.01.63-.76.92-1.46.92-1.22 0-1.87-.19-2.87-.63l-.4-.19-.43 2.66c.72.33 2.05.61 3.44.62 3.24 0 5.35-1.6 5.37-4.08.01-1.36-.81-2.4-2.59-3.26-1.08-.55-1.74-.92-1.74-1.48.01-.51.58-1.03 1.83-1.03 1.04-.02 1.8.22 2.38.47l.28.13.47-2.58zm6.5 6.13l.77-4.66.44 2.15h-1.21zm2.56-6.13h-1.82c-.56 0-1 .16-1.24.74l-4.36 10.45h2.47l.49-1.36h3.02l.28 1.36h2.18l-2.02-11.19zm-21.72 0H5.74c-.7 0-1.22.2-1.53.94l-5.3 12.65h2.48l.5-1.37h3.03l.28 1.37h2.24l-1.61-7.53 2.8 7.53h2.32L10.18 1.63H10.18zM6.55 7.76L7.1 5.1l.32 1.51-.87 1.15z"/>
+  <svg viewBox="0 0 120 40" className="h-5 w-auto overflow-visible" fill="#1434CB" xmlns="http://www.w3.org/2000/svg">
+    <path d="M43.4 4.8l-7.9 30.6h7.8L51.3 4.8h-7.9zM22.5 4.8H9.6c-1.8 0-3.4 1.4-3.9 3.1L0 35.4h8.2l1.6-4.5h10.1l1.1 4.5h7.2L22.5 4.8zm-7.9 18.2l3.3-11.5 1.5 11.5h-4.8zM111.9 4.8h-7.6c-2.4 0-4.1 1.4-5.1 3.1l-11.2 27.5h8.3l1.7-4.6h10.2l0.9 4.6h7.4l-4.6-30.6zM102.3 22.8l3.1-8.5 1.7 8.5h-4.8zM65.4 18.2c0-5.6 7.9-5.9 7.9-8.4 0-2.3-2.8-2.4-5.4-2.4-4.2 0-6.8 1.4-8.7 2.3l-1.2.6-1.4-6.3c1.8-.8 5.2-1.6 8.7-1.6 9.3 0 15.4 4.6 15.5 11.7 0 8.7-12.2 9.2-12.1 14 0 2.8 3.5 2.9 5.5 2.9 3.3 0 5.6-.7 7.5-1.6l0.9-.4 1.4 6.6c-2.1 .9-5.2 1.7-9 1.7-9.8.1-16-5.3-16.1-19.1z" />
   </svg>
 );
 
 const MastercardIcon = () => (
-  <svg viewBox="0 0 32 20" className="h-5 w-auto" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <svg viewBox="0 0 32 20" className="h-6 w-auto overflow-visible" fill="none" xmlns="http://www.w3.org/2000/svg">
     <circle cx="10" cy="10" r="10" fill="#EB001B"/>
     <circle cx="22" cy="10" r="10" fill="#F79E1B"/>
-    <path d="M16 4.2c2.1 1.4 3.5 3.8 3.5 6.4s-1.4 5-3.5 6.4a7.8 7.8 0 010-12.8z" fill="#FF5F00"/>
+    <path d="M16 3.5c2.3 2 2.3 7 0 9.1a8.2 8.2 0 010-9.1z" fill="#FF5F00"/>
   </svg>
 );
 
 const MpesaLogo = ({ className = "h-8", light = false }) => (
-  <div className={`flex items-center gap-0.5 ${className}`}>
-    <span className="font-black italic text-[#EB1B2D] text-lg leading-none">M-</span>
-    <div className={`px-1 rounded-sm flex items-center justify-center ${light ? 'bg-white' : 'bg-[#4CAF50]'}`}>
-      <span className={`font-black uppercase text-[9px] tracking-tighter ${light ? 'text-[#4CAF50]' : 'text-white'}`}>PESA</span>
+  <div className={`flex items-center gap-1 select-none ${className}`}>
+    <span className="font-black italic text-[#EB1B2D] text-lg leading-none transform translate-y-[1px]">M-</span>
+    <div className={`px-2 py-1 rounded-md flex items-center justify-center ${light ? 'bg-white shadow-sm' : 'bg-[#4CAF50] shadow-sm'}`}>
+      <span className={`font-black uppercase text-[11px] tracking-tight leading-none ${light ? 'text-[#4CAF50]' : 'text-white'}`}>PESA</span>
     </div>
   </div>
 );
@@ -307,9 +307,9 @@ const Checkout = () => {
                       <p className="text-xs text-black/40">Secure payment via Stripe</p>
                     </div>
                   </div>
-                  <div className="flex gap-2 bg-white px-3 py-1.5 rounded-xl border border-black/5 shadow-sm items-center relative z-10">
+                  <div className="flex gap-3 bg-white px-4 py-2 rounded-xl border border-black/5 shadow-sm items-center relative z-10 transition-transform group-hover:scale-105">
                     <VisaIcon />
-                    <div className="w-px h-3 bg-black/10 mx-1" />
+                    <div className="w-px h-4 bg-black/10 mx-1" />
                     <MastercardIcon />
                   </div>
                 </button>
@@ -354,7 +354,7 @@ const Checkout = () => {
                       <p className="text-xs text-black/40">Manual payment via Till Number</p>
                     </div>
                   </div>
-                  <MpesaLogo className={`h-6 transition-all ${paymentMethod === 'manual_mpesa' ? 'opacity-100' : 'opacity-40 grayscale group-hover:grayscale-0 group-hover:opacity-100'}`} />
+                  <MpesaLogo className={`h-8 transition-all ${paymentMethod === 'manual_mpesa' ? 'opacity-100' : 'opacity-40 grayscale group-hover:grayscale-0 group-hover:opacity-100'}`} />
                 </button>
               </div>
 
@@ -419,7 +419,7 @@ const Checkout = () => {
                 </>
               ) : (
                 <>
-                  <span>Pay KSh {finalTotal.toLocaleString()}</span>
+                  <span>Pay KES {finalTotal.toLocaleString()}</span>
                   <ArrowRight size={20} />
                 </>
               )}
@@ -442,7 +442,7 @@ const Checkout = () => {
                     <h4 className="font-bold text-sm line-clamp-1">{item.name}</h4>
                     <p className="text-xs text-black/40">Qty: {item.quantity}</p>
                   </div>
-                  <span className="font-bold text-sm">KSh {(item.price * item.quantity).toLocaleString()}</span>
+                  <span className="font-bold text-sm">KES {(item.price * item.quantity).toLocaleString()}</span>
                 </div>
               ))}
             </div>
@@ -450,19 +450,19 @@ const Checkout = () => {
             <div className="space-y-4 pt-6 border-t border-black/10">
               <div className="flex justify-between text-black/40 text-sm">
                 <span>Subtotal</span>
-                <span>KSh {cartTotal.toLocaleString()}</span>
+                <span>KES {cartTotal.toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-black/40 text-sm">
                 <span>Shipping ({distanceNum} km)</span>
                 {deliveryCharge === 0 ? (
                   <span className="text-emerald-600 font-bold uppercase tracking-widest text-[10px]">Free</span>
                 ) : (
-                  <span>KSh {deliveryCharge.toLocaleString()}</span>
+                  <span>KES {deliveryCharge.toLocaleString()}</span>
                 )}
               </div>
               <div className="pt-4 border-t border-black/10 flex justify-between items-end">
                 <span className="text-lg font-bold">Total</span>
-                <span className="text-3xl font-bold tracking-tighter">KSh {finalTotal.toLocaleString()}</span>
+                <span className="text-3xl font-bold tracking-tighter">KES {finalTotal.toLocaleString()}</span>
               </div>
             </div>
 
