@@ -7,24 +7,28 @@ import { Helmet } from 'react-helmet-async';
 import { ChevronLeft, CreditCard, Smartphone, Loader2, AlertCircle, ArrowRight, ShieldCheck, Truck } from 'lucide-react';
 
 const VisaIcon = () => (
-  <svg viewBox="0 0 48 48" className="h-4 w-auto" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M18.835 30H15.01l2.39-14.825h3.826L18.835 30zM37.755 15.65c-.86-.325-2.204-.675-3.868-.675-4.276 0-7.29 2.225-7.31 5.4 0 2.35 2.155 3.65 3.825 4.45 1.714.814 2.29 1.34 2.28 2.067-.02 1.114-1.37 1.625-2.636 1.625-1.758 0-2.7-.263-4.14-.888l-.574-.275-.61 3.7c1.02.463 2.91.863 4.887.876 4.545 0 7.5-2.202 7.532-5.613.018-1.875-1.12-3.3-3.583-4.45-1.492-.763-2.408-1.276-2.408-2.05.014-.688.784-1.402 2.484-1.402 1.41-.025 2.434.3 3.22.625l.383.175.811-3.562zm10.15 0h-2.953c-.914 0-1.603.262-2.003 1.2l-5.717 13.15h4.027l.804-2.188h4.925l.465 2.188h3.553L47.905 15.65zM42.82 24.625l1.83-4.938.838 4.938h-2.668zM12.924 15.175H8.06c-1.157 0-2.03.325-2.527 1.5L.1 28.525c.010 0 3.333.2 4.093.2.76 0 1.25-.45 1.455-1.025l.813-2.2h4.965l.504 2.125h3.639l-2.645-12.45h-.001zM7.221 22.3l1.815-4.8 1.045 4.8H7.221z" fill="#1434CB"/>
+  <svg viewBox="0 0 100 32" className="h-4 w-auto" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M36.19 2.067L30.342 29.83h5.66l5.852-27.763h-5.664zM16.91 2.067h-9.25C5.55 2.067 4.3 3.328 3.88 4.542l-9.04 25.295h5.922s.967-2.68 1.185-3.282h7.228c.17.794.7 3.282.7 3.282h5.228l-4.193-27.77zm-5.75 17.526l2.368-11.233c-.02.085 1.157 5.518 1.868 8.875l.18.847s-4.416-.017-4.416 1.51zm83.33-17.526h-5.46c-1.69 0-2.954.966-3.69 2.18l-8.082 19.336L79.16 4.932c-.386-1.93-1.898-2.864-3.593-2.864H66.11l-.093.432c3.483.882 6.64 3.016 8.767 6.136l1.242 5.86-5.94 15.334h5.952l9.055-27.763zm-39.01 10.364c.034-4.22 5.877-4.453 5.922-6.33.023-1.706-2.115-1.776-4.067-1.776-3.237 0-5.123 1.05-6.618 1.745l-.94.444-1.025-4.78c1.373-.635 3.903-1.186 6.542-1.186 6.94 0 11.516 3.424 11.558 8.73.042 6.542-9.055 6.907-8.996 10.457.025 2.144 2.652 2.186 4.09 2.186 2.454 0 4.223-.525 5.564-1.16l.66-.312 1.056 4.903c-1.503.69-3.873 1.258-6.69 1.258-7.394 0-11.96-3.924-12.01-14.18z" fill="#1434CB"/>
   </svg>
 );
 
 const MastercardIcon = () => (
-  <svg viewBox="0 0 24 24" className="h-4 w-auto" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="7" cy="12" r="7" fill="#EB001B" fillOpacity="0.8" />
-    <circle cx="17" cy="12" r="7" fill="#F79E1B" fillOpacity="0.8" />
-    <path d="M12 12a6.99 6.99 0 012.37-5.18 6.99 6.99 0 00-4.74 0A6.99 6.99 0 0112 12z" fill="#FF5F00" />
+  <svg viewBox="0 0 100 62" className="h-4 w-auto" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="31" cy="31" r="31" fill="#EB001B"/>
+    <circle cx="69" cy="31" r="31" fill="#F79E1B"/>
+    <path d="M50 8.543a30.933 30.933 0 0111.01 22.457A30.933 30.933 0 0150 53.457 30.933 30.933 0 0138.99 31 30.933 30.933 0 0150 8.543z" fill="#FF5F00"/>
   </svg>
 );
 
 const MpesaLogo = ({ className = "h-6", light = false }) => (
-  <div className={`flex items-center font-black italic tracking-tighter ${className} ${light ? 'text-white' : 'text-[#4CAF50]'}`}>
-    <span className="text-[1.2em]">M-</span>
-    <span className="text-[1.2em] bg-[#4CAF50] text-white px-1 ml-0.5 rounded not-italic">PESA</span>
-  </div>
+  <svg viewBox="0 0 200 60" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M42.41 47.38H29.17l-3.32-23.71c-.08-.57-.49-.77-.85-.77-.32 0-.69.16-.85.77l-4.13 23.71H7.81L16.2 3.82h12.59l2.87 21.05c.08.57.45.81.85.81.36 0 .73-.24.81-.81l2.87-21.05h12.59l-6.38 43.56z" fill="#EB1B2D"/>
+    <path d="M57.44 23.33H73.7v6.62H57.44v17.43H43.91V3.82H73.7v6.62H57.44v12.89z" fill={light ? "#FFFFFF" : "#4CAF50"}/>
+    <path d="M96.11 34.02h8.08v6.62h-8.08v6.74h12.33v6.62H82.58V3.82h18.82v6.62h-5.29v23.58z" fill={light ? "#FFFFFF" : "#4CAF50"}/>
+    <path d="M125.74 38.3c0 6.62 5.05 10.33 13.9 10.33 2.14 0 4.29-.24 6.38-.69v6.52c-2.09.4-4.25.53-6.43.53-15.36 0-27.42-7.25-27.42-23.11 0-16.14 12.06-23.63 27.42-23.63 2.18 0 4.34.12 6.43.53v6.51c-2.09-.45-4.24-.69-6.38-.69-8.85 0-13.9 3.71-13.9 10.33 0 10 5.4 13.41 12 13.41z" fill={light ? "#FFFFFF" : "#4CAF50"}/>
+    <path d="M165.71 47.38H151l-1.95-12.89h-5.83v12.89H129.8V3.82h18.25c11.01 0 17.67 4.13 17.67 15.36 0 8.01-3.6 12.05-10.13 13.47l.02 14.73zm-22.49-36.93v17.43h4.74c6.38 0 10.13-2.14 10.13-8.71 0-6.57-3.75-8.72-10.13-8.72h-4.74z" fill={light ? "#FFFFFF" : "#4CAF50"}/>
+    <path d="M176.4 3.82h12.55l8.47 43.56H184.22l-2.09-12.89h-7.22l-1.95 12.89h-13.23L176.4 3.82zm8.01 24.18l-2.03-12.89h-.08l-2.03 12.89h4.14z" fill={light ? "#FFFFFF" : "#4CAF50"}/>
+  </svg>
 );
 
 const Checkout = () => {
@@ -288,22 +292,24 @@ const Checkout = () => {
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('card')}
-                  className={`p-6 rounded-2xl border transition-all flex items-center justify-between ${
-                    paymentMethod === 'card' ? 'bg-emerald-50 border-emerald-600' : 'bg-stone-50 border-black/5 hover:bg-stone-100'
+                  className={`p-6 rounded-3xl border transition-all flex items-center justify-between group relative overflow-hidden ${
+                    paymentMethod === 'card' 
+                      ? 'border-emerald-600 bg-emerald-50/30 ring-2 ring-emerald-600/10' 
+                      : 'border-black/5 bg-white hover:border-black/20 hover:shadow-lg'
                   }`}
                 >
-                  <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${
-                      paymentMethod === 'card' ? 'bg-white border-emerald-200' : 'bg-white border-black/5'
+                  <div className="flex items-center gap-4 relative z-10">
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border transition-colors ${
+                      paymentMethod === 'card' ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-stone-50 border-black/5 text-black/20'
                     }`}>
-                      <CreditCard size={24} className={paymentMethod === 'card' ? 'text-emerald-600' : 'text-black/40'} />
+                      <CreditCard size={24} />
                     </div>
                     <div className="text-left">
                       <p className="font-bold">Credit / Debit Card</p>
                       <p className="text-xs text-black/40">Secure payment via Stripe</p>
                     </div>
                   </div>
-                  <div className="flex gap-2 bg-white px-2 py-1 rounded-lg border border-black/5 shadow-sm items-center">
+                  <div className="flex gap-2 bg-white px-3 py-1.5 rounded-xl border border-black/5 shadow-sm items-center relative z-10">
                     <VisaIcon />
                     <div className="w-px h-3 bg-black/10 mx-1" />
                     <MastercardIcon />
@@ -313,42 +319,44 @@ const Checkout = () => {
                 <button
                   type="button"
                   disabled
-                  className="p-6 rounded-2xl border transition-all flex items-center justify-between bg-stone-50 border-black/5 opacity-60 cursor-not-allowed relative overflow-hidden group"
+                  className="p-6 rounded-3xl border transition-all flex items-center justify-between bg-stone-50 border-black/5 opacity-60 cursor-not-allowed relative overflow-hidden group"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl flex items-center justify-center border bg-white border-black/5">
-                      <Smartphone size={24} className="text-black/20" />
+                  <div className="flex items-center gap-4 relative z-10">
+                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center border bg-white border-black/5 text-black/20">
+                      <Smartphone size={24} />
                     </div>
                     <div className="text-left">
                       <div className="flex items-center gap-2">
-                        <p className="font-bold text-black/40">M-Pesa</p>
+                        <p className="font-bold text-black/40">M-Pesa Express</p>
                         <span className="bg-emerald-100 text-emerald-700 text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-tighter">Coming Soon</span>
                       </div>
                       <p className="text-xs text-black/20">Mobile money (STK Push)</p>
                     </div>
                   </div>
-                  <MpesaLogo className="h-5 opacity-40 grayscale" />
+                  <MpesaLogo className="h-5 opacity-20 grayscale" />
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('manual_mpesa')}
-                  className={`p-6 rounded-2xl border transition-all flex items-center justify-between ${
-                    paymentMethod === 'manual_mpesa' ? 'bg-emerald-50 border-emerald-600' : 'bg-stone-50 border-black/5 hover:bg-stone-100'
+                  className={`p-6 rounded-3xl border transition-all flex items-center justify-between group relative overflow-hidden ${
+                    paymentMethod === 'manual_mpesa' 
+                      ? 'border-[#4CAF50] bg-[#4CAF50]/5 ring-2 ring-[#4CAF50]/10' 
+                      : 'border-black/5 bg-white hover:border-[#4CAF50]/20 hover:shadow-lg'
                   }`}
                 >
-                  <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${
-                      paymentMethod === 'manual_mpesa' ? 'bg-white border-emerald-200' : 'bg-white border-black/5'
+                  <div className="flex items-center gap-4 relative z-10">
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border transition-colors ${
+                      paymentMethod === 'manual_mpesa' ? 'bg-[#4CAF50] border-[#4CAF50] text-white' : 'bg-stone-50 border-black/5 text-black/20'
                     }`}>
-                      <Smartphone size={24} className={paymentMethod === 'manual_mpesa' ? 'text-emerald-600' : 'text-black/40'} />
+                      <Smartphone size={24} />
                     </div>
                     <div className="text-left">
                       <p className="font-bold">Lipa na M-Pesa (Buy Goods)</p>
                       <p className="text-xs text-black/40">Manual payment via Till Number</p>
                     </div>
                   </div>
-                  <MpesaLogo className="h-6" />
+                  <MpesaLogo className={`h-6 transition-all ${paymentMethod === 'manual_mpesa' ? 'opacity-100' : 'opacity-40 grayscale group-hover:grayscale-0 group-hover:opacity-100'}`} />
                 </button>
               </div>
 
