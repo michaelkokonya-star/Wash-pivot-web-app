@@ -25,6 +25,7 @@ import ProvisionOwner from './pages/ProvisionOwner';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
 import CheckoutSuccess from './pages/CheckoutSuccess';
+import OrderTracking from './pages/OrderTracking';
 import Auth from './pages/Auth';
 import CreativeStudio from './pages/CreativeStudio';
 import WelcomeOnboarding from './components/WelcomeOnboarding';
@@ -62,6 +63,11 @@ function App() {
                       <Route path="/cart" element={<Cart />} />
                       <Route path="/checkout" element={<Checkout />} />
                       <Route path="/checkout/success" element={<CheckoutSuccess />} />
+                      <Route path="/track/:orderId" element={
+                        <ProtectedRoute>
+                          <OrderTracking />
+                        </ProtectedRoute>
+                      } />
                       <Route path="/recruitment" element={<Recruitment />} />
                       <Route path="/funding" element={<MicroFunding />} />
                       <Route path="/funding/:id" element={<ProjectDetail />} />

@@ -282,9 +282,9 @@ const Checkout = () => {
                       <p className="text-xs text-black/40">Secure payment via Stripe</p>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/d6/Visa_2021.svg/1200px-Visa_2021.svg.png" alt="Visa" className="h-4 opacity-50" referrerPolicy="no-referrer" />
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Mastercard-logo.svg/1280px-Mastercard-logo.svg.png" alt="Mastercard" className="h-4 opacity-50" referrerPolicy="no-referrer" />
+                  <div className="flex gap-2 bg-white px-2 py-1 rounded-lg border border-black/5 shadow-sm">
+                    <img src="https://www.vectorlogo.zone/logos/visa/visa-ar21.svg" alt="Visa" className="h-4" referrerPolicy="no-referrer" />
+                    <img src="https://www.vectorlogo.zone/logos/mastercard/mastercard-ar21.svg" alt="Mastercard" className="h-4" referrerPolicy="no-referrer" />
                   </div>
                 </button>
 
@@ -305,7 +305,7 @@ const Checkout = () => {
                       <p className="text-xs text-black/20">Mobile money (STK Push)</p>
                     </div>
                   </div>
-                  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/M-PESA_LOGO-01.svg/1200px-M-PESA_LOGO-01.svg.png" alt="M-Pesa" className="h-6 grayscale opacity-30" referrerPolicy="no-referrer" />
+                  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/M-PESA_LOGO-01.svg/512px-M-PESA_LOGO-01.svg.png" alt="M-Pesa" className="h-6 grayscale opacity-30" referrerPolicy="no-referrer" />
                 </button>
 
                 <button
@@ -326,7 +326,7 @@ const Checkout = () => {
                       <p className="text-xs text-black/40">Manual payment via Till Number</p>
                     </div>
                   </div>
-                  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/M-PESA_LOGO-01.svg/1200px-M-PESA_LOGO-01.svg.png" alt="M-Pesa" className="h-6" referrerPolicy="no-referrer" />
+                  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/M-PESA_LOGO-01.svg/512px-M-PESA_LOGO-01.svg.png" alt="M-Pesa" className="h-6" referrerPolicy="no-referrer" />
                 </button>
               </div>
 
@@ -340,7 +340,7 @@ const Checkout = () => {
                   <div className="relative z-10 text-center">
                     <div className="flex justify-center mb-4">
                       <img 
-                        src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/M-PESA_LOGO-01.svg/1200px-M-PESA_LOGO-01.svg.png" 
+                        src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/M-PESA_LOGO-01.svg/512px-M-PESA_LOGO-01.svg.png" 
                         alt="Lipa na M-Pesa" 
                         className="h-10 brightness-0 invert" 
                         referrerPolicy="no-referrer"

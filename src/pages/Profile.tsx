@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, Mail, Shield, CheckCircle2, XCircle, Phone, Eye, EyeOff, Save, Loader2, Award, GraduationCap, Briefcase, Clock, Settings, LogOut, Sparkles, Package, ExternalLink, Lock, Camera } from 'lucide-react';
+import { User, Mail, Shield, CheckCircle2, XCircle, Phone, Eye, EyeOff, Save, Loader2, Award, GraduationCap, Briefcase, Clock, Settings, LogOut, Sparkles, Package, ExternalLink, Lock, Camera, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 interface OrderItem {
@@ -628,9 +628,16 @@ const Profile = () => {
                           </div>
                         )}
                       </div>
-                      <div className="text-right">
+                      <div className="text-right flex flex-col items-end gap-2">
                         <p className="text-[10px] font-bold uppercase tracking-widest text-black/40">Total Amount</p>
                         <p className="text-lg font-bold text-emerald-600">KES {order.totalAmount.toLocaleString()}</p>
+                        <Link 
+                          to={`/track/${order.id}`}
+                          className="mt-2 text-[10px] font-bold uppercase tracking-widest bg-black text-white px-3 py-1.5 rounded-lg hover:bg-emerald-600 transition-all flex items-center space-x-1"
+                        >
+                          <span>Track Order</span>
+                          <ArrowRight size={10} />
+                        </Link>
                       </div>
                     </div>
                   </div>
