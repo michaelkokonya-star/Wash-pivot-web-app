@@ -6,6 +6,27 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { ChevronLeft, CreditCard, Smartphone, Loader2, AlertCircle, ArrowRight, ShieldCheck, Truck } from 'lucide-react';
 
+const VisaIcon = () => (
+  <svg viewBox="0 0 48 48" className="h-4 w-auto" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M18.835 30H15.01l2.39-14.825h3.826L18.835 30zM37.755 15.65c-.86-.325-2.204-.675-3.868-.675-4.276 0-7.29 2.225-7.31 5.4 0 2.35 2.155 3.65 3.825 4.45 1.714.814 2.29 1.34 2.28 2.067-.02 1.114-1.37 1.625-2.636 1.625-1.758 0-2.7-.263-4.14-.888l-.574-.275-.61 3.7c1.02.463 2.91.863 4.887.876 4.545 0 7.5-2.202 7.532-5.613.018-1.875-1.12-3.3-3.583-4.45-1.492-.763-2.408-1.276-2.408-2.05.014-.688.784-1.402 2.484-1.402 1.41-.025 2.434.3 3.22.625l.383.175.811-3.562zm10.15 0h-2.953c-.914 0-1.603.262-2.003 1.2l-5.717 13.15h4.027l.804-2.188h4.925l.465 2.188h3.553L47.905 15.65zM42.82 24.625l1.83-4.938.838 4.938h-2.668zM12.924 15.175H8.06c-1.157 0-2.03.325-2.527 1.5L.1 28.525c.010 0 3.333.2 4.093.2.76 0 1.25-.45 1.455-1.025l.813-2.2h4.965l.504 2.125h3.639l-2.645-12.45h-.001zM7.221 22.3l1.815-4.8 1.045 4.8H7.221z" fill="#1434CB"/>
+  </svg>
+);
+
+const MastercardIcon = () => (
+  <svg viewBox="0 0 24 24" className="h-4 w-auto" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="7" cy="12" r="7" fill="#EB001B" fillOpacity="0.8" />
+    <circle cx="17" cy="12" r="7" fill="#F79E1B" fillOpacity="0.8" />
+    <path d="M12 12a6.99 6.99 0 012.37-5.18 6.99 6.99 0 00-4.74 0A6.99 6.99 0 0112 12z" fill="#FF5F00" />
+  </svg>
+);
+
+const MpesaLogo = ({ className = "h-6", light = false }) => (
+  <div className={`flex items-center font-black italic tracking-tighter ${className} ${light ? 'text-white' : 'text-[#4CAF50]'}`}>
+    <span className="text-[1.2em]">M-</span>
+    <span className="text-[1.2em] bg-[#4CAF50] text-white px-1 ml-0.5 rounded not-italic">PESA</span>
+  </div>
+);
+
 const Checkout = () => {
   const { cart, cartTotal, cartCount, clearCart } = useCart();
   const { user, profile, authFetch } = useAuth();
@@ -282,9 +303,10 @@ const Checkout = () => {
                       <p className="text-xs text-black/40">Secure payment via Stripe</p>
                     </div>
                   </div>
-                  <div className="flex gap-2 bg-white px-2 py-1 rounded-lg border border-black/5 shadow-sm">
-                    <img src="https://www.vectorlogo.zone/logos/visa/visa-ar21.svg" alt="Visa" className="h-4" referrerPolicy="no-referrer" />
-                    <img src="https://www.vectorlogo.zone/logos/mastercard/mastercard-ar21.svg" alt="Mastercard" className="h-4" referrerPolicy="no-referrer" />
+                  <div className="flex gap-2 bg-white px-2 py-1 rounded-lg border border-black/5 shadow-sm items-center">
+                    <VisaIcon />
+                    <div className="w-px h-3 bg-black/10 mx-1" />
+                    <MastercardIcon />
                   </div>
                 </button>
 
@@ -305,7 +327,7 @@ const Checkout = () => {
                       <p className="text-xs text-black/20">Mobile money (STK Push)</p>
                     </div>
                   </div>
-                  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/M-PESA_LOGO-01.svg/512px-M-PESA_LOGO-01.svg.png" alt="M-Pesa" className="h-6 grayscale opacity-30" referrerPolicy="no-referrer" />
+                  <MpesaLogo className="h-5 opacity-40 grayscale" />
                 </button>
 
                 <button
@@ -326,7 +348,7 @@ const Checkout = () => {
                       <p className="text-xs text-black/40">Manual payment via Till Number</p>
                     </div>
                   </div>
-                  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/M-PESA_LOGO-01.svg/512px-M-PESA_LOGO-01.svg.png" alt="M-Pesa" className="h-6" referrerPolicy="no-referrer" />
+                  <MpesaLogo className="h-6" />
                 </button>
               </div>
 
@@ -339,12 +361,7 @@ const Checkout = () => {
                   <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-2xl" />
                   <div className="relative z-10 text-center">
                     <div className="flex justify-center mb-4">
-                      <img 
-                        src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/M-PESA_LOGO-01.svg/512px-M-PESA_LOGO-01.svg.png" 
-                        alt="Lipa na M-Pesa" 
-                        className="h-10 brightness-0 invert" 
-                        referrerPolicy="no-referrer"
-                      />
+                      <MpesaLogo className="h-10" light />
                     </div>
                     <h3 className="text-2xl font-black uppercase tracking-tighter mb-6">Buy Goods Till Number</h3>
                     
