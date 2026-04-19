@@ -264,13 +264,24 @@ const ProductDetail = () => {
     if (product && pricingRules && currentRating) {
       const rule = pricingRules[product.subCategory];
       if (rule) {
-        let ratingValue = parseFloat(currentRating.replace(/[^\d.]/g, ''));
-        // Handle KW to Watt conversion
-        if (currentRating.toUpperCase().includes('KW')) {
-          ratingValue = ratingValue * 1000;
+        const cleanedRating = currentRating.replace(/[^\d.]/g, '');
+        let ratingValue = parseFloat(cleanedRating);
+        
+        if (!isNaN(ratingValue)) {
+          // Handle KW to Watt conversion
+          if (currentRating.toUpperCase().includes('KW')) {
+            ratingValue = ratingValue * 1000;
+          }
+          const calculated = Math.round(ratingValue * rule);
+          if (calculated > 0) {
+            setCurrentPrice(calculated);
+            return;
+          }
         }
-        setCurrentPrice(Math.round(ratingValue * rule));
       }
+    }
+    if (product) {
+      setCurrentPrice(product.price || 0);
     }
   }, [currentRating, product, pricingRules]);
 

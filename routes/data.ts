@@ -33,6 +33,9 @@ router.get('/:collection', async (req: any, res) => {
     res.json(data);
   } catch (err: any) {
     console.error(`Error fetching collection ${req.params.collection}:`, err);
+    if (err.message?.includes('PERMISSION_DENIED')) {
+      return res.status(403).json({ error: 'Permission denied. Please check your service account permissions.' });
+    }
     res.status(500).json({ error: err.message });
   }
 });

@@ -82,7 +82,7 @@ const PricingSettings = ({ onSuccess, onError }: { onSuccess: () => void, onErro
   const [newRuleName, setNewRuleName] = useState('');
   const [newRuleValue, setNewRuleValue] = useState('');
 
-  const HARDCODED_RULES = ['Solar Panels', 'Batteries', 'Inverter', 'Charge Controller'];
+  const HARDCODED_RULES = ['Solar Panels', 'Batteries', 'Inverter', 'Inverters', 'Charge Controller'];
 
   useEffect(() => {
     const fetchRules = async () => {
@@ -90,6 +90,10 @@ const PricingSettings = ({ onSuccess, onError }: { onSuccess: () => void, onErro
         const response = await fetch('/api/settings/pricing-rules');
         if (response.ok) {
           const data = await response.json();
+          // Normalize 'Inverters' to 'Inverter' for consistent lookup
+          if (data['Inverters'] && !data['Inverter']) {
+            data['Inverter'] = data['Inverters'];
+          }
           setRules(data);
         } else {
           // Default rules if fetch fails
@@ -111,7 +115,7 @@ const PricingSettings = ({ onSuccess, onError }: { onSuccess: () => void, onErro
 
   const handleAddRule = () => {
     if (!newRuleName || !newRuleValue) return;
-    setRules({ ...rules, [newRuleName]: parseFloat(newRuleValue) });
+    setRules({ ...rules, [newRuleName.trim()]: parseFloat(newRuleValue) });
     setNewRuleName('');
     setNewRuleValue('');
   };
@@ -125,10 +129,15 @@ const PricingSettings = ({ onSuccess, onError }: { onSuccess: () => void, onErro
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Ensure 'Inverter' and 'Inverters' are both set for compatibility
+      const payload = { ...rules };
+      if (payload['Inverter']) payload['Inverters'] = payload['Inverter'];
+      if (payload['Inverters']) payload['Inverter'] = payload['Inverters'];
+
       const response = await authFetch('/api/settings/pricing-rules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(rules)
+        body: JSON.stringify(payload)
       });
       if (response.ok) {
         onSuccess();
@@ -203,7 +212,10 @@ const PricingSettings = ({ onSuccess, onError }: { onSuccess: () => void, onErro
             <input 
               type="number" 
               value={rules['Inverter'] || ''} 
-              onChange={(e) => setRules({ ...rules, 'Inverter': parseFloat(e.target.value) })}
+              onChange={(e) => {
+                const val = parseFloat(e.target.value) || 0;
+                setRules({ ...rules, 'Inverter': val, 'Inverters': val });
+              }}
               className="w-full px-4 py-3 bg-white border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors"
               placeholder="e.g. 25"
             />
@@ -1088,19 +1100,23 @@ const AdminDashboard = () => {
       </AnimatePresence>
 
       <div className="bg-white rounded-[3rem] border border-black/5 overflow-hidden shadow-sm">
-        {activeTab === 'pricing' && (
-          <PricingSettings 
-            onSuccess={() => setMessage({ type: 'success', text: 'Pricing rules updated successfully' })}
-            onError={(err) => setMessage({ type: 'error', text: err })}
-          />
-        )}
+      {activeTab === 'pricing' && (
+        <PricingSettings 
+          onSuccess={() => {
+            setMessage({ type: 'success', text: 'Pricing rules updated successfully! Changes will reflect in Marketplace automatically.' });
+          }}
+          onError={(err) => setMessage({ type: 'error', text: err })}
+        />
+      )}
 
-        {activeTab === 'delivery' && (
-          <DeliverySettings 
-            onSuccess={() => setMessage({ type: 'success', text: 'Delivery rules updated successfully' })}
-            onError={(err) => setMessage({ type: 'error', text: err })}
-          />
-        )}
+      {activeTab === 'delivery' && (
+        <DeliverySettings 
+          onSuccess={() => {
+            setMessage({ type: 'success', text: 'Delivery rules updated successfully! These will be applied at checkout.' });
+          }}
+          onError={(err) => setMessage({ type: 'error', text: err })}
+        />
+      )}
 
         {activeTab === 'security' && (
           <SecuritySettings 

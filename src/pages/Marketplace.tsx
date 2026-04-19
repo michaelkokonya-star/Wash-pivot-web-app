@@ -50,18 +50,24 @@ const ProductCard: React.FC<ProductCardProps & { ratingFilter: string }> = ({
     if (product && pricingRules && currentRating) {
       const rule = pricingRules[product.subCategory];
       if (rule) {
-        let ratingValue = parseFloat(currentRating.replace(/[^\d.]/g, ''));
-        // Handle KW to Watt conversion
-        if (currentRating.toUpperCase().includes('KW')) {
-          ratingValue = ratingValue * 1000;
+        const cleanedRating = currentRating.replace(/[^\d.]/g, '');
+        let ratingValue = parseFloat(cleanedRating);
+        
+        if (!isNaN(ratingValue)) {
+          // Handle KW to Watt conversion
+          if (currentRating.toUpperCase().includes('KW')) {
+            ratingValue = ratingValue * 1000;
+          }
+          const calculated = Math.round(ratingValue * rule);
+          if (calculated > 0) {
+            setCurrentPrice(calculated);
+            return;
+          }
         }
-        setCurrentPrice(Math.round(ratingValue * rule));
-      } else {
-        setCurrentPrice(product.price);
       }
-    } else {
-      setCurrentPrice(product.price);
     }
+    // Fallback to product price if no rule matches or calculation fails
+    setCurrentPrice(product.price || 0);
   }, [currentRating, product, pricingRules]);
 
   const handleAddToCart = () => {
@@ -154,7 +160,12 @@ const ProductCard: React.FC<ProductCardProps & { ratingFilter: string }> = ({
           )}
 
           <div className="mt-auto flex items-center justify-between relative">
-            <span className="text-2xl font-bold tracking-tighter">KSh {currentPrice.toLocaleString()}</span>
+            <div className="flex flex-col">
+              <span className="text-2xl font-bold tracking-tighter">KSh {currentPrice.toLocaleString()}</span>
+              {product && pricingRules?.[product.subCategory] && currentRating && (
+                <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest mt-1">Rule-based Price</span>
+              )}
+            </div>
             <div className="relative">
               <AnimatePresence>
                 {added && (
@@ -315,6 +326,10 @@ const Marketplace = () => {
     fetchProducts();
     fetchServices();
     fetchPricingRules();
+    
+    // Refresh pricing rules every 60 seconds to keep them synced
+    const interval = setInterval(fetchPricingRules, 60000);
+    return () => clearInterval(interval);
   }, [filter, subFilter, ratingFilter]);
 
   const ratingOptions: Record<string, string[]> = {
