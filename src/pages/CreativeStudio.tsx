@@ -1,7 +1,15 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { motion } from 'motion/react';
-import { Sparkles, Zap, Image as ImageIcon, Video, Shield } from 'lucide-react';
-import AICreativeStudio from '../components/AICreativeStudio';
+import { Sparkles, Zap, Image as ImageIcon, Video, Shield, Loader2 } from 'lucide-react';
+
+const AICreativeStudio = lazy(() => import('../components/AICreativeStudio'));
+
+const StudioLoader = () => (
+  <div className="min-h-[400px] flex flex-col items-center justify-center text-center p-12">
+    <Loader2 className="w-12 h-12 text-emerald-500 animate-spin mb-4" />
+    <p className="text-black/40 font-medium">Initializing AI Studio Environment...</p>
+  </div>
+);
 
 const CreativeStudio = () => {
   return (
@@ -86,7 +94,9 @@ const CreativeStudio = () => {
             animate={{ opacity: 1, y: 0 }}
             className="bg-white p-8 rounded-[40px] border border-black/5 shadow-2xl shadow-black/5"
           >
-            <AICreativeStudio />
+            <Suspense fallback={<StudioLoader />}>
+              <AICreativeStudio />
+            </Suspense>
           </motion.div>
         </div>
       </div>

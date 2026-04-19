@@ -1,13 +1,13 @@
 import express from 'express';
 import admin from 'firebase-admin';
+import { getDb } from './db.ts';
 
 const router = express.Router();
-const db = admin.firestore();
 
 // Fetch pricing rules
 router.get('/pricing-rules', async (req, res) => {
   try {
-    const doc = await db.collection('settings').doc('pricing_rules').get();
+    const doc = await getDb().collection('settings').doc('pricing_rules').get();
     if (!doc.exists) {
       // Return defaults if document doesn't exist
       return res.json({
@@ -28,7 +28,7 @@ router.get('/pricing-rules', async (req, res) => {
 // Save pricing rules
 router.post('/pricing-rules', async (req, res) => {
   try {
-    await db.collection('settings').doc('pricing_rules').set({
+    await getDb().collection('settings').doc('pricing_rules').set({
       value: req.body,
       updatedAt: new Date().toISOString()
     }, { merge: true });
@@ -42,7 +42,7 @@ router.post('/pricing-rules', async (req, res) => {
 // Delivery Rules
 router.get('/delivery-rules', async (req, res) => {
   try {
-    const doc = await db.collection('settings').doc('delivery_rules').get();
+    const doc = await getDb().collection('settings').doc('delivery_rules').get();
     if (!doc.exists) {
       return res.json({
         baseRate: 200,
@@ -60,7 +60,7 @@ router.get('/delivery-rules', async (req, res) => {
 
 router.post('/delivery-rules', async (req, res) => {
   try {
-    await db.collection('settings').doc('delivery_rules').set({
+    await getDb().collection('settings').doc('delivery_rules').set({
       value: req.body,
       updatedAt: new Date().toISOString()
     }, { merge: true });

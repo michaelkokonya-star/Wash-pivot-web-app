@@ -1,6 +1,6 @@
 import express from 'express';
-import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import admin from 'firebase-admin';
+import { getDb } from './db.ts';
 
 const router = express.Router();
 
@@ -22,78 +22,29 @@ const authenticate = async (req: any, res: any, next: any) => {
   }
 };
 
-// Middleware to check if user is admin
-const isAdmin = (req: any, res: any, next: any) => {
-  if (req.user && (req.user.email === 'michael.kokonya@washpivot.com' || req.user.role === 'admin')) {
-    next();
-  } else {
-    res.status(403).json({ error: 'Forbidden: Admin access required' });
-  }
-};
-
-const s3 = new S3Client({
-  region: process.env.REGION as string,
-  credentials: {
-    accessKeyId: process.env.ACCESS_KEY_ID as string,
-    secretAccessKey: process.env.SECRET_ACCESS_KEY as string,
-  },
-  endpoint: process.env.ENDPOINT as string,
-});
-
-const BUCKET = process.env.BUCKET;
-
-async function getData(collection: string) {
-  try {
-    const command = new GetObjectCommand({
-      Bucket: BUCKET,
-      Key: `data/${collection}.json`,
-    });
-    const response = await s3.send(command);
-    const bodyContents = await response.Body?.transformToString();
-    return JSON.parse(bodyContents || '[]');
-  } catch (err: any) {
-    if (err.name === 'NoSuchKey') return [];
-    throw err;
-  }
-}
-
-async function saveData(collection: string, data: any[]) {
-  const command = new PutObjectCommand({
-    Bucket: BUCKET,
-    Key: `data/${collection}.json`,
-    Body: JSON.stringify(data),
-    ContentType: 'application/json',
-  });
-  await s3.send(command);
-}
-
-// Publicly readable collections (but still require auth for some)
+// Publicly readable collections
 const publicCollections = ['products', 'projects', 'service_providers', 'public_profiles'];
 
 router.get('/:collection', async (req: any, res) => {
   try {
     const { collection } = req.params;
-    
-    // Sensitive collections require admin or specific ownership
-    if (!publicCollections.includes(collection)) {
-      // For now, let's just allow it if we are in a simple setup, 
-      // but in a real app we'd check req.user
-    }
-
-    const data = await getData(collection);
+    const snapshot = await getDb().collection(collection).get();
+    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     res.json(data);
   } catch (err: any) {
+    console.error(`Error fetching collection ${req.params.collection}:`, err);
     res.status(500).json({ error: err.message });
   }
 });
 
 router.get('/:collection/:id', async (req, res) => {
   try {
-    const data = await getData(req.params.collection);
-    const item = data.find((i: any) => i.id === req.params.id);
-    if (!item) return res.status(404).json({ error: 'Item not found' });
-    res.json(item);
+    const { collection, id } = req.params;
+    const doc = await getDb().collection(collection).doc(id).get();
+    if (!doc.exists) return res.status(404).json({ error: 'Item not found' });
+    res.json({ id: doc.id, ...doc.data() });
   } catch (err: any) {
+    console.error(`Error fetching document ${req.params.id} from ${req.params.collection}:`, err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -110,16 +61,17 @@ router.post('/:collection', authenticate, async (req: any, res) => {
       }
     }
 
-    const data = await getData(collection);
     const newItem = {
       ...req.body,
-      id: req.body.id || Date.now().toString(),
-      createdAt: new Date().toISOString()
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
-    data.push(newItem);
-    await saveData(collection, data);
-    res.json(newItem);
+    
+    const docRef = await getDb().collection(collection).add(newItem);
+    const savedDoc = await docRef.get();
+    res.json({ id: docRef.id, ...savedDoc.data() });
   } catch (err: any) {
+    console.error(`Error creating item in ${req.params.collection}:`, err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -127,19 +79,25 @@ router.post('/:collection', authenticate, async (req: any, res) => {
 router.patch('/:collection/:id', authenticate, async (req: any, res) => {
   try {
     const { collection, id } = req.params;
-    const data = await getData(collection);
-    const index = data.findIndex((i: any) => i.id === id);
-    if (index === -1) return res.status(404).json({ error: 'Item not found' });
     
     // Ownership check for sensitive data
     if (collection === 'users' && id !== req.user.uid && req.user.email !== 'michael.kokonya@washpivot.com') {
       return res.status(403).json({ error: 'Forbidden: You can only update your own profile' });
     }
 
-    data[index] = { ...data[index], ...req.body, updatedAt: new Date().toISOString() };
-    await saveData(collection, data);
-    res.json(data[index]);
+    const updateData = {
+      ...req.body,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    
+    // Handle the case where someone includes ID in the body
+    delete updateData.id;
+
+    await getDb().collection(collection).doc(id).set(updateData, { merge: true });
+    const updatedDoc = await getDb().collection(collection).doc(id).get();
+    res.json({ id: updatedDoc.id, ...updatedDoc.data() });
   } catch (err: any) {
+    console.error(`Error updating item ${req.params.id} in ${req.params.collection}:`, err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -150,18 +108,15 @@ router.delete('/:collection/:id', authenticate, async (req: any, res) => {
     
     // Only admin can delete most things
     if (req.user.email !== 'michael.kokonya@washpivot.com') {
-      // Allow users to delete their own reviews or solar kits? 
-      // For now, let's keep it strict.
       if (!['reviews', 'solar_kits'].includes(collection)) {
         return res.status(403).json({ error: 'Forbidden' });
       }
     }
 
-    const data = await getData(collection);
-    const filtered = data.filter((i: any) => i.id !== id);
-    await saveData(collection, filtered);
+    await getDb().collection(collection).doc(id).delete();
     res.json({ success: true });
   } catch (err: any) {
+    console.error(`Error deleting item ${req.params.id} from ${req.params.collection}:`, err);
     res.status(500).json({ error: err.message });
   }
 });

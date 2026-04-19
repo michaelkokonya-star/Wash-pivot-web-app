@@ -7,6 +7,7 @@ import Stripe from 'stripe';
 import axios from 'axios';
 import dotenv from 'dotenv';
 import admin from 'firebase-admin';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import uploadRoutes from './routes/upload.ts';
 import settingsRoutes from './routes/settings.ts';
 import dataRoutes from './routes/data.ts';
@@ -15,20 +16,23 @@ dotenv.config();
 
 // Load Firebase Config safely
 const firebaseConfigPath = path.join(process.cwd(), 'firebase-applet-config.json');
-let firebaseConfig: any;
+let firebaseConfig: any = {};
 try {
   firebaseConfig = JSON.parse(readFileSync(firebaseConfigPath, 'utf-8'));
 } catch (error) {
-  console.error('Failed to load firebase-applet-config.json:', error);
-  process.exit(1);
+  console.log('Note: firebase-applet-config.json not found or invalid. Using environment variables instead.');
 }
 
 // Initialize Firebase Admin
 try {
+  const projectId = process.env.FIREBASE_PROJECT_ID || firebaseConfig.projectId;
+  if (!projectId) {
+    console.warn('Warning: FIREBASE_PROJECT_ID not set and firebase-applet-config.json missing projectId');
+  }
   admin.initializeApp({
-    projectId: firebaseConfig.projectId,
+    projectId: projectId,
   });
-  console.log('Firebase Admin Initialized');
+  console.log(`Firebase Admin Initialized for project: ${projectId}`);
 } catch (error) {
   console.error('Firebase Admin Initialization Error:', error);
 }
@@ -92,6 +96,75 @@ async function startServer() {
     // API routes
     app.get('/api/health', (req, res) => {
       res.json({ status: 'ok' });
+    });
+
+    // AI Endpoints
+    app.post('/api/ai/image', async (req, res) => {
+      const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ error: 'Gemini API key is not configured' });
+      }
+
+      try {
+        const { prompt, aspectRatio, imageSize, model, quality } = req.body;
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const aiModel = genAI.getGenerativeModel({ model: model || 'gemini-2.0-flash' });
+
+        const result = await aiModel.generateContent({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.7,
+            topP: 0.95,
+            topK: 40,
+            maxOutputTokens: 2048,
+          }
+        });
+
+        const response = await result.response;
+        const candidates = (response as any).candidates;
+
+        if (candidates && candidates[0]?.content?.parts) {
+          for (const part of candidates[0].content.parts) {
+            if (part.inlineData) {
+              return res.json({ image: `data:image/png;base64,${part.inlineData.data}` });
+            }
+          }
+        }
+        
+        // If we get here, the model might have returned text instead of an image
+        // Or it's a model that doesn't support image generation via generateContent
+        res.status(400).json({ error: 'AI did not return an image. Make sure to use an image-capable model.' });
+      } catch (error: any) {
+        console.error('AI Image Error:', error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    app.post('/api/ai/chat', async (req, res) => {
+      const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ error: 'Gemini API key is not configured' });
+      }
+
+      try {
+        const { message, history, systemInstruction } = req.body;
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ 
+          model: 'gemini-2.0-flash',
+          systemInstruction: systemInstruction
+        });
+
+        const chat = model.startChat({
+          history: history || [],
+        });
+
+        const result = await chat.sendMessage(message);
+        const response = await result.response;
+        res.json({ text: response.text() });
+      } catch (error: any) {
+        console.error('AI Chat Error:', error);
+        res.status(500).json({ error: error.message });
+      }
     });
 
     // Provision System Owner

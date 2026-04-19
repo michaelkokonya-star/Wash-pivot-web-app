@@ -3,7 +3,6 @@ import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Sun, Droplets, ShieldCheck, ArrowRight, Zap, Globe, Users, Sparkles, Loader2, Search, Layers } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
 import OptimizedImage from '../components/OptimizedImage';
 import { toast } from 'sonner';
 
@@ -14,41 +13,31 @@ const Home = () => {
   const generateImpactImage = async () => {
     setIsGenerating(true);
     try {
-      const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-      if (!apiKey || apiKey === "undefined") {
-        throw new Error("API Key is not defined. Please ensure your Gemini API key is configured in the Secrets panel.");
-      }
-      
-      const ai = new GoogleGenAI({ apiKey });
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
-        contents: {
-          parts: [
-            {
-              text: 'A high-quality, realistic image of a solar-powered water purification system being installed in a vibrant rural village. The scene should show local community members and technicians working together, with solar panels clearly visible and clean water flowing. The atmosphere should be hopeful and sustainable.',
-            },
-          ],
-        },
-        config: {
-          imageConfig: {
-            aspectRatio: "16:9",
-          },
-        },
+      const response = await fetch('/api/ai/image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: 'A high-quality, realistic image of a solar-powered water purification system being installed in a vibrant rural village. The scene should show local community members and technicians working together, with solar panels clearly visible and clean water flowing. The atmosphere should be hopeful and sustainable.',
+          aspectRatio: "16:9",
+          model: 'gemini-2.0-flash'
+        })
       });
 
-      if (response.candidates && response.candidates[0]?.content?.parts) {
-        for (const part of response.candidates[0].content.parts) {
-          if (part.inlineData) {
-            const base64EncodeString = part.inlineData.data;
-            setGeneratedImage(`data:image/png;base64,${base64EncodeString}`);
-            break;
-          }
-        }
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to generate image');
       }
-      toast.success("Impact visualization generated!");
+
+      const data = await response.json();
+      if (data.image) {
+        setGeneratedImage(data.image);
+        toast.success("Impact visualization generated!");
+      } else {
+        throw new Error("No image returned from server");
+      }
     } catch (error: any) {
       console.error("Error generating image:", error);
-      toast.error(error.message || "Failed to generate visualization. Please check your API key.");
+      toast.error(error.message || "Failed to generate visualization.");
     } finally {
       setIsGenerating(false);
     }

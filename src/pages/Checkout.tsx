@@ -7,24 +7,24 @@ import { Helmet } from 'react-helmet-async';
 import { ChevronLeft, CreditCard, Smartphone, Loader2, AlertCircle, ArrowRight, ShieldCheck, Truck } from 'lucide-react';
 
 const VisaIcon = () => (
-  <svg viewBox="0 0 24 24" className="h-5 w-auto" fill="#1434CB" xmlns="http://www.w3.org/2000/svg">
-    <path d="M13.9 11h-1.8L10.5 15h1.7l1.7-4zM8.3 11H4L3.5 13.5h3.4L6.4 15h3.6l-1.7-4zm4.8 4h1.7l1.7-4h-1.7l-1.7 4zM20 11h-2c-.5 0-.9.3-1.1.7L14.5 15h1.8l.4-1h2.2l.2 1h1.6L20 11zm-1.8 2.8l.7-1.9.4 1.9h-1.1z" />
+  <svg viewBox="0 0 48 48" className="h-4 w-auto" xmlns="http://www.w3.org/2000/svg">
+    <path fill="#1A1F71" d="M18.5 29.5L21.4 12H16L13.1 29.5h5.4zm16.4-17.1c-1.1-.4-2.8-.8-4.9-.8-5.4 0-9.2 2.8-9.2 6.7 0 3 2.7 4.7 4.8 5.7 2.1 1 2.8 1.7 2.8 2.6 0 1.4-1.7 2-3.3 2-2.2 0-3.4-.3-5.2-1.1l-.7-.3-.8 4.7c1.3.6 3.7 1.1 6.2 1.1 5.8 0 9.5-2.8 9.5-7.1 0-2.4-1.4-4.2-4.6-5.7-2.1-1.1-3.4-1.8-3.4-2.9 0-1 .1-1.8 3.5-1.8 2 0 3.4.4 4.5.9l.5.2.7-4.5zM47 12h-4.2c-1.3 0-2.3.4-2.9 1.7l-8.2 15.8h5.6s1-2.5 1.2-3.1h6.6c.2.7.5 3.1.5 3.1h5L47 12zm-8.2 10.3c.4-1 3.2-8.1 3.2-8.1l.2.5s1.8 8.1 1.8 8.1L38.8 22.3zM9.5 12L4.2 24.3l-.6-2.9C2.4 16.5 2 12 2 12h7.5z" />
   </svg>
 );
 
 const MastercardIcon = () => (
-  <svg viewBox="0 0 24 24" className="h-6 w-auto" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="9" cy="12" r="6" fill="#EB001B" fillOpacity="0.8" />
-    <circle cx="15" cy="12" r="6" fill="#F79E1B" fillOpacity="0.8" />
-    <path d="M12 7.5a6 6 0 0 0 0 9 6 6 0 0 0 0-9z" fill="#FF5F00" />
+  <svg viewBox="0 0 48 48" className="h-6 w-auto" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="18" cy="24" r="15" fill="#EB001B" />
+    <circle cx="30" cy="24" r="15" fill="#F79E1B" />
+    <path d="M24 12.3a14.9 14.9 0 0 0 0 23.4 14.9 14.9 0 0 0 0-23.4z" fill="#FF5F00" />
   </svg>
 );
 
 const MpesaLogo = ({ className = "h-8", light = false }) => (
   <div className={`flex items-center gap-1 select-none ${className}`}>
-    <span className="font-black italic text-[#EB1B2D] text-lg leading-none transform translate-y-[1px]">M-</span>
-    <div className={`px-2 py-1 rounded-md flex items-center justify-center ${light ? 'bg-white shadow-sm' : 'bg-[#4CAF50] shadow-sm'}`}>
-      <span className={`font-black uppercase text-[11px] tracking-tight leading-none ${light ? 'text-[#4CAF50]' : 'text-white'}`}>PESA</span>
+    <span className="font-black italic text-[#EB1B2D] text-lg leading-none transform translate-y-[2px]">M-</span>
+    <div className={`px-2.5 py-1.5 rounded-lg flex items-center justify-center shadow-lg ${light ? 'bg-white' : 'bg-[#4CAF50]'}`}>
+      <span className={`font-black uppercase text-[12px] tracking-tighter leading-none ${light ? 'text-[#4CAF50]' : 'text-white'}`}>PESA</span>
     </div>
   </div>
 );

@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { GoogleGenAI } from "@google/genai";
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Sparkles, 
@@ -89,6 +88,7 @@ const AICreativeStudio = () => {
 
     try {
       await checkAndOpenKey();
+      const { GoogleGenAI } = await import("@google/genai");
       const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
       
       const ai = new GoogleGenAI({ apiKey });
@@ -143,6 +143,7 @@ const AICreativeStudio = () => {
 
     try {
       await checkAndOpenKey();
+      const { GoogleGenAI } = await import("@google/genai");
       const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
       
       const ai = new GoogleGenAI({ apiKey });
