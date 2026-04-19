@@ -12,9 +12,7 @@ import {
   updatePassword,
   sendEmailVerification
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '../firebase';
-import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
+import { auth } from '../firebase';
 
 interface AuthContextType {
   user: User | null;
@@ -29,6 +27,7 @@ interface AuthContextType {
   sendVerification: () => Promise<void>;
   refreshUser: () => Promise<void>;
   updateProfile: (data: any) => Promise<void>;
+  authFetch: (url: string, options?: RequestInit) => Promise<Response>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -43,15 +42,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log("Auth state changed, user:", user?.uid, user?.email);
       setUser(user);
       if (user) {
-        const docRef = doc(db, 'users', user.uid);
-        console.log("Fetching profile for:", user.uid, "from path:", docRef.path);
         try {
-          const docSnap = await getDoc(docRef);
-          if (docSnap.exists()) {
-            const data = docSnap.data();
+          const response = await fetch(`/api/data/users/${user.uid}`);
+          if (response.ok) {
+            const data = await response.json();
             if (user.email === 'michael.kokonya@washpivot.com' && data.role !== 'admin') {
               const updatedProfile = { ...data, role: 'admin', isApproved: true };
-              await setDoc(docRef, updatedProfile);
+              await fetch(`/api/data/users/${user.uid}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatedProfile)
+              });
               setProfile(updatedProfile);
             } else {
               setProfile(data);
@@ -60,6 +61,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const isGoogleUser = user.providerData.some(p => p.providerId === 'google.com');
             // Create initial profile
             const initialProfile = {
+              id: user.uid,
               uid: user.uid,
               displayName: user.displayName || 'Anonymous',
               email: user.email || '',
@@ -68,13 +70,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               isApproved: user.email === 'michael.kokonya@washpivot.com' || isGoogleUser, // Admin and Google users are auto-approved
               showContacts: true,
               hasSeenWelcome: false,
-              createdAt: serverTimestamp(),
+              createdAt: new Date().toISOString(),
             };
-            await setDoc(docRef, initialProfile);
+            await fetch('/api/data/users', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(initialProfile)
+            });
             setProfile(initialProfile);
           }
         } catch (error) {
-          handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
+          console.error("Error fetching profile:", error);
         }
       } else {
         setProfile(null);
@@ -114,8 +120,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await sendEmailVerification(user);
     
     // Create profile immediately to ensure fields are set
-    const docRef = doc(db, 'users', user.uid);
     const initialProfile = {
+      id: user.uid,
       uid: user.uid,
       displayName: displayName,
       email: email,
@@ -124,9 +130,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isApproved: email === 'michael.kokonya@washpivot.com',
       showContacts: true,
       hasSeenWelcome: false,
-      createdAt: serverTimestamp(),
+      createdAt: new Date().toISOString(),
     };
-    await setDoc(docRef, initialProfile);
+    await fetch('/api/data/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(initialProfile)
+    });
     setProfile(initialProfile);
   };
 
@@ -161,13 +171,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateProfile = async (data: any) => {
     if (!user) return;
-    const docRef = doc(db, 'users', user.uid);
-    await updateDoc(docRef, data);
+    const token = await user.getIdToken();
+    await fetch(`/api/data/users/${user.uid}`, {
+      method: 'PATCH',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(data)
+    });
     setProfile((prev: any) => ({ ...prev, ...data }));
   };
 
+  const authFetch = async (url: string, options: RequestInit = {}) => {
+    if (!user) throw new Error('Not authenticated');
+    const token = await user.getIdToken();
+    return fetch(url, {
+      ...options,
+      headers: {
+        ...options.headers,
+        'Authorization': `Bearer ${token}`
+      }
+    });
+  };
+
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signIn, signInAsGuest, signUp, logout, resetPassword, changePassword, sendVerification, refreshUser, updateProfile }}>
+    <AuthContext.Provider value={{ user, profile, loading, signIn, signInAsGuest, signUp, logout, resetPassword, changePassword, sendVerification, refreshUser, updateProfile, authFetch } as any}>
       {children}
     </AuthContext.Provider>
   );

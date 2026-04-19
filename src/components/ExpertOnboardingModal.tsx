@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, CheckCircle2, Award, GraduationCap, Briefcase, ArrowRight, ArrowLeft, Sparkles, ShieldCheck, Mail, MapPin, Clock, ListChecks, Eye } from 'lucide-react';
-import { doc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 
 interface ExpertOnboardingModalProps {
@@ -50,8 +48,9 @@ const ExpertOnboardingModal: React.FC<ExpertOnboardingModalProps> = ({ isOpen, o
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     expertise: '',
-    subSpecialty: '',
-    academics: '',
+    customExpertise: '',
+    specialisations: [] as string[],
+    academics: [] as string[],
     yearsOfExperience: '',
     keyProjects: '',
     availability: [] as string[],
@@ -60,6 +59,18 @@ const ExpertOnboardingModal: React.FC<ExpertOnboardingModalProps> = ({ isOpen, o
     contactEmail: profile?.email || '',
     role: 'expert'
   });
+
+  const academicOptions = [
+    'Certificate', 'Diploma', 'Higher Diploma', "Bachelor's Degree", 
+    'Post-Graduate Diploma', "Master's Degree", 'Doctorate (PhD)', 'Professional Certification'
+  ];
+
+  const specialisationOptions = [
+    'Solar Energy Systems', 'Water Purification', 'Sanitation Engineering', 
+    'Sustainable Agriculture', 'WASH Policy & Advocacy', 'Groundwater Hydrology', 
+    'Community Engagement', 'Water treatment', 'Monitoring and evaluation', 
+    'Project implementation', 'Partnership and government engagement'
+  ];
 
   const availabilityOptions = [
     'East Africa', 'West Africa', 'Southern Africa', 'North Africa', 
@@ -83,27 +94,35 @@ const ExpertOnboardingModal: React.FC<ExpertOnboardingModalProps> = ({ isOpen, o
     setLoading(true);
     try {
       const expertJoinedAt = new Date().toISOString();
-      const userRef = doc(db, 'users', user.uid);
-      const publicRef = doc(db, 'public_profiles', user.uid);
-
+      
       const expertData = {
         ...formData,
+        expertise: formData.expertise === 'Other' ? formData.customExpertise : formData.expertise,
         role: 'expert',
         onboardingCompleted: true,
         expertJoinedAt,
         isApproved: false,
-        updatedAt: serverTimestamp()
+        updatedAt: new Date().toISOString()
       };
 
-      // Update private user document
-      await updateDoc(userRef, expertData);
+      // Update private user document via API
+      await fetch(`/api/data/users/${user.uid}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(expertData)
+      });
 
-      // Create public profile
-      await setDoc(publicRef, {
-        uid: user.uid,
-        displayName: profile.displayName,
-        photoURL: profile.photoURL || null,
-        ...expertData
+      // Create public profile via API
+      await fetch('/api/data/public_profiles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: user.uid,
+          uid: user.uid,
+          displayName: profile.displayName,
+          photoURL: profile.photoURL || null,
+          ...expertData
+        })
       });
 
       onComplete();
@@ -113,6 +132,24 @@ const ExpertOnboardingModal: React.FC<ExpertOnboardingModalProps> = ({ isOpen, o
     } finally {
       setLoading(false);
     }
+  };
+
+  const toggleAcademic = (option: string) => {
+    setFormData(prev => ({
+      ...prev,
+      academics: prev.academics.includes(option)
+        ? prev.academics.filter(a => a !== option)
+        : [...prev.academics, option]
+    }));
+  };
+
+  const toggleSpecialisation = (option: string) => {
+    setFormData(prev => ({
+      ...prev,
+      specialisations: prev.specialisations.includes(option)
+        ? prev.specialisations.filter(s => s !== option)
+        : [...prev.specialisations, option]
+    }));
   };
 
   const toggleAvailability = (option: string) => {
@@ -137,12 +174,31 @@ const ExpertOnboardingModal: React.FC<ExpertOnboardingModalProps> = ({ isOpen, o
         <div>
           <h4 className="font-bold text-lg">{profile?.displayName || 'Expert Name'}</h4>
           <p className="text-emerald-600 text-xs font-bold uppercase tracking-widest">
-            {formData.expertise || 'Specialization'}
+            {formData.expertise === 'Other' ? formData.customExpertise : formData.expertise || 'Specialization'}
           </p>
         </div>
       </div>
 
       <div className="space-y-4">
+        {formData.specialisations.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-2">
+            {formData.specialisations.map(s => (
+              <span key={s} className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border border-emerald-100">{s}</span>
+            ))}
+          </div>
+        )}
+
+        {formData.academics.length > 0 && (
+          <div className="flex items-start space-x-2 text-sm text-black/60">
+            <GraduationCap size={14} className="mt-1 shrink-0" />
+            <div className="flex flex-wrap gap-1">
+              {formData.academics.map(a => (
+                <span key={a} className="bg-stone-200 px-2 py-0.5 rounded text-[10px]">{a}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
         {formData.yearsOfExperience && (
           <div className="flex items-center space-x-2 text-sm text-black/60">
             <Clock size={14} />
@@ -252,7 +308,7 @@ const ExpertOnboardingModal: React.FC<ExpertOnboardingModalProps> = ({ isOpen, o
                   )}
 
                   {currentStep === 1 && (
-                    <div className="space-y-6">
+                    <div className="space-y-6 max-h-[450px] overflow-y-auto pr-2 custom-scrollbar">
                       <div className="space-y-2">
                         <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Primary Specialization</label>
                         <select
@@ -261,25 +317,70 @@ const ExpertOnboardingModal: React.FC<ExpertOnboardingModalProps> = ({ isOpen, o
                           className="w-full p-4 bg-stone-50 border border-black/10 rounded-2xl focus:outline-none focus:border-emerald-600 transition-colors font-medium"
                         >
                           <option value="">Select Specialization</option>
-                          <option value="Solar Energy Systems">Solar Energy Systems</option>
-                          <option value="Water Purification">Water Purification</option>
-                          <option value="Sanitation Engineering">Sanitation Engineering</option>
-                          <option value="Sustainable Agriculture">Sustainable Agriculture</option>
-                          <option value="WASH Policy & Advocacy">WASH Policy & Advocacy</option>
-                          <option value="Groundwater Hydrology">Groundwater Hydrology</option>
-                          <option value="Community Engagement">Community Engagement</option>
+                          {specialisationOptions.map(opt => (
+                            <option key={opt} value={opt}>{opt}</option>
+                          ))}
+                          <option value="Other">Other (Custom)</option>
                         </select>
                       </div>
+
+                      {formData.expertise === 'Other' && (
+                        <motion.div 
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="space-y-2"
+                        >
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Custom Specialization</label>
+                          <input
+                            type="text"
+                            value={formData.customExpertise}
+                            onChange={(e) => setFormData({ ...formData, customExpertise: e.target.value })}
+                            placeholder="Enter your specialization"
+                            className="w-full p-4 bg-stone-50 border border-black/10 rounded-2xl focus:outline-none focus:border-emerald-600 transition-colors font-medium"
+                          />
+                        </motion.div>
+                      )}
+
                       <div className="space-y-2">
-                        <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Academic Background</label>
-                        <input
-                          type="text"
-                          value={formData.academics}
-                          onChange={(e) => setFormData({ ...formData, academics: e.target.value })}
-                          placeholder="e.g. MSc. Environmental Engineering"
-                          className="w-full p-4 bg-stone-50 border border-black/10 rounded-2xl focus:outline-none focus:border-emerald-600 transition-colors font-medium"
-                        />
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Additional Specialisations (Multiple)</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {specialisationOptions.map(option => (
+                            <button
+                              key={option}
+                              type="button"
+                              onClick={() => toggleSpecialisation(option)}
+                              className={`p-3 rounded-xl text-[10px] font-bold transition-all border text-left ${
+                                formData.specialisations.includes(option)
+                                  ? 'bg-emerald-600 text-white border-emerald-600'
+                                  : 'bg-stone-50 text-black/60 border-black/5 hover:border-black/20'
+                              }`}
+                            >
+                              {option}
+                            </button>
+                          ))}
+                        </div>
                       </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Academic Qualifications (Multiple)</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {academicOptions.map(option => (
+                            <button
+                              key={option}
+                              type="button"
+                              onClick={() => toggleAcademic(option)}
+                              className={`p-3 rounded-xl text-[10px] font-bold transition-all border text-left ${
+                                formData.academics.includes(option)
+                                  ? 'bg-emerald-600 text-white border-emerald-600'
+                                  : 'bg-stone-50 text-black/60 border-black/5 hover:border-black/20'
+                              }`}
+                            >
+                              {option}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
                       <div className="space-y-2">
                         <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Years of Experience</label>
                         <input
@@ -410,7 +511,7 @@ const ExpertOnboardingModal: React.FC<ExpertOnboardingModalProps> = ({ isOpen, o
                 {currentStep === steps.length - 1 ? (
                   <button
                     onClick={handleSubmit}
-                    disabled={loading || !formData.expertise || !formData.yearsOfExperience || formData.availability.length === 0 || formData.bio.length < 20}
+                    disabled={loading || !formData.expertise || !formData.yearsOfExperience || formData.availability.length === 0 || formData.bio.length < 20 || (formData.expertise === 'Other' && !formData.customExpertise)}
                     className="px-8 py-4 bg-emerald-600 text-white font-bold rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-600/20 disabled:opacity-50 flex items-center space-x-2"
                   >
                     {loading ? (

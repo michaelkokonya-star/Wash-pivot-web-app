@@ -9,6 +9,12 @@
     <meta name="title" content="Wash Pivot | Sustainable WASH Solutions" />
     <meta name="description" content="Wash Pivot is a social enterprise offering sustainable solutions in solar energy, water treatment, and sanitation. Empowering communities through technology and expertise." />
     
+    <!-- Fonts & Performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
+    
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <link rel="apple-touch-icon" href="/logo.svg" />
@@ -41,6 +47,10 @@
           "https://linkedin.com/company/washpivot"
         ]
       }
+    </script>
+    <script>
+      // Polyfill for process.env to prevent crashes in the browser
+      window.process = { env: {} };
     </script>
   </head>
   <body>

@@ -1,8 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, getDoc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
-import { db } from '../firebase';
-import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'motion/react';
 import { 
@@ -30,30 +27,45 @@ const AdminProjectDetails = () => {
   useEffect(() => {
     if (!id) return;
 
-    const path = `projects/${id}`;
-    const unsubscribe = onSnapshot(doc(db, 'projects', id), (docSnap) => {
-      if (docSnap.exists()) {
-        setProject({ id: docSnap.id, ...docSnap.data() });
-      } else {
-        setProject(null);
+    const fetchProject = async () => {
+      try {
+        const response = await fetch(`/api/data/projects/${id}`);
+        if (response.ok) {
+          const data = await response.json();
+          setProject(data);
+        } else {
+          setProject(null);
+        }
+      } catch (error) {
+        console.error("Error fetching project:", error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, path);
-      setLoading(false);
-    });
+    };
 
-    return () => unsubscribe();
+    fetchProject();
+    const interval = setInterval(fetchProject, 5000);
+    return () => clearInterval(interval);
   }, [id]);
 
   const handleApproveProject = async (approved: boolean) => {
     if (!project) return;
     setActionLoading(true);
     try {
-      await updateDoc(doc(db, 'projects', project.id), {
-        status: approved ? 'active' : 'rejected'
+      const response = await fetch(`/api/data/projects/${project.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: approved ? 'active' : 'rejected'
+        })
       });
-      toast.success(`Project ${approved ? 'approved' : 'rejected'} successfully`);
+      
+      if (response.ok) {
+        setProject({ ...project, status: approved ? 'active' : 'rejected' });
+        toast.success(`Project ${approved ? 'approved' : 'rejected'} successfully`);
+      } else {
+        throw new Error('Failed to update status');
+      }
     } catch (error) {
       console.error("Error updating project status:", error);
       toast.error("Failed to update project status");
@@ -68,9 +80,16 @@ const AdminProjectDetails = () => {
 
     setActionLoading(true);
     try {
-      await deleteDoc(doc(db, 'projects', project.id));
-      toast.success("Project deleted successfully");
-      navigate('/admin');
+      const response = await fetch(`/api/data/projects/${project.id}`, {
+        method: 'DELETE'
+      });
+      
+      if (response.ok) {
+        toast.success("Project deleted successfully");
+        navigate('/admin');
+      } else {
+        throw new Error('Failed to delete project');
+      }
     } catch (error) {
       console.error("Error deleting project:", error);
       toast.error("Failed to delete project");

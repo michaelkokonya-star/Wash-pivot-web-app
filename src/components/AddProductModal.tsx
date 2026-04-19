@@ -1,10 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Upload, Plus, Loader2, Image as ImageIcon } from 'lucide-react';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db, auth } from '../firebase';
-import { compressImage } from '../lib/image-utils';
-import { uploadFile } from '../lib/upload';
+import { auth } from '../firebase';
+import { compressImage, sanitizeFilename, fileToDataUrl } from '../lib/image-utils';
 import { toast } from 'sonner';
 
 interface AddProductModalProps {
@@ -26,9 +24,68 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
     price: '',
     category: 'Solar',
     subCategory: 'None',
+    rating: '',
     description: '',
     imageUrl: ''
   });
+  const [pricingRules, setPricingRules] = useState<any>({});
+
+  useEffect(() => {
+    const fetchRules = async () => {
+      try {
+        const response = await fetch('/api/settings/pricing-rules');
+        if (response.ok) {
+          const data = await response.json();
+          setPricingRules(data);
+        }
+      } catch (error) {
+        console.error("Error fetching rules:", error);
+      }
+    };
+    fetchRules();
+  }, []);
+
+  const calculatePrice = async () => {
+    if (!formData.subCategory || !formData.rating) {
+      toast.error("Please select a sub-category and rating first.");
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/settings/pricing-rules');
+      if (response.ok) {
+        const rules = await response.json();
+        const pricePerUnit = rules[formData.subCategory];
+        
+        if (pricePerUnit) {
+          // Parse rating value (e.g. "450W" -> 450, "100AH" -> 100, "1KW" -> 1000)
+          let ratingValue = parseFloat(formData.rating.replace(/[^\d.]/g, ''));
+          
+          if (formData.rating.toUpperCase().includes('KW')) {
+            ratingValue = ratingValue * 1000;
+          }
+          
+          const calculatedPrice = ratingValue * pricePerUnit;
+          setFormData({ ...formData, price: Math.round(calculatedPrice).toString() });
+          toast.success(`Price calculated based on ${formData.subCategory} rules.`);
+        } else {
+          toast.error(`No pricing rule found for ${formData.subCategory}.`);
+        }
+      } else {
+        toast.error("Pricing rules not configured in settings.");
+      }
+    } catch (error) {
+      console.error("Error calculating price:", error);
+      toast.error("Failed to calculate price.");
+    }
+  };
+
+  const ratingOptions: Record<string, string[]> = {
+    'Solar Panels': ['100W', '120W', '200W', '300W', '450W', '595W', '610W', '710W'],
+    'Batteries': ['100AH', '120AH', '150AH', '200AH'],
+    'Inverter': ['600W', '1KW', '3KW', '5.5KW', '10KW'],
+    'Charge Controller': ['30A', '50A', '60A', '80A', '100A']
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -55,41 +112,53 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
       let finalImageUrl = formData.imageUrl;
 
       if (imageFile) {
-        setUploadStatus('compressing');
-        const compressedFile = await compressImage(imageFile);
-
         setUploadStatus('uploading');
         setUploadProgress(10);
-        try {
-          finalImageUrl = await uploadFile(compressedFile);
+        
+        const uploadFormData = new FormData();
+        uploadFormData.append('file', imageFile);
+
+        const uploadRes = await fetch('/api/upload', {
+          method: 'POST',
+          body: uploadFormData
+        });
+
+        if (uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+          finalImageUrl = uploadData.url;
           setUploadProgress(100);
-        } catch (uploadError: any) {
-          console.error("Upload error:", uploadError);
-          toast.error(`Upload failed. ${uploadError.message || "Unknown error."}`);
-          throw uploadError;
+        } else {
+          throw new Error('Upload failed');
         }
       }
 
       setUploadStatus('saving');
-      await addDoc(collection(db, 'products'), {
-        ...formData,
-        imageUrl: finalImageUrl,
-        price: parseFloat(formData.price),
-        createdAt: serverTimestamp()
+      const response = await fetch('/api/data/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          imageUrl: finalImageUrl,
+          price: parseFloat(formData.price)
+        })
       });
-      onSuccess();
-      onClose();
-      toast.success("Product added successfully!");
-      setFormData({
-        name: '',
-        price: '',
-        category: 'Solar',
-        subCategory: 'None',
-        description: '',
-        imageUrl: ''
-      });
-      setImageFile(null);
-      setImagePreview(null);
+
+      if (response.ok) {
+        onSuccess();
+        onClose();
+        toast.success("Product added successfully!");
+        setFormData({
+          name: '',
+          price: '',
+          category: 'Solar',
+          subCategory: 'None',
+          rating: '',
+          description: '',
+          imageUrl: ''
+        });
+        setImageFile(null);
+        setImagePreview(null);
+      }
     } catch (error) {
       console.error("Error adding product:", error);
       toast.error("Failed to add product. Please try again.");
@@ -144,14 +213,23 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Price (KSh)</label>
-                  <input
-                    required
-                    type="number"
-                    value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                    className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors"
-                    placeholder="58500"
-                  />
+                  <div className="relative">
+                    <input
+                      required
+                      type="number"
+                      value={formData.price}
+                      onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                      className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors pr-24"
+                      placeholder="58500"
+                    />
+                    <button
+                      type="button"
+                      onClick={calculatePrice}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-black text-white text-[9px] font-bold uppercase tracking-widest rounded-lg hover:bg-stone-800 transition-colors"
+                    >
+                      Calculate
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -199,6 +277,11 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
                       <option value="Charge Controller">Charge Controller</option>
                       <option value="Inverter">Inverter</option>
                       <option value="Accessories">Accessories</option>
+                      {Object.keys(pricingRules).filter(key => 
+                        !['Solar Panels', 'Batteries', 'Charge Controller', 'Inverter', 'Accessories', 'Fluoride Removal', 'Filtration', 'Chlorination', 'Exhaust Services'].includes(key)
+                      ).map(key => (
+                        <option key={key} value={key}>{key}</option>
+                      ))}
                     </select>
                   </div>
                 )}
@@ -208,7 +291,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
                     <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Sub-Category</label>
                     <select
                       value={formData.subCategory}
-                      onChange={(e) => setFormData({ ...formData, subCategory: e.target.value })}
+                      onChange={(e) => setFormData({ ...formData, subCategory: e.target.value, rating: '' })}
                       className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors appearance-none"
                     >
                       <option value="None">None</option>
@@ -217,6 +300,32 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
                   </div>
                 )}
               </div>
+
+              {formData.subCategory !== 'None' && (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Technical Rating / Capacity</label>
+                  {ratingOptions[formData.subCategory] ? (
+                    <select
+                      value={formData.rating}
+                      onChange={(e) => setFormData({ ...formData, rating: e.target.value })}
+                      className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors appearance-none"
+                    >
+                      <option value="">Select Rating</option>
+                      {ratingOptions[formData.subCategory].map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={formData.rating}
+                      onChange={(e) => setFormData({ ...formData, rating: e.target.value })}
+                      className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors"
+                      placeholder="e.g. 500L, 2HP, etc."
+                    />
+                  )}
+                </div>
+              )}
 
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Product Image</label>
@@ -227,7 +336,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
                   >
                     {imagePreview ? (
                       <>
-                        <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                        <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           <Upload className="text-white" size={24} />
                         </div>

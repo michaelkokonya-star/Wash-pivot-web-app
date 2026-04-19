@@ -1,7 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, query, where, deleteDoc, doc } from 'firebase/firestore';
-import { db } from '../firebase';
-import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'motion/react';
 import { User, Briefcase, GraduationCap, Search, Filter, Mail, Award, Sparkles, Trash2 } from 'lucide-react';
@@ -19,21 +16,15 @@ const Recruitment = () => {
 
   const fetchExperts = async () => {
     setLoading(true);
-    const path = 'public_profiles';
     try {
-      const q = query(
-        collection(db, path), 
-        where('role', '==', 'expert'),
-        where('isApproved', '==', true)
-      );
-      const querySnapshot = await getDocs(q);
-      const expertsData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setExperts(expertsData);
+      const response = await fetch('/api/data/public_profiles');
+      if (response.ok) {
+        const data = await response.json();
+        const expertsData = data.filter((p: any) => p.role === 'expert' && p.isApproved === true);
+        setExperts(expertsData);
+      }
     } catch (error) {
-      handleFirestoreError(error, OperationType.GET, path);
+      console.error("Error fetching experts:", error);
     } finally {
       setLoading(false);
     }
@@ -42,9 +33,9 @@ const Recruitment = () => {
   const handleDeleteExpert = async (expertId: string) => {
     if (!window.confirm('Are you sure you want to remove this expert?')) return;
     try {
-      // Delete from both collections
-      await deleteDoc(doc(db, 'users', expertId));
-      await deleteDoc(doc(db, 'public_profiles', expertId));
+      // Delete from both collections via API
+      await fetch(`/api/data/users/${expertId}`, { method: 'DELETE' });
+      await fetch(`/api/data/public_profiles/${expertId}`, { method: 'DELETE' });
       setExperts(experts.filter(e => e.id !== expertId));
     } catch (error) {
       console.error("Error deleting expert:", error);
@@ -134,8 +125,28 @@ const Recruitment = () => {
               <div className="space-y-4 mb-8">
                 <div className="flex items-start space-x-3 text-sm text-black/60">
                   <GraduationCap size={18} className="mt-1 flex-shrink-0" />
-                  <p>{expert.academics}</p>
+                  <div>
+                    {Array.isArray(expert.academics) ? (
+                      <div className="flex flex-wrap gap-1">
+                        {expert.academics.map((a: string) => (
+                          <span key={a} className="bg-stone-100 px-2 py-0.5 rounded text-[10px]">{a}</span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p>{expert.academics}</p>
+                    )}
+                  </div>
                 </div>
+                {expert.specialisations && expert.specialisations.length > 0 && (
+                  <div className="flex items-start space-x-3 text-sm text-black/60">
+                    <Sparkles size={18} className="mt-1 flex-shrink-0" />
+                    <div className="flex flex-wrap gap-1">
+                      {expert.specialisations.map((s: string) => (
+                        <span key={s} className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border border-emerald-100">{s}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="flex items-start space-x-3 text-sm text-black/60">
                   <Award size={18} className="mt-1 flex-shrink-0" />
                   <p className="line-clamp-3">{expert.bio}</p>

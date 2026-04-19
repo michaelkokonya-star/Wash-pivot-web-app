@@ -1,10 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Upload, Plus, Loader2, Mail, Phone, MapPin, Image as ImageIcon } from 'lucide-react';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db, auth } from '../firebase';
+import { useAuth } from '../context/AuthContext';
+import { auth } from '../firebase';
 import { compressImage } from '../lib/image-utils';
-import { uploadFile } from '../lib/upload';
 import { toast } from 'sonner';
 
 interface AddServiceModalProps {
@@ -14,6 +13,7 @@ interface AddServiceModalProps {
 }
 
 const AddServiceModal: React.FC<AddServiceModalProps> = ({ isOpen, onClose, onSuccess }) => {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'compressing' | 'uploading' | 'saving'>('idle');
@@ -46,7 +46,7 @@ const AddServiceModal: React.FC<AddServiceModalProps> = ({ isOpen, onClose, onSu
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!auth.currentUser) {
+    if (!user) {
       toast.error("You must be logged in to perform this action.");
       return;
     }
@@ -59,41 +59,55 @@ const AddServiceModal: React.FC<AddServiceModalProps> = ({ isOpen, onClose, onSu
       if (imageFile) {
         setUploadStatus('compressing');
         const compressedFile = await compressImage(imageFile);
-
+        
         setUploadStatus('uploading');
         setUploadProgress(10);
-        try {
-          finalImageUrl = await uploadFile(compressedFile);
-          setUploadProgress(100);
-        } catch (uploadError: any) {
-          console.error("Upload error:", uploadError);
-          toast.error(`Upload failed. ${uploadError.message || "Unknown error."}`);
-          throw uploadError;
-        }
+        
+        const uploadFormData = new FormData();
+        uploadFormData.append('file', compressedFile);
+        
+        const uploadRes = await fetch('/api/upload', {
+          method: 'POST',
+          body: uploadFormData
+        });
+
+        if (!uploadRes.ok) throw new Error('Upload failed');
+        const uploadData = await uploadRes.json();
+        finalImageUrl = uploadData.url;
+        setUploadProgress(100);
       }
 
       setUploadStatus('saving');
-      await addDoc(collection(db, 'service_providers'), {
-        ...formData,
-        imageUrl: finalImageUrl,
-        isApproved: false,
-        createdAt: serverTimestamp()
+      const response = await fetch('/api/data/service_providers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          imageUrl: finalImageUrl,
+          isApproved: false,
+          createdAt: new Date().toISOString()
+        })
       });
-      onSuccess();
-      onClose();
-      toast.success("Service provider added successfully!");
-      setFormData({
-        name: '',
-        category: 'Installation',
-        subCategory: 'None',
-        description: '',
-        imageUrl: '',
-        contactEmail: '',
-        contactPhone: '',
-        location: ''
-      });
-      setImageFile(null);
-      setImagePreview(null);
+
+      if (response.ok) {
+        onSuccess();
+        onClose();
+        toast.success("Service provider added successfully!");
+        setFormData({
+          name: '',
+          category: 'Installation',
+          subCategory: 'None',
+          description: '',
+          imageUrl: '',
+          contactEmail: '',
+          contactPhone: '',
+          location: ''
+        });
+        setImageFile(null);
+        setImagePreview(null);
+      } else {
+        throw new Error('Failed to save service provider');
+      }
     } catch (error) {
       console.error("Error adding service provider:", error);
       toast.error("Failed to add service provider. Please try again.");
@@ -269,7 +283,7 @@ const AddServiceModal: React.FC<AddServiceModalProps> = ({ isOpen, onClose, onSu
                   >
                     {imagePreview ? (
                       <>
-                        <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                        <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           <Upload className="text-white" size={24} />
                         </div>

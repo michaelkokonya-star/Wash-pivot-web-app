@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, getDoc, collection, getDocs, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, deleteDoc } from 'firebase/firestore';
-import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { motion, AnimatePresence } from 'motion/react';
@@ -28,6 +26,16 @@ const ProductDetail = () => {
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
+  const [currentRating, setCurrentRating] = useState<string>('');
+  const [currentPrice, setCurrentPrice] = useState<number>(0);
+  const [pricingRules, setPricingRules] = useState<any>(null);
+
+  const ratingOptions: Record<string, string[]> = {
+    'Solar Panels': ['100W', '120W', '200W', '300W', '450W', '595W', '610W', '710W'],
+    'Batteries': ['100AH', '120AH', '150AH', '200AH'],
+    'Inverter': ['600W', '1KW', '3KW', '5.5KW', '10KW'],
+    'Charge Controller': ['30A', '50A', '60A', '80A', '100A']
+  };
 
   const currencies = [
     { code: 'USD', symbol: '$', name: 'US Dollar' },
@@ -68,7 +76,21 @@ const ProductDetail = () => {
         setLoadingRates(false);
       }
     };
+
+    const fetchPricingRules = async () => {
+      try {
+        const response = await fetch('/api/settings/pricing-rules');
+        if (response.ok) {
+          const data = await response.json();
+          setPricingRules(data);
+        }
+      } catch (error) {
+        console.error("Error fetching pricing rules:", error);
+      }
+    };
+
     fetchRates();
+    fetchPricingRules();
   }, []);
 
   const formatPrice = (price: number) => {
@@ -79,18 +101,49 @@ const ProductDetail = () => {
     return `${symbol}${converted.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
   };
 
+  const getCalculationDetails = () => {
+    if (!product || !pricingRules || !currentRating) return null;
+    
+    const rule = pricingRules[product.subCategory];
+    if (!rule) return null;
+
+    let ratingValue = parseFloat(currentRating.replace(/[^\d.]/g, ''));
+    let unit = 'Watt';
+    let conversionText = '';
+
+    if (currentRating.toUpperCase().includes('KW')) {
+      const originalValue = ratingValue;
+      ratingValue = ratingValue * 1000;
+      conversionText = `(${originalValue}KW = ${ratingValue}W)`;
+    } else if (product.subCategory === 'Batteries') {
+      unit = 'AH';
+    } else if (product.subCategory === 'Charge Controller') {
+      unit = 'Ampere';
+    }
+
+    return {
+      rule,
+      ratingValue,
+      unit,
+      conversionText,
+      total: Math.round(ratingValue * rule)
+    };
+  };
+
+  const calcDetails = getCalculationDetails();
+
   useEffect(() => {
     const fetchProduct = async () => {
       try {
         if (!id) return;
-        const docRef = doc(db, 'products', id);
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-          const productData = { id: docSnap.id, ...docSnap.data() } as any;
+        const response = await fetch(`/api/data/products/${id}`);
+        if (response.ok) {
+          const productData = await response.json();
           setProduct(productData);
           setSelectedImage(productData.imageUrl);
-          fetchRelated(productData.category, docSnap.id);
+          setCurrentRating(productData.rating || '');
+          setCurrentPrice(productData.price || 0);
+          fetchRelated(productData.category, id);
         }
       } catch (error) {
         console.error("Error fetching product:", error);
@@ -101,17 +154,14 @@ const ProductDetail = () => {
 
     const fetchRelated = async (category: string, currentId: string) => {
       try {
-        const q = query(
-          collection(db, 'products'),
-          where('category', '==', category)
-        );
-        const querySnapshot = await getDocs(collection(db, 'products')); // Simplified for now since where might need index
-        const allProductsData = querySnapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() }))
-          .filter((p: any) => p.category === category && p.id !== currentId)
-          .slice(0, 4);
-        
-        setRelatedProducts(allProductsData);
+        const response = await fetch('/api/data/products');
+        if (response.ok) {
+          const allProducts = await response.json();
+          const related = allProducts
+            .filter((p: any) => p.category === category && p.id !== currentId)
+            .slice(0, 4);
+          setRelatedProducts(related);
+        }
       } catch (error) {
         console.error("Error fetching related products:", error);
       }
@@ -124,28 +174,24 @@ const ProductDetail = () => {
   useEffect(() => {
     if (!id) return;
 
-    const q = query(
-      collection(db, 'reviews'),
-      where('productId', '==', id)
-    );
+    const fetchReviews = async () => {
+      try {
+        const response = await fetch('/api/data/reviews');
+        if (response.ok) {
+          const allReviews = await response.json();
+          const productReviews = allReviews
+            .filter((r: any) => r.productId === id)
+            .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          setReviews(productReviews);
+        }
+      } catch (error) {
+        console.error("Error fetching reviews:", error);
+      }
+    };
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const reviewsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      // Sort in memory to avoid index requirement
-      reviewsData.sort((a: any, b: any) => {
-        const dateA = a.createdAt?.toDate()?.getTime() || 0;
-        const dateB = b.createdAt?.toDate()?.getTime() || 0;
-        return dateB - dateA;
-      });
-      setReviews(reviewsData);
-    }, (error) => {
-      console.error("Error fetching reviews:", error);
-    });
-
-    return () => unsubscribe();
+    fetchReviews();
+    const interval = setInterval(fetchReviews, 5000); // Poll every 5s
+    return () => clearInterval(interval);
   }, [id]);
 
   const averageRating = reviews.length > 0 
@@ -156,7 +202,8 @@ const ProductDetail = () => {
     if (!window.confirm('Are you sure you want to delete your review?')) return;
     setDeletingReviewId(reviewId);
     try {
-      await deleteDoc(doc(db, 'reviews', reviewId));
+      await fetch(`/api/data/reviews/${reviewId}`, { method: 'DELETE' });
+      setReviews(reviews.filter(r => r.id !== reviewId));
     } catch (error) {
       console.error("Error deleting review:", error);
     } finally {
@@ -170,16 +217,32 @@ const ProductDetail = () => {
 
     setSubmittingReview(true);
     try {
-      await addDoc(collection(db, 'reviews'), {
-        productId: id,
-        userId: user.uid,
-        userName: profile?.displayName || user.displayName || 'Anonymous',
-        rating: newRating,
-        comment: newComment,
-        createdAt: serverTimestamp()
+      const response = await fetch('/api/data/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productId: id,
+          userId: user.uid,
+          userName: profile?.displayName || user.displayName || 'Anonymous',
+          rating: newRating,
+          comment: newComment,
+          createdAt: new Date().toISOString()
+        })
       });
-      setNewComment('');
-      setNewRating(5);
+
+      if (response.ok) {
+        setNewComment('');
+        setNewRating(5);
+        // Refresh reviews
+        const res = await fetch('/api/data/reviews');
+        if (res.ok) {
+          const allReviews = await res.json();
+          const productReviews = allReviews
+            .filter((r: any) => r.productId === id)
+            .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          setReviews(productReviews);
+        }
+      }
     } catch (error) {
       console.error("Error submitting review:", error);
     } finally {
@@ -187,9 +250,29 @@ const ProductDetail = () => {
     }
   };
 
+  useEffect(() => {
+    if (product && pricingRules && currentRating) {
+      const rule = pricingRules[product.subCategory];
+      if (rule) {
+        let ratingValue = parseFloat(currentRating.replace(/[^\d.]/g, ''));
+        // Handle KW to Watt conversion
+        if (currentRating.toUpperCase().includes('KW')) {
+          ratingValue = ratingValue * 1000;
+        }
+        setCurrentPrice(Math.round(ratingValue * rule));
+      }
+    }
+  }, [currentRating, product, pricingRules]);
+
   const handleAddToCart = (productToAdd = product) => {
     if (!productToAdd) return;
-    addToCart(productToAdd);
+    
+    // Use current state for the main product, or the passed product for related items
+    const itemToCart = productToAdd.id === product.id 
+      ? { ...productToAdd, price: currentPrice, rating: currentRating }
+      : productToAdd;
+
+    addToCart(itemToCart);
     if (productToAdd.id === product.id) {
       setAddedToCart(true);
       setTimeout(() => setAddedToCart(false), 2000);
@@ -292,35 +375,78 @@ const ProductDetail = () => {
             <span className="px-4 py-1.5 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold uppercase tracking-widest mb-4 inline-block">
               {product.category}
             </span>
+            {product.rating && (
+              <span className="ml-2 px-4 py-1.5 bg-stone-100 text-black/60 rounded-full text-xs font-bold uppercase tracking-widest mb-4 inline-block">
+                {product.rating}
+              </span>
+            )}
             <h1 className="text-5xl font-bold tracking-tighter mb-4 leading-tight">{product.name}</h1>
-            <div className="flex items-center space-x-6 mb-8">
-              <div className="text-3xl font-bold text-black">{formatPrice(product.price)}</div>
-              <div className="flex items-center space-x-2">
-                <div className="flex text-emerald-600">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <Star key={star} size={16} fill={star <= Math.round(averageRating) ? "currentColor" : "none"} />
-                  ))}
-                </div>
-                <span className="text-sm font-bold text-black/40">({reviews.length})</span>
-              </div>
-              <div className="relative group">
-                <div className="flex items-center space-x-2 px-3 py-1.5 bg-stone-100 rounded-lg text-xs font-bold cursor-pointer hover:bg-stone-200 transition-colors">
-                  <Globe size={14} className="text-black/40" />
-                  <span>{currency}</span>
-                </div>
-                <div className="absolute top-full left-0 mt-2 w-48 bg-white border border-black/10 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 overflow-hidden">
-                  {currencies.map((c) => (
+            
+            {ratingOptions[product.subCategory] && (
+              <div className="mb-8 p-6 bg-stone-50 rounded-3xl border border-black/5">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-black/40 mb-4 block">Select Capacity / Rating</label>
+                <div className="flex flex-wrap gap-3">
+                  {ratingOptions[product.subCategory].map((rating) => (
                     <button
-                      key={c.code}
-                      onClick={() => setCurrency(c.code)}
-                      className={`w-full px-4 py-2.5 text-left text-xs font-bold hover:bg-stone-50 transition-colors flex items-center justify-between ${currency === c.code ? 'text-emerald-600 bg-emerald-50/50' : 'text-black/60'}`}
+                      key={rating}
+                      onClick={() => setCurrentRating(rating)}
+                      className={`px-6 py-3 rounded-xl text-sm font-bold transition-all border ${
+                        currentRating === rating 
+                          ? 'bg-black text-white border-black shadow-lg' 
+                          : 'bg-white text-black/60 border-black/5 hover:border-black'
+                      }`}
                     >
-                      <span>{c.name}</span>
-                      <span className="opacity-40">{c.code}</span>
+                      {rating}
                     </button>
                   ))}
                 </div>
+                <p className="mt-4 text-[10px] text-black/30 italic">Price updates automatically based on selected rating.</p>
               </div>
+            )}
+
+            <div className="flex flex-col mb-8">
+              <div className="flex items-center space-x-6 mb-2">
+                <div className="text-4xl font-bold text-black">{formatPrice(currentPrice)}</div>
+                <div className="flex items-center space-x-2">
+                  <div className="flex text-emerald-600">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Star key={star} size={16} fill={star <= Math.round(averageRating) ? "currentColor" : "none"} />
+                    ))}
+                  </div>
+                  <span className="text-sm font-bold text-black/40">({reviews.length})</span>
+                </div>
+                <div className="relative group">
+                  <div className="flex items-center space-x-2 px-3 py-1.5 bg-stone-100 rounded-lg text-xs font-bold cursor-pointer hover:bg-stone-200 transition-colors">
+                    <Globe size={14} className="text-black/40" />
+                    <span>{currency}</span>
+                  </div>
+                  <div className="absolute top-full left-0 mt-2 w-48 bg-white border border-black/10 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 overflow-hidden">
+                    {currencies.map((c) => (
+                      <button
+                        key={c.code}
+                        onClick={() => setCurrency(c.code)}
+                        className={`w-full px-4 py-2.5 text-left text-xs font-bold hover:bg-stone-50 transition-colors flex items-center justify-between ${currency === c.code ? 'text-emerald-600 bg-emerald-50/50' : 'text-black/60'}`}
+                      >
+                        <span>{c.name}</span>
+                        <span className="opacity-40">{c.code}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {calcDetails && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-100 rounded-xl w-fit"
+                >
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">
+                    Calculation: {calcDetails.ratingValue}{calcDetails.unit.charAt(0)} {calcDetails.conversionText} × KSh {calcDetails.rule}/{calcDetails.unit}
+                  </span>
+                </motion.div>
+              )}
             </div>
           </div>
 
@@ -463,7 +589,7 @@ const ProductDetail = () => {
                       <div>
                         <h4 className="font-bold text-sm">{review.userName}</h4>
                         <p className="text-[10px] text-black/40 uppercase tracking-widest">
-                          {review.createdAt?.toDate().toLocaleDateString()}
+                          {new Date(review.createdAt).toLocaleDateString()}
                         </p>
                       </div>
                     </div>

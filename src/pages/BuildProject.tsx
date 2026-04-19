@@ -1,7 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '../firebase';
-import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, Trash2, Calculator, FileText, CheckCircle2, User, Package, Download, Sparkles, Sun } from 'lucide-react';
 import { jsPDF } from 'jspdf';
@@ -22,20 +19,23 @@ const BuildProject = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      const productsPath = 'products';
       try {
-        const pSnap = await getDocs(collection(db, productsPath));
-        setProducts(pSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        const pRes = await fetch('/api/data/products');
+        if (pRes.ok) {
+          setProducts(await pRes.json());
+        }
       } catch (error) {
-        handleFirestoreError(error, OperationType.GET, productsPath);
+        console.error("Error fetching products:", error);
       }
 
-      const expertsPath = 'public_profiles';
       try {
-        const eSnap = await getDocs(query(collection(db, expertsPath), where('role', '==', 'expert')));
-        setExperts(eSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        const eRes = await fetch('/api/data/public_profiles');
+        if (eRes.ok) {
+          const allProfiles = await eRes.json();
+          setExperts(allProfiles.filter((p: any) => p.role === 'expert'));
+        }
       } catch (error) {
-        handleFirestoreError(error, OperationType.GET, expertsPath);
+        console.error("Error fetching experts:", error);
       }
     };
     fetchData();

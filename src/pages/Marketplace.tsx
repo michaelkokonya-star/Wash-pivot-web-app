@@ -1,7 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { collection, getDocs, query, where, deleteDoc, doc, orderBy } from 'firebase/firestore';
-import { db } from '../firebase';
-import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { motion, useAnimation, AnimatePresence } from 'motion/react';
 import { ShoppingCart, Filter, Search, Sun, Droplets, ShieldCheck, ChevronLeft, ChevronRight, Check, Plus, Edit, Trash2, LogIn, Mail, Phone, MapPin, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -19,6 +16,7 @@ const Marketplace = () => {
   const [servicesLoading, setServicesLoading] = useState(true);
   const [filter, setFilter] = useState('All');
   const [subFilter, setSubFilter] = useState('All');
+  const [ratingFilter, setRatingFilter] = useState('All');
   const carouselRef = useRef<HTMLDivElement>(null);
   const servicesCarouselRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -34,29 +32,25 @@ const Marketplace = () => {
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      let q;
-      if (filter === 'All') {
-        q = collection(db, 'products');
-      } else {
-        if (subFilter !== 'All') {
-          q = query(
-            collection(db, 'products'), 
-            where('category', '==', filter),
-            where('subCategory', '==', subFilter)
-          );
-        } else {
-          q = query(collection(db, 'products'), where('category', '==', filter));
+      const response = await fetch('/api/data/products');
+      if (response.ok) {
+        let productsData = await response.json();
+        
+        // Apply client-side filtering
+        if (filter !== 'All') {
+          productsData = productsData.filter((p: any) => p.category === filter);
         }
+        if (subFilter !== 'All') {
+          productsData = productsData.filter((p: any) => p.subCategory === subFilter);
+        }
+        if (ratingFilter !== 'All') {
+          productsData = productsData.filter((p: any) => p.rating === ratingFilter);
+        }
+        
+        setProducts(productsData);
       }
-      
-      const querySnapshot = await getDocs(q);
-      const productsData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...(doc.data() as any)
-      }));
-      setProducts(productsData);
     } catch (error) {
-      handleFirestoreError(error, OperationType.GET, 'products');
+      console.error("Error fetching products:", error);
     } finally {
       setLoading(false);
     }
@@ -65,34 +59,28 @@ const Marketplace = () => {
   const fetchServices = async () => {
     setServicesLoading(true);
     try {
-      let q;
-      if (filter === 'All') {
-        q = query(collection(db, 'service_providers'), where('isApproved', '==', true), orderBy('createdAt', 'desc'));
-      } else if (subFilter !== 'All') {
-        q = query(
-          collection(db, 'service_providers'), 
-          where('isApproved', '==', true),
-          where('category', '==', filter),
-          where('subCategory', '==', subFilter),
-          orderBy('createdAt', 'desc')
-        );
-      } else {
-        q = query(
-          collection(db, 'service_providers'), 
-          where('isApproved', '==', true),
-          where('category', '==', filter),
-          orderBy('createdAt', 'desc')
-        );
+      const response = await fetch('/api/data/service_providers');
+      if (response.ok) {
+        let servicesData = await response.json();
+        
+        // Filter by approved status
+        servicesData = servicesData.filter((s: any) => s.isApproved === true);
+        
+        // Apply client-side filtering
+        if (filter !== 'All') {
+          servicesData = servicesData.filter((s: any) => s.category === filter);
+        }
+        if (subFilter !== 'All') {
+          servicesData = servicesData.filter((s: any) => s.subCategory === subFilter);
+        }
+        
+        // Sort by createdAt desc
+        servicesData.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        
+        setServices(servicesData);
       }
-      
-      const querySnapshot = await getDocs(q);
-      const servicesData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...(doc.data() as any)
-      }));
-      setServices(servicesData);
     } catch (error) {
-      handleFirestoreError(error, OperationType.GET, 'service_providers');
+      console.error("Error fetching services:", error);
     } finally {
       setServicesLoading(false);
     }
@@ -101,10 +89,12 @@ const Marketplace = () => {
   const handleDeleteProduct = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this product?')) return;
     try {
-      await deleteDoc(doc(db, 'products', id));
-      fetchProducts();
+      const response = await fetch(`/api/data/products/${id}`, { method: 'DELETE' });
+      if (response.ok) {
+        fetchProducts();
+      }
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `products/${id}`);
+      console.error("Error deleting product:", error);
     }
   };
 
@@ -116,7 +106,14 @@ const Marketplace = () => {
   useEffect(() => {
     fetchProducts();
     fetchServices();
-  }, [filter, subFilter]);
+  }, [filter, subFilter, ratingFilter]);
+
+  const ratingOptions: Record<string, string[]> = {
+    'Solar Panels': ['100W', '120W', '200W', '300W', '450W', '595W', '610W', '710W'],
+    'Batteries': ['100AH', '120AH', '150AH', '200AH'],
+    'Inverter': ['600W', '1KW', '3KW', '5.5KW', '10KW'],
+    'Charge Controller': ['30A', '50A', '60A', '80A', '100A']
+  };
 
   useEffect(() => {
     if (carouselRef.current) {
@@ -176,6 +173,7 @@ const Marketplace = () => {
                   onClick={() => {
                     setFilter(cat);
                     setSubFilter('All');
+                    setRatingFilter('All');
                   }}
                   className={`px-6 py-2 rounded-full text-sm font-bold transition-all border ${
                     filter === cat 
@@ -197,7 +195,10 @@ const Marketplace = () => {
                 {['All', 'Fluoride Removal', 'Filtration', 'Chlorination'].map((sub) => (
                   <button
                     key={sub}
-                    onClick={() => setSubFilter(sub)}
+                    onClick={() => {
+                      setSubFilter(sub);
+                      setRatingFilter('All');
+                    }}
                     className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${
                       subFilter === sub 
                         ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20' 
@@ -219,7 +220,10 @@ const Marketplace = () => {
                 {['All', 'Solar Panels', 'Batteries', 'Charge Controller', 'Inverter', 'Accessories'].map((sub) => (
                   <button
                     key={sub}
-                    onClick={() => setSubFilter(sub)}
+                    onClick={() => {
+                      setSubFilter(sub);
+                      setRatingFilter('All');
+                    }}
                     className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${
                       subFilter === sub 
                         ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20' 
@@ -241,7 +245,10 @@ const Marketplace = () => {
                 {['All', 'Exhaust Services'].map((sub) => (
                   <button
                     key={sub}
-                    onClick={() => setSubFilter(sub)}
+                    onClick={() => {
+                      setSubFilter(sub);
+                      setRatingFilter('All');
+                    }}
                     className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${
                       subFilter === sub 
                         ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20' 
@@ -249,6 +256,29 @@ const Marketplace = () => {
                     }`}
                   >
                     {sub}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+
+            {ratingOptions[subFilter] && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex flex-wrap gap-2 p-2 bg-stone-50 rounded-2xl border border-black/5"
+              >
+                <span className="text-[9px] font-bold uppercase tracking-widest text-black/30 px-2 flex items-center">Rating:</span>
+                {['All', ...ratingOptions[subFilter]].map((rating) => (
+                  <button
+                    key={rating}
+                    onClick={() => setRatingFilter(rating)}
+                    className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all ${
+                      ratingFilter === rating 
+                        ? 'bg-black text-white shadow-sm' 
+                        : 'bg-white text-black/40 hover:text-black border border-black/5'
+                    }`}
+                  >
+                    {rating}
                   </button>
                 ))}
               </motion.div>
@@ -315,6 +345,11 @@ const Marketplace = () => {
                           <span className="px-4 py-1.5 bg-white/90 backdrop-blur-md rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm">
                             {product.category}
                           </span>
+                          {product.rating && (
+                            <span className="px-4 py-1.5 bg-emerald-600 text-white rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm">
+                              {product.rating}
+                            </span>
+                          )}
                           {isAdmin && (
                             <div className="flex gap-2">
                               <button
@@ -450,6 +485,7 @@ const Marketplace = () => {
                             src={service.imageUrl} 
                             alt={service.name}
                             className="w-full h-full object-cover"
+                            referrerPolicy="no-referrer"
                           />
                         </div>
                         <span className="px-4 py-1.5 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-bold uppercase tracking-widest">

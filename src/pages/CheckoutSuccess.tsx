@@ -4,23 +4,27 @@ import { motion } from 'motion/react';
 import { Helmet } from 'react-helmet-async';
 import { CheckCircle2, ShoppingBag, ArrowRight, Mail, Package } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../firebase';
 
 const CheckoutSuccess = () => {
   const { clearCart } = useCart();
   const [searchParams] = useSearchParams();
   const orderId = searchParams.get('orderId');
 
+  const method = searchParams.get('method');
+  const isManualMpesa = method === 'manual_mpesa';
+
   useEffect(() => {
     const finalizeOrder = async () => {
       clearCart();
       if (orderId) {
         try {
-          const orderRef = doc(db, 'orders', orderId);
-          await updateDoc(orderRef, {
-            status: 'paid',
-            paidAt: new Date()
+          await fetch(`/api/data/orders/${orderId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              status: isManualMpesa ? 'pending_verification' : 'paid',
+              paidAt: isManualMpesa ? null : new Date().toISOString()
+            })
           });
         } catch (error) {
           console.error("Error updating order status:", error);
@@ -28,7 +32,7 @@ const CheckoutSuccess = () => {
       }
     };
     finalizeOrder();
-  }, [orderId]);
+  }, [orderId, isManualMpesa]);
 
   return (
     <div className="pt-32 pb-20 px-4 sm:px-6 lg:px-8 max-w-3xl mx-auto text-center">
@@ -45,10 +49,29 @@ const CheckoutSuccess = () => {
           <CheckCircle2 size={48} />
         </div>
 
-        <h1 className="text-5xl font-bold tracking-tighter mb-6 uppercase">Order Successful!</h1>
+        <h1 className="text-5xl font-bold tracking-tighter mb-6 uppercase">
+          {isManualMpesa ? 'Order Placed!' : 'Order Successful!'}
+        </h1>
         <p className="text-black/50 text-lg mb-12 leading-relaxed max-w-md mx-auto">
-          Thank you for your purchase. Your order has been placed successfully and is being processed.
+          {isManualMpesa 
+            ? "Your order has been placed. Please ensure you have completed the M-Pesa payment. Our team will verify the transaction and update your order status shortly."
+            : "Thank you for your purchase. Your order has been placed successfully and is being processed."}
         </p>
+
+        {isManualMpesa && (
+          <div className="mb-12 p-8 bg-[#4CAF50] text-white rounded-[3rem] shadow-xl text-center">
+            <h3 className="text-xl font-black uppercase tracking-tighter mb-4">Payment Instructions</h3>
+            <p className="text-sm mb-6 opacity-90">Please pay the total amount to the Till Number below if you haven't already:</p>
+            <div className="flex justify-center gap-1 mb-6">
+              {['8', '5', '0', '0', '1', '3', '2'].map((digit, i) => (
+                <div key={i} className="w-8 h-10 bg-white text-[#4CAF50] rounded flex items-center justify-center text-xl font-black shadow-lg">
+                  {digit}
+                </div>
+              ))}
+            </div>
+            <p className="text-xs font-bold uppercase tracking-widest opacity-80">Account: MICHAEL KOKONYA OKUO</p>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-12">
           {orderId && (

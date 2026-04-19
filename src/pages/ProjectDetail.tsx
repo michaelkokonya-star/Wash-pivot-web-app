@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
-import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { Helmet } from 'react-helmet-async';
-import { ArrowLeft, CheckCircle2, Circle, Heart, Users, Target, Calendar, ShieldCheck, TrendingUp, Facebook, Twitter, Linkedin, MessageSquare, Link as LinkIcon } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Circle, Heart, Users, Target, Calendar, ShieldCheck, TrendingUp, Facebook, Twitter, Linkedin, MessageSquare, Link as LinkIcon, Shield, Play } from 'lucide-react';
 
 const ProjectDetail = () => {
   const { id } = useParams();
@@ -18,19 +16,26 @@ const ProjectDetail = () => {
   useEffect(() => {
     if (!id) return;
 
-    const unsubscribe = onSnapshot(doc(db, 'projects', id), (docSnap) => {
-      if (docSnap.exists()) {
-        setProject({ id: docSnap.id, ...docSnap.data() });
-      } else {
-        setProject(null);
+    const fetchProject = async () => {
+      try {
+        const response = await fetch(`/api/data/projects/${id}`);
+        if (response.ok) {
+          const data = await response.json();
+          setProject(data);
+        } else {
+          setProject(null);
+        }
+      } catch (error) {
+        console.error("Error fetching project:", error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    }, (error) => {
-      console.error("Error fetching project:", error);
-      setLoading(false);
-    });
+    };
 
-    return () => unsubscribe();
+    fetchProject();
+    // Set up polling instead of onSnapshot since we are using S3 JSON
+    const interval = setInterval(fetchProject, 5000);
+    return () => clearInterval(interval);
   }, [id]);
 
   const handleToggleMilestone = async (milestoneId: string) => {
@@ -42,9 +47,15 @@ const ProjectDetail = () => {
         m.id === milestoneId ? { ...m, isCompleted: !m.isCompleted } : m
       );
 
-      await updateDoc(doc(db, 'projects', project.id), {
-        milestones: updatedMilestones
+      const response = await fetch(`/api/data/projects/${project.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ milestones: updatedMilestones })
       });
+      
+      if (response.ok) {
+        setProject({ ...project, milestones: updatedMilestones });
+      }
     } catch (error) {
       console.error("Error updating milestone:", error);
     } finally {
@@ -57,13 +68,57 @@ const ProjectDetail = () => {
     if (!project) return;
 
     try {
-      const projectRef = doc(db, 'projects', project.id);
-      await updateDoc(projectRef, {
-        currentFunding: project.currentFunding + 5000 // Mock support amount
+      const response = await fetch(`/api/data/projects/${project.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentFunding: project.currentFunding + 5000 // Mock support amount
+        })
       });
+      if (response.ok) {
+        setProject({ ...project, currentFunding: project.currentFunding + 5000 });
+      }
     } catch (error) {
       console.error("Error supporting project:", error);
     }
+  };
+
+  const renderVideo = (url: string) => {
+    // Check for YouTube
+    const ytMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/))([\w-]{11})/);
+    if (ytMatch) {
+      return (
+        <iframe
+          src={`https://www.youtube.com/embed/${ytMatch[1]}`}
+          className="w-full h-full"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
+      );
+    }
+
+    // Check for Vimeo
+    const vimeoMatch = url.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+    if (vimeoMatch) {
+      return (
+        <iframe
+          src={`https://player.vimeo.com/video/${vimeoMatch[1]}`}
+          className="w-full h-full"
+          allow="autoplay; fullscreen; picture-in-picture"
+          allowFullScreen
+        />
+      );
+    }
+
+    // Direct video file (S3 or other)
+    return (
+      <video 
+        src={url} 
+        controls 
+        className="w-full h-full object-cover"
+        poster={project.imageUrl}
+      />
+    );
   };
 
   if (loading) {
@@ -142,17 +197,48 @@ const ProjectDetail = () => {
               </div>
               <div className="flex items-center space-x-2">
                 <Calendar size={16} />
-                <span>Created {project.createdAt?.toDate().toLocaleDateString()}</span>
+                <span>Created {project.createdAt ? new Date(project.createdAt).toLocaleDateString() : 'N/A'}</span>
               </div>
               <div className="flex items-center space-x-2">
                 <ShieldCheck size={16} className="text-emerald-600" />
                 <span className="text-emerald-600 font-bold">Verified Project</span>
               </div>
+              {project.isCertified && (
+                <div className="flex items-center space-x-2 px-3 py-1 bg-emerald-600 text-white rounded-full">
+                  <Shield size={14} className="fill-white" />
+                  <span className="font-bold text-[10px] uppercase tracking-widest">Certified Genuine</span>
+                </div>
+              )}
             </div>
 
             <div className="prose prose-lg text-black/60 leading-relaxed max-w-none">
               <p>{project.description}</p>
             </div>
+
+            {/* Project Gallery */}
+            {project.media && project.media.length > 0 && (
+              <div className="mt-12">
+                <h3 className="text-xl font-bold mb-6 tracking-tight uppercase">Project Gallery</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  {project.media.map((item: any, index: number) => (
+                    <div key={index} className="relative aspect-video rounded-3xl overflow-hidden bg-stone-100 border border-black/5 group shadow-sm">
+                      {item.type === 'image' ? (
+                        <img 
+                          src={item.url} 
+                          alt={`Gallery ${index}`} 
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div className="w-full h-full">
+                          {renderVideo(item.url)}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Social Sharing */}
             <div className="mt-10 pt-8 border-t border-black/5">

@@ -12,6 +12,13 @@ const Contact = () => {
       color: 'bg-emerald-50 text-emerald-600'
     },
     {
+      icon: MessageSquare,
+      title: 'WhatsApp',
+      details: ['+254 712 890 155'],
+      action: 'https://wa.me/254712890155',
+      color: 'bg-[#25D366]/10 text-[#25D366]'
+    },
+    {
       icon: Mail,
       title: 'Email Us',
       details: ['info@washpivot.com'],

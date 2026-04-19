@@ -3,7 +3,6 @@ import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Sun, Droplets, ShieldCheck, ArrowRight, Zap, Globe, Users, Sparkles, Loader2, Search, Layers } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
 import OptimizedImage from '../components/OptimizedImage';
 import { toast } from 'sonner';
 
@@ -14,41 +13,31 @@ const Home = () => {
   const generateImpactImage = async () => {
     setIsGenerating(true);
     try {
-      const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-      if (!apiKey || apiKey === "undefined") {
-        throw new Error("API Key is not defined. Please ensure your Gemini API key is configured in the Secrets panel.");
-      }
-      
-      const ai = new GoogleGenAI({ apiKey });
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
-        contents: {
-          parts: [
-            {
-              text: 'A high-quality, realistic image of a solar-powered water purification system being installed in a vibrant rural village. The scene should show local community members and technicians working together, with solar panels clearly visible and clean water flowing. The atmosphere should be hopeful and sustainable.',
-            },
-          ],
-        },
-        config: {
-          imageConfig: {
-            aspectRatio: "16:9",
-          },
-        },
+      const response = await fetch('/api/ai/image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: 'A high-quality, realistic image of a solar-powered water purification system being installed in a vibrant rural village. The scene should show local community members and technicians working together, with solar panels clearly visible and clean water flowing. The atmosphere should be hopeful and sustainable.',
+          aspectRatio: "16:9",
+          model: 'gemini-2.0-flash'
+        })
       });
 
-      if (response.candidates && response.candidates[0]?.content?.parts) {
-        for (const part of response.candidates[0].content.parts) {
-          if (part.inlineData) {
-            const base64EncodeString = part.inlineData.data;
-            setGeneratedImage(`data:image/png;base64,${base64EncodeString}`);
-            break;
-          }
-        }
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to generate image');
       }
-      toast.success("Impact visualization generated!");
+
+      const data = await response.json();
+      if (data.image) {
+        setGeneratedImage(data.image);
+        toast.success("Impact visualization generated!");
+      } else {
+        throw new Error("No image returned from server");
+      }
     } catch (error: any) {
       console.error("Error generating image:", error);
-      toast.error(error.message || "Failed to generate visualization. Please check your API key.");
+      toast.error(error.message || "Failed to generate visualization.");
     } finally {
       setIsGenerating(false);
     }
@@ -106,6 +95,33 @@ const Home = () => {
               </Link>
             </div>
           </motion.div>
+        </div>
+      </section>
+
+      {/* Partners Section */}
+      <section className="py-20 border-b border-black/5 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="text-center text-[10px] font-bold uppercase tracking-[0.3em] text-black/30 mb-12">
+            Accelerating sustainable development with
+          </p>
+          <div className="flex flex-wrap justify-center items-center gap-12 md:gap-24 opacity-40 grayscale group hover:grayscale-0 transition-all duration-700">
+            <div className="flex items-center space-x-2 font-black text-xl tracking-tighter hover:scale-105 transition-transform">
+              <Globe size={24} className="text-emerald-600" />
+              <span>ECOWASH</span>
+            </div>
+            <div className="flex items-center space-x-2 font-black text-xl tracking-tighter hover:scale-105 transition-transform">
+              <Zap size={24} className="text-orange-500" />
+              <span>SOLAR GRID</span>
+            </div>
+            <div className="flex items-center space-x-2 font-black text-xl tracking-tighter hover:scale-105 transition-transform">
+              <Droplets size={24} className="text-blue-500" />
+              <span>AQUA PURE</span>
+            </div>
+            <div className="flex items-center space-x-2 font-black text-xl tracking-tighter hover:scale-105 transition-transform">
+              <Users size={24} className="text-emerald-500" />
+              <span>COMMUNITY FIRST</span>
+            </div>
+          </div>
         </div>
       </section>
 
