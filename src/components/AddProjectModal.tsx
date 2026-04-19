@@ -278,7 +278,7 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSu
                   >
                     {imagePreview ? (
                       <>
-                        <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                        <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           <Upload className="text-white" size={24} />
                         </div>
@@ -322,7 +322,7 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSu
                     {mediaFiles.map((item, index) => (
                       <div key={index} className="relative aspect-square rounded-lg overflow-hidden bg-stone-100 group">
                         {item.type === 'image' ? (
-                          <img src={item.preview} alt="Gallery" className="w-full h-full object-cover" />
+                          <img src={item.preview} alt="Gallery" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center bg-black/5">
                             <Video size={20} className="text-black/20" />
@@ -340,7 +340,7 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSu
                     {formData.media.map((item, index) => (
                       <div key={`url-${index}`} className="relative aspect-square rounded-lg overflow-hidden bg-stone-100 group">
                         {item.type === 'image' ? (
-                          <img src={item.url} alt="Gallery" className="w-full h-full object-cover" />
+                          <img src={item.url} alt="Gallery" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center bg-black/5">
                             <Video size={20} className="text-black/20" />

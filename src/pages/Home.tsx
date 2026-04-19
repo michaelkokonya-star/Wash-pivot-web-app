@@ -109,6 +109,33 @@ const Home = () => {
         </div>
       </section>
 
+      {/* Partners Section */}
+      <section className="py-20 border-b border-black/5 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="text-center text-[10px] font-bold uppercase tracking-[0.3em] text-black/30 mb-12">
+            Accelerating sustainable development with
+          </p>
+          <div className="flex flex-wrap justify-center items-center gap-12 md:gap-24 opacity-40 grayscale group hover:grayscale-0 transition-all duration-700">
+            <div className="flex items-center space-x-2 font-black text-xl tracking-tighter hover:scale-105 transition-transform">
+              <Globe size={24} className="text-emerald-600" />
+              <span>ECOWASH</span>
+            </div>
+            <div className="flex items-center space-x-2 font-black text-xl tracking-tighter hover:scale-105 transition-transform">
+              <Zap size={24} className="text-orange-500" />
+              <span>SOLAR GRID</span>
+            </div>
+            <div className="flex items-center space-x-2 font-black text-xl tracking-tighter hover:scale-105 transition-transform">
+              <Droplets size={24} className="text-blue-500" />
+              <span>AQUA PURE</span>
+            </div>
+            <div className="flex items-center space-x-2 font-black text-xl tracking-tighter hover:scale-105 transition-transform">
+              <Users size={24} className="text-emerald-500" />
+              <span>COMMUNITY FIRST</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
 
       {/* Visualizing Impact Section (GenAI) */}
       <section className="py-32 bg-white">

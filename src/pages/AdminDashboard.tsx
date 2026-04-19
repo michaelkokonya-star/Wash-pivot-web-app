@@ -1141,6 +1141,7 @@ const AdminDashboard = () => {
                           src={u.photoURL || `https://ui-avatars.com/api/?name=${u.displayName}`} 
                           className="w-10 h-10 rounded-xl object-cover"
                           alt=""
+                          referrerPolicy="no-referrer"
                         />
                         <div>
                           <p className="font-bold text-sm">{u.displayName}</p>
@@ -1281,6 +1282,7 @@ const AdminDashboard = () => {
                           src={u.photoURL || `https://ui-avatars.com/api/?name=${u.displayName}`} 
                           className="w-16 h-16 rounded-2xl object-cover"
                           alt=""
+                          referrerPolicy="no-referrer"
                         />
                         <div>
                           <h4 className="text-xl font-bold tracking-tight">{u.displayName}</h4>
@@ -1469,6 +1471,7 @@ const AdminDashboard = () => {
                                 src={product.imageUrl} 
                                 className="w-12 h-12 rounded-xl object-cover bg-stone-100"
                                 alt=""
+                                referrerPolicy="no-referrer"
                               />
                               <div>
                                 <p className="font-bold text-sm">{product.name}</p>
@@ -1523,6 +1526,7 @@ const AdminDashboard = () => {
                           src={product.imageUrl}
                           alt={product.name}
                           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                          referrerPolicy="no-referrer"
                         />
                         <div className="absolute top-4 left-4">
                           <span className="px-3 py-1 bg-white/90 backdrop-blur-md rounded-full text-[9px] font-bold uppercase tracking-widest shadow-sm">
@@ -1618,6 +1622,7 @@ const AdminDashboard = () => {
                             src={service.imageUrl} 
                             className="w-12 h-12 rounded-xl object-cover bg-stone-100"
                             alt=""
+                            referrerPolicy="no-referrer"
                           />
                           <div>
                             <p className="font-bold text-sm">{service.name}</p>
@@ -1794,6 +1799,7 @@ const AdminDashboard = () => {
                           src={project.imageUrl} 
                           className="w-12 h-12 rounded-xl object-cover bg-stone-100"
                           alt=""
+                          referrerPolicy="no-referrer"
                         />
                         <div>
                           <div className="flex items-center gap-2">

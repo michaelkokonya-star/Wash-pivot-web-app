@@ -485,6 +485,7 @@ const Marketplace = () => {
                             src={service.imageUrl} 
                             alt={service.name}
                             className="w-full h-full object-cover"
+                            referrerPolicy="no-referrer"
                           />
                         </div>
                         <span className="px-4 py-1.5 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-bold uppercase tracking-widest">

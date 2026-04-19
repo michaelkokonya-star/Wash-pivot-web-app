@@ -326,7 +326,7 @@ const AICreativeStudio = () => {
                 >
                   {videoSourceImage ? (
                     <>
-                      <img src={videoSourceImage} alt="Source" className="absolute inset-0 w-full h-full object-cover opacity-50" />
+                      <img src={videoSourceImage} alt="Source" className="absolute inset-0 w-full h-full object-cover opacity-50" referrerPolicy="no-referrer" />
                       <div className="relative z-10 bg-white/90 p-2 rounded-lg shadow-sm flex items-center space-x-2 text-xs font-bold">
                         <CheckCircle2 size={14} className="text-emerald-500" />
                         <span>Image Uploaded</span>

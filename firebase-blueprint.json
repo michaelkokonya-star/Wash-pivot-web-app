@@ -162,6 +162,15 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "kitName", "loadRequirements", "totalDailyLoadWh", "totalPeakLoadW", "createdAt"]
+    },
+    "Setting": {
+      "title": "System Setting",
+      "description": "System-wide configuration settings.",
+      "type": "object",
+      "properties": {
+        "value": { "type": "object", "description": "JSON object containing setting configuration" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
     }
   },
   "firestore": {
@@ -192,6 +201,10 @@
     "/solar_kits/{kitId}": {
       "schema": "SolarKit",
       "description": "Customized solar kits."
+    },
+    "/settings/{settingId}": {
+      "schema": "Setting",
+      "description": "System-wide settings (pricing, delivery, etc.)."
     }
   }
 }

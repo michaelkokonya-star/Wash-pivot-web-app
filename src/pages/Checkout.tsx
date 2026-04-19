@@ -7,16 +7,16 @@ import { Helmet } from 'react-helmet-async';
 import { ChevronLeft, CreditCard, Smartphone, Loader2, AlertCircle, ArrowRight, ShieldCheck, Truck } from 'lucide-react';
 
 const VisaIcon = () => (
-  <svg viewBox="0 0 120 40" className="h-5 w-auto overflow-visible" fill="#1434CB" xmlns="http://www.w3.org/2000/svg">
-    <path d="M43.4 4.8l-7.9 30.6h7.8L51.3 4.8h-7.9zM22.5 4.8H9.6c-1.8 0-3.4 1.4-3.9 3.1L0 35.4h8.2l1.6-4.5h10.1l1.1 4.5h7.2L22.5 4.8zm-7.9 18.2l3.3-11.5 1.5 11.5h-4.8zM111.9 4.8h-7.6c-2.4 0-4.1 1.4-5.1 3.1l-11.2 27.5h8.3l1.7-4.6h10.2l0.9 4.6h7.4l-4.6-30.6zM102.3 22.8l3.1-8.5 1.7 8.5h-4.8zM65.4 18.2c0-5.6 7.9-5.9 7.9-8.4 0-2.3-2.8-2.4-5.4-2.4-4.2 0-6.8 1.4-8.7 2.3l-1.2.6-1.4-6.3c1.8-.8 5.2-1.6 8.7-1.6 9.3 0 15.4 4.6 15.5 11.7 0 8.7-12.2 9.2-12.1 14 0 2.8 3.5 2.9 5.5 2.9 3.3 0 5.6-.7 7.5-1.6l0.9-.4 1.4 6.6c-2.1 .9-5.2 1.7-9 1.7-9.8.1-16-5.3-16.1-19.1z" />
+  <svg viewBox="0 0 24 24" className="h-5 w-auto" fill="#1434CB" xmlns="http://www.w3.org/2000/svg">
+    <path d="M13.9 11h-1.8L10.5 15h1.7l1.7-4zM8.3 11H4L3.5 13.5h3.4L6.4 15h3.6l-1.7-4zm4.8 4h1.7l1.7-4h-1.7l-1.7 4zM20 11h-2c-.5 0-.9.3-1.1.7L14.5 15h1.8l.4-1h2.2l.2 1h1.6L20 11zm-1.8 2.8l.7-1.9.4 1.9h-1.1z" />
   </svg>
 );
 
 const MastercardIcon = () => (
-  <svg viewBox="0 0 32 20" className="h-6 w-auto overflow-visible" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="10" cy="10" r="10" fill="#EB001B"/>
-    <circle cx="22" cy="10" r="10" fill="#F79E1B"/>
-    <path d="M16 3.5c2.3 2 2.3 7 0 9.1a8.2 8.2 0 010-9.1z" fill="#FF5F00"/>
+  <svg viewBox="0 0 24 24" className="h-6 w-auto" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="9" cy="12" r="6" fill="#EB001B" fillOpacity="0.8" />
+    <circle cx="15" cy="12" r="6" fill="#F79E1B" fillOpacity="0.8" />
+    <path d="M12 7.5a6 6 0 0 0 0 9 6 6 0 0 0 0-9z" fill="#FF5F00" />
   </svg>
 );
 
@@ -436,7 +436,7 @@ const Checkout = () => {
               {cart.map((item) => (
                 <div key={item.id} className="flex items-center gap-4">
                   <div className="w-16 h-16 rounded-xl overflow-hidden bg-white border border-black/5 flex-shrink-0">
-                    <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                    <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                   </div>
                   <div className="flex-grow">
                     <h4 className="font-bold text-sm line-clamp-1">{item.name}</h4>
