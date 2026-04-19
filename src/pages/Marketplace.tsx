@@ -9,6 +9,183 @@ import { useCart } from '../context/CartContext';
 import AddProductModal from '../components/AddProductModal';
 import EditProductModal from '../components/EditProductModal';
 
+interface ProductCardProps {
+  product: any;
+  isAdmin: boolean;
+  onEdit: (product: any) => void;
+  onDelete: (id: string) => void;
+  addToCart: (product: any) => void;
+  pricingRules: any;
+  ratingOptions: Record<string, string[]>;
+}
+
+const ProductCard: React.FC<ProductCardProps & { ratingFilter: string }> = ({ 
+  product, 
+  isAdmin, 
+  onEdit, 
+  onDelete, 
+  addToCart, 
+  pricingRules, 
+  ratingOptions,
+  ratingFilter
+}) => {
+  const options = ratingOptions[product.subCategory] || [];
+  const [currentRating, setCurrentRating] = useState(() => {
+    if (ratingFilter !== 'All' && options.includes(ratingFilter)) {
+      return ratingFilter;
+    }
+    return product.rating || '';
+  });
+  const [currentPrice, setCurrentPrice] = useState(product.price || 0);
+  const [added, setAdded] = useState(false);
+
+  // Sync with global rating filter
+  useEffect(() => {
+    if (ratingFilter !== 'All' && options.includes(ratingFilter)) {
+      setCurrentRating(ratingFilter);
+    }
+  }, [ratingFilter, options]);
+
+  useEffect(() => {
+    if (product && pricingRules && currentRating) {
+      const rule = pricingRules[product.subCategory];
+      if (rule) {
+        let ratingValue = parseFloat(currentRating.replace(/[^\d.]/g, ''));
+        // Handle KW to Watt conversion
+        if (currentRating.toUpperCase().includes('KW')) {
+          ratingValue = ratingValue * 1000;
+        }
+        setCurrentPrice(Math.round(ratingValue * rule));
+      } else {
+        setCurrentPrice(product.price);
+      }
+    } else {
+      setCurrentPrice(product.price);
+    }
+  }, [currentRating, product, pricingRules]);
+
+  const handleAddToCart = () => {
+    const itemToCart = {
+      ...product,
+      price: currentPrice,
+      rating: currentRating
+    };
+    addToCart(itemToCart);
+    setAdded(true);
+    setTimeout(() => setAdded(false), 2000);
+  };
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.9 }}
+      className="min-w-[280px] sm:min-w-[320px] lg:min-w-[350px] snap-start"
+    >
+      <div className="group bg-white rounded-3xl border border-black/5 overflow-hidden hover:shadow-2xl transition-all h-full flex flex-col">
+        <Link to={`/marketplace/${product.id}`}>
+          <div className="aspect-[4/5] overflow-hidden bg-stone-100 relative">
+            <OptimizedImage
+              src={product.imageUrl}
+              alt={product.name}
+              className="w-full h-full group-hover:scale-110 transition-transform duration-700"
+              width={600}
+            />
+            <div className="absolute top-6 left-6 flex flex-col gap-2">
+              <span className="px-4 py-1.5 bg-white/90 backdrop-blur-md rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm">
+                {product.category}
+              </span>
+              {currentRating && (
+                <span className="px-4 py-1.5 bg-emerald-600 text-white rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm">
+                  {currentRating}
+                </span>
+              )}
+              {isAdmin && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onEdit(product);
+                    }}
+                    className="p-2 bg-white/90 backdrop-blur-md rounded-full text-emerald-600 shadow-sm hover:bg-emerald-600 hover:text-white transition-all"
+                  >
+                    <Edit size={14} />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onDelete(product.id);
+                    }}
+                    className="p-2 bg-white/90 backdrop-blur-md rounded-full text-red-600 shadow-sm hover:bg-red-600 hover:text-white transition-all"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </Link>
+        <div className="p-8 flex flex-col flex-grow">
+          <Link to={`/marketplace/${product.id}`}>
+            <h3 className="font-bold text-2xl mb-2 hover:text-emerald-600 transition-colors tracking-tight line-clamp-1">{product.name}</h3>
+          </Link>
+          <p className="text-black/50 text-sm mb-4 line-clamp-2 leading-relaxed">{product.description}</p>
+          
+          {options.length > 0 && (
+            <div className="mb-6">
+              <label className="text-[9px] font-bold uppercase tracking-widest text-black/30 mb-2 block">Choose Rating:</label>
+              <div className="flex flex-wrap gap-1.5">
+                {options.map((opt) => (
+                  <button
+                    key={opt}
+                    onClick={() => setCurrentRating(opt)}
+                    className={`px-2 py-1 rounded text-[10px] font-bold border transition-all ${
+                      currentRating === opt
+                        ? 'bg-black text-white border-black'
+                        : 'bg-white text-black/40 border-black/5 hover:border-black/20'
+                    }`}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="mt-auto flex items-center justify-between relative">
+            <span className="text-2xl font-bold tracking-tighter">KSh {currentPrice.toLocaleString()}</span>
+            <div className="relative">
+              <AnimatePresence>
+                {added && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: -20 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute -top-8 left-1/2 -translate-x-1/2 bg-emerald-600 text-white text-[10px] font-bold px-2 py-1 rounded-full whitespace-nowrap shadow-lg"
+                  >
+                    Added!
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              <button 
+                onClick={handleAddToCart}
+                className={`p-4 rounded-2xl transition-all hover:scale-105 active:scale-95 shadow-lg ${
+                  added 
+                    ? 'bg-white text-emerald-600 border-2 border-emerald-600' 
+                    : 'bg-emerald-600 text-white shadow-emerald-600/20'
+                }`}
+              >
+                {added ? <Check size={22} /> : <ShoppingCart size={22} />}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
 const Marketplace = () => {
   const [products, setProducts] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
@@ -24,10 +201,23 @@ const Marketplace = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [pricingRules, setPricingRules] = useState<any>(null);
   const { user, profile, signIn } = useAuth();
   const { addToCart } = useCart();
 
   const isAdmin = user?.email?.toLowerCase() === 'michael.kokonya@washpivot.com';
+
+  const fetchPricingRules = async () => {
+    try {
+      const response = await fetch('/api/settings/pricing-rules');
+      if (response.ok) {
+        const data = await response.json();
+        setPricingRules(data);
+      }
+    } catch (error) {
+      console.error("Error fetching rules:", error);
+    }
+  };
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -36,18 +226,36 @@ const Marketplace = () => {
       if (response.ok) {
         let productsData = await response.json();
         
-        // Apply client-side filtering
+        // Apply category/subcategory filters BEFORE grouping
         if (filter !== 'All') {
           productsData = productsData.filter((p: any) => p.category === filter);
         }
         if (subFilter !== 'All') {
           productsData = productsData.filter((p: any) => p.subCategory === subFilter);
         }
+
+        // Group by name
+        const groupedMap = new Map();
+        productsData.forEach((p: any) => {
+          if (!groupedMap.has(p.name)) {
+            groupedMap.set(p.name, p);
+          }
+        });
+        
+        let filteredProducts = Array.from(groupedMap.values());
+        
+        // Apply rating filter on groups
         if (ratingFilter !== 'All') {
-          productsData = productsData.filter((p: any) => p.rating === ratingFilter);
+          filteredProducts = filteredProducts.filter((p: any) => {
+            // Check if product record has this rating
+            if (p.rating === ratingFilter) return true;
+            // Or check if this rating is a valid option for this subcategory
+            const options = ratingOptions[p.subCategory] || [];
+            return options.includes(ratingFilter);
+          });
         }
         
-        setProducts(productsData);
+        setProducts(filteredProducts);
       }
     } catch (error) {
       console.error("Error fetching products:", error);
@@ -106,6 +314,7 @@ const Marketplace = () => {
   useEffect(() => {
     fetchProducts();
     fetchServices();
+    fetchPricingRules();
   }, [filter, subFilter, ratingFilter]);
 
   const ratingOptions: Record<string, string[]> = {
@@ -131,12 +340,6 @@ const Marketplace = () => {
         behavior: 'smooth'
       });
     }
-  };
-
-  const handleAddToCart = (product: any) => {
-    addToCart(product);
-    setAddedId(product.id);
-    setTimeout(() => setAddedId(null), 2000);
   };
 
   return (
@@ -324,92 +527,17 @@ const Marketplace = () => {
           <AnimatePresence mode="popLayout">
             {allProducts.length > 0 ? (
               allProducts.map((product) => (
-                <motion.div
-                  key={product.id}
-                  layout
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  className="min-w-[280px] sm:min-w-[320px] lg:min-w-[350px] snap-start"
-                >
-                  <div className="group bg-white rounded-3xl border border-black/5 overflow-hidden hover:shadow-2xl transition-all h-full flex flex-col">
-                    <Link to={`/marketplace/${product.id}`}>
-                      <div className="aspect-[4/5] overflow-hidden bg-stone-100 relative">
-                        <OptimizedImage
-                          src={product.imageUrl}
-                          alt={product.name}
-                          className="w-full h-full group-hover:scale-110 transition-transform duration-700"
-                          width={600}
-                        />
-                        <div className="absolute top-6 left-6 flex flex-col gap-2">
-                          <span className="px-4 py-1.5 bg-white/90 backdrop-blur-md rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm">
-                            {product.category}
-                          </span>
-                          {product.rating && (
-                            <span className="px-4 py-1.5 bg-emerald-600 text-white rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm">
-                              {product.rating}
-                            </span>
-                          )}
-                          {isAdmin && (
-                            <div className="flex gap-2">
-                              <button
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  handleEditProduct(product);
-                                }}
-                                className="p-2 bg-white/90 backdrop-blur-md rounded-full text-emerald-600 shadow-sm hover:bg-emerald-600 hover:text-white transition-all"
-                              >
-                                <Edit size={14} />
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  handleDeleteProduct(product.id);
-                                }}
-                                className="p-2 bg-white/90 backdrop-blur-md rounded-full text-red-600 shadow-sm hover:bg-red-600 hover:text-white transition-all"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </Link>
-                    <div className="p-8 flex flex-col flex-grow">
-                      <Link to={`/marketplace/${product.id}`}>
-                        <h3 className="font-bold text-2xl mb-2 hover:text-emerald-600 transition-colors tracking-tight">{product.name}</h3>
-                      </Link>
-                      <p className="text-black/50 text-sm mb-6 line-clamp-2 leading-relaxed">{product.description}</p>
-                      <div className="mt-auto flex items-center justify-between relative">
-                        <span className="text-2xl font-bold tracking-tighter">KSh {product.price.toLocaleString()}</span>
-                        <div className="relative">
-                          <AnimatePresence>
-                            {addedId === product.id && (
-                              <motion.div
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: -20 }}
-                                exit={{ opacity: 0 }}
-                                className="absolute -top-8 left-1/2 -translate-x-1/2 bg-emerald-600 text-white text-[10px] font-bold px-2 py-1 rounded-full whitespace-nowrap shadow-lg"
-                              >
-                                Added!
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                          <button 
-                            onClick={() => handleAddToCart(product)}
-                            className={`p-4 rounded-2xl transition-all hover:scale-105 active:scale-95 shadow-lg ${
-                              addedId === product.id 
-                                ? 'bg-white text-emerald-600 border-2 border-emerald-600' 
-                                : 'bg-emerald-600 text-white shadow-emerald-600/20'
-                            }`}
-                          >
-                            {addedId === product.id ? <Check size={22} /> : <ShoppingCart size={22} />}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
+                <ProductCard 
+                  key={product.id} 
+                  product={product} 
+                  isAdmin={isAdmin} 
+                  onEdit={handleEditProduct} 
+                  onDelete={handleDeleteProduct}
+                  addToCart={addToCart}
+                  pricingRules={pricingRules}
+                  ratingOptions={ratingOptions}
+                  ratingFilter={ratingFilter}
+                />
               ))
             ) : (
               <div className="w-full py-20 text-center bg-stone-50 rounded-3xl border border-dashed border-black/10">

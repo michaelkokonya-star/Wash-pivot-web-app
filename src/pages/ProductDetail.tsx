@@ -157,7 +157,17 @@ const ProductDetail = () => {
         const response = await fetch('/api/data/products');
         if (response.ok) {
           const allProducts = await response.json();
-          const related = allProducts
+          
+          // Group by name to avoid duplicates
+          const groupedMap = new Map();
+          allProducts.forEach((p: any) => {
+            if (!groupedMap.has(p.name)) {
+              groupedMap.set(p.name, p);
+            }
+          });
+          const uniqueProducts = Array.from(groupedMap.values());
+
+          const related = uniqueProducts
             .filter((p: any) => p.category === category && p.id !== currentId)
             .slice(0, 4);
           setRelatedProducts(related);

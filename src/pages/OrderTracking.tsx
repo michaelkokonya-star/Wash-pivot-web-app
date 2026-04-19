@@ -2,18 +2,26 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Helmet } from 'react-helmet-async';
-import { ChevronLeft, Package, Truck, CheckCircle2, Clock, MapPin, AlertCircle, ShoppingBag, ArrowRight } from 'lucide-react';
+import { ChevronLeft, Package, Truck, CheckCircle2, Clock, MapPin, AlertCircle, ShoppingBag, ArrowRight, Activity } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+
+interface OrderTimelineEntry {
+  status: string;
+  label: string;
+  timestamp: string;
+  note: string;
+}
 
 interface Order {
   id: string;
-  status: 'pending' | 'paid' | 'shipped' | 'delivered' | 'failed';
+  status: 'pending' | 'paid' | 'processing' | 'shipped' | 'out-for-delivery' | 'delivered' | 'failed';
   items: any[];
   totalAmount: number;
   deliveryCharge: number;
   createdAt: string;
   shippingInfo: any;
   paymentMethod: string;
+  trackingTimeline?: OrderTimelineEntry[];
 }
 
 const OrderTracking = () => {
@@ -69,10 +77,12 @@ const OrderTracking = () => {
   }
 
   const steps = [
-    { id: 'pending', label: 'Order Placed', icon: Clock, description: 'We have received your order' },
-    { id: 'paid', label: 'Payment Confirmed', icon: CheckCircle2, description: 'Payment has been successfully processed' },
-    { id: 'shipped', label: 'Shipped', icon: Truck, description: 'Your order is on its way to you' },
-    { id: 'delivered', label: 'Delivered', icon: Package, description: 'Package has been delivered' },
+    { id: 'pending', label: 'Order Placed', icon: Clock, description: 'Order received' },
+    { id: 'paid', label: 'Paid', icon: CheckCircle2, description: 'Payment confirmed' },
+    { id: 'processing', label: 'Processing', icon: Activity, description: 'Preparing items' },
+    { id: 'shipped', label: 'Shipped', icon: Truck, description: 'In transit' },
+    { id: 'out-for-delivery', label: 'Delivery', icon: MapPin, description: 'Out for delivery' },
+    { id: 'delivered', label: 'Delivered', icon: Package, description: 'Package received' },
   ];
 
   const currentStepIndex = steps.findIndex(step => step.id === order.status);
@@ -176,6 +186,49 @@ const OrderTracking = () => {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Timeline View */}
+          <div className="bg-white p-10 rounded-[3rem] border border-black/5 shadow-xl shadow-black/5">
+            <h3 className="text-xl font-bold mb-8 flex items-center gap-3">
+              <Activity size={24} className="text-black/40" />
+              <span>Tracking History</span>
+            </h3>
+            
+            <div className="space-y-8">
+              {(order.trackingTimeline || [
+                {
+                  status: 'pending',
+                  label: 'Order Placed',
+                  timestamp: order.createdAt,
+                  note: 'Order successfully submitted.'
+                }
+              ]).slice().reverse().map((entry, idx) => (
+                <div key={idx} className="relative pl-10">
+                  {idx !== (order.trackingTimeline?.length || 1) - 1 && (
+                    <div className="absolute left-[15px] top-6 bottom-[-32px] w-px bg-stone-100" />
+                  )}
+                  <div className={`absolute left-0 top-1 w-8 h-8 rounded-full flex items-center justify-center border-4 border-white shadow-sm ${
+                    idx === 0 ? 'bg-emerald-600' : 'bg-stone-200'
+                  }`}>
+                    <div className="w-2 h-2 rounded-full bg-white" />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <p className={`font-bold text-sm ${idx === 0 ? 'text-black' : 'text-black/40'}`}>
+                        {entry.label}
+                      </p>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-black/20">
+                        {new Date(entry.timestamp).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                      </p>
+                    </div>
+                    <p className="text-xs text-black/60 leading-relaxed bg-stone-50 p-4 rounded-2xl border border-black/5">
+                      {entry.note}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Shipping Details */}

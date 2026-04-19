@@ -94,6 +94,14 @@ const Checkout = () => {
         subtotal: cartTotal,
         deliveryCharge: deliveryCharge,
         status: 'pending',
+        trackingTimeline: [
+          {
+            status: 'pending',
+            label: 'Order Placed',
+            timestamp: new Date().toISOString(),
+            note: 'We have received your order and it is currently being reviewed.'
+          }
+        ],
         paymentMethod: paymentMethod,
         shippingInfo: formData,
         createdAt: new Date().toISOString(),

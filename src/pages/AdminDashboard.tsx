@@ -527,6 +527,10 @@ const AdminDashboard = () => {
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [selectedService, setSelectedService] = useState<any>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [isUpdateStatusModalOpen, setIsUpdateStatusModalOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [newStatusNote, setNewStatusNote] = useState('');
+  const [pendingStatus, setPendingStatus] = useState('');
   const [analyticsData, setAnalyticsData] = useState<{
     revenueByMonth: any[];
     userGrowthByMonth: any[];
@@ -862,20 +866,40 @@ const AdminDashboard = () => {
     setIsEditServiceModalOpen(true);
   };
 
-  const handleUpdateOrderStatus = async (orderId: string, newStatus: string) => {
+  const handleUpdateOrderStatus = async (orderId: string, newStatus: string, note?: string) => {
     try {
-      const response = await fetch(`/api/data/orders/${orderId}`, {
+      const currentOrder = orders.find(o => o.id === orderId);
+      if (!currentOrder) return;
+
+      const timelineEntry = {
+        status: newStatus,
+        label: newStatus.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' '),
+        timestamp: new Date().toISOString(),
+        note: note || `Order status updated to ${newStatus}`
+      };
+
+      const updatedTimeline = [...(currentOrder.trackingTimeline || []), timelineEntry];
+
+      const response = await authFetch(`/api/data/orders/${orderId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus })
+        body: JSON.stringify({ 
+          status: newStatus,
+          trackingTimeline: updatedTimeline
+        })
       });
       if (response.ok) {
-        setOrders(orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+        setOrders(orders.map(o => o.id === orderId ? { ...o, status: newStatus, trackingTimeline: updatedTimeline } : o));
         setMessage({ type: 'success', text: 'Order status updated successfully' });
+        setIsUpdateStatusModalOpen(false);
+        setNewStatusNote('');
+      } else {
+        const err = await response.json();
+        setMessage({ type: 'error', text: err.error || 'Failed to update order status' });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating order status:", error);
-      setMessage({ type: 'error', text: 'Failed to update order status' });
+      setMessage({ type: 'error', text: error.message || 'Failed to update order status' });
     }
   };
 
@@ -1712,22 +1736,26 @@ const AdminDashboard = () => {
                       <p className="text-sm font-bold tracking-tight">KSh {order.totalAmount.toLocaleString()}</p>
                     </td>
                     <td className="px-8 py-6">
-                      <select
-                        value={order.status}
-                        onChange={(e) => handleUpdateOrderStatus(order.id, e.target.value)}
-                        className={`text-[10px] font-bold uppercase tracking-widest border-none rounded-lg px-3 py-1.5 outline-none ${
+                      <button
+                        onClick={() => {
+                          setSelectedOrder(order);
+                          setPendingStatus(order.status);
+                          setIsUpdateStatusModalOpen(true);
+                        }}
+                        className={`text-[10px] font-bold uppercase tracking-widest border-none rounded-lg px-3 py-1.5 outline-none text-left flex items-center gap-2 hover:opacity-80 transition-all ${
                           order.status === 'paid' ? 'bg-emerald-100 text-emerald-700' :
                           order.status === 'pending' ? 'bg-amber-100 text-amber-700' :
+                          order.status === 'processing' ? 'bg-blue-100 text-blue-700' :
+                          order.status === 'shipped' ? 'bg-purple-100 text-purple-700' :
+                          order.status === 'out-for-delivery' ? 'bg-fuchsia-100 text-fuchsia-700' :
+                          order.status === 'delivered' ? 'bg-emerald-600 text-white' :
                           order.status === 'failed' ? 'bg-red-100 text-red-700' :
                           'bg-stone-200 text-black/40'
                         }`}
                       >
-                        <option value="pending">Pending</option>
-                        <option value="paid">Paid</option>
-                        <option value="shipped">Shipped</option>
-                        <option value="delivered">Delivered</option>
-                        <option value="failed">Failed</option>
-                      </select>
+                        <span>{order.status.replace(/-/g, ' ')}</span>
+                        <Edit size={10} />
+                      </button>
                     </td>
                     <td className="px-8 py-6">
                       <span className="px-3 py-1 bg-stone-100 rounded-full text-[10px] font-bold uppercase tracking-widest">
@@ -2155,6 +2183,79 @@ const AdminDashboard = () => {
         onSuccess={fetchData}
         service={selectedService}
       />
+
+      {/* Update Order Status Modal */}
+      <AnimatePresence>
+        {isUpdateStatusModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-[2rem] w-full max-w-md overflow-hidden shadow-2xl"
+            >
+              <div className="p-8 border-b border-black/5 bg-stone-50">
+                <h3 className="text-xl font-bold tracking-tight">Update Order Status</h3>
+                <p className="text-xs text-black/40 mt-1">ID: {selectedOrder?.id}</p>
+              </div>
+              
+              <div className="p-8 space-y-6">
+                <div className="space-y-4">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Select New Status</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { id: 'pending', label: 'Pending' },
+                      { id: 'paid', label: 'Paid' },
+                      { id: 'processing', label: 'Processing' },
+                      { id: 'shipped', label: 'Shipped' },
+                      { id: 'out-for-delivery', label: 'Out for Delivery' },
+                      { id: 'delivered', label: 'Delivered' },
+                      { id: 'failed', label: 'Failed' }
+                    ].map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => setPendingStatus(s.id)}
+                        className={`px-4 py-3 rounded-xl text-xs font-bold transition-all text-left ${
+                          pendingStatus === s.id 
+                            ? 'bg-black text-white shadow-lg' 
+                            : 'bg-stone-100 text-black/60 hover:bg-stone-200'
+                        }`}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Status Note (Optional)</label>
+                  <textarea
+                    value={newStatusNote}
+                    onChange={(e) => setNewStatusNote(e.target.value)}
+                    placeholder="e.g. Package has been picked up by the courier"
+                    className="w-full h-24 p-4 bg-stone-50 border border-black/5 rounded-xl text-sm focus:outline-none focus:border-black transition-all resize-none"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => setIsUpdateStatusModalOpen(false)}
+                    className="flex-1 py-4 bg-stone-100 text-black font-bold rounded-2xl hover:bg-stone-200 transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => handleUpdateOrderStatus(selectedOrder.id, pendingStatus, newStatusNote)}
+                    className="flex-1 py-4 bg-black text-white font-bold rounded-2xl hover:bg-stone-800 transition-all"
+                  >
+                    Update Status
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <AddProjectModal
         isOpen={isAddProjectModalOpen}

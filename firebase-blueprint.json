@@ -104,7 +104,19 @@
         "userEmail": { "type": "string" },
         "items": { "type": "array" },
         "totalAmount": { "type": "number" },
-        "status": { "type": "string", "enum": ["pending", "paid", "failed", "shipped", "delivered"] },
+        "status": { "type": "string", "enum": ["pending", "paid", "processing", "shipped", "out-for-delivery", "delivered", "failed"] },
+        "trackingTimeline": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "status": { "type": "string" },
+              "label": { "type": "string" },
+              "timestamp": { "type": "string", "format": "date-time" },
+              "note": { "type": "string" }
+            }
+          }
+        },
         "paymentMethod": { "type": "string", "enum": ["card", "mpesa"] },
         "shippingInfo": { "type": "object" },
         "createdAt": { "type": "string", "format": "date-time" },
