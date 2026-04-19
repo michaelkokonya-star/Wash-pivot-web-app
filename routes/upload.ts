@@ -31,8 +31,9 @@ router.post('/upload', upload.single('file'), async (req, res) => {
       ContentType: req.file.mimetype,
     }));
     
-    // Construct URL based on endpoint and bucket
-    const url = `${process.env.ENDPOINT}/${process.env.BUCKET}/${key}`;
+    // Construct URL based on endpoint and bucket.
+    // Strip any trailing slash from ENDPOINT to avoid double-slash in the URL.
+    const url = `${(process.env.ENDPOINT as string).replace(/\/$/, '')}/${process.env.BUCKET}/${key}`;
     res.json({ url });
   } catch (err: any) {
     console.error('Upload error:', err);
