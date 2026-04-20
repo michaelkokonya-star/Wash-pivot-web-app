@@ -2,64 +2,43 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // ===============================================================
-    // Assumed Data Model
+    // Global Catch-all Deny
     // ===============================================================
-    //
-    // Collection: users
-    // Document ID: userId (Auth UID)
-    // Fields:
-    //   - uid: string (required)
-    //   - displayName: string (required)
-    //   - email: string (required, email format)
-    //   - role: string (required, enum: user, expert, admin)
-    //   - expertise: string (optional)
-    //   - academics: string (optional)
-    //   - bio: string (optional)
-    //   - hasSeenWelcome: bool (optional)
-    //   - onboardingCompleted: bool (optional)
-    //   - expertJoinedAt: string (optional, ISO 8601)
-    //   - createdAt: timestamp (required)
-    //
-    // Collection: products
-    // Document ID: productId
-    // Fields:
-    //   - name: string (required)
-    //   - description: string (required)
-    //   - price: number (required)
-    //   - category: string (required, enum: Solar, Water Treatment, Sanitation)
-    //   - subCategory: string (optional, enum: Fluoride Removal, Filtration, Chlorination, None)
-    //   - imageUrl: string (optional)
-    //
-    // Collection: projects
-    // Document ID: projectId
-    // Fields:
-    //   - title: string (required)
-    //   - description: string (required)
-    //   - ownerUid: string (required)
-    //   - ownerName: string (required)
-    //   - targetFunding: number (required)
-    //   - currentFunding: number (required)
-    //   - category: string (required, enum: Solar, Water Treatment, Sanitation)
-    //   - imageUrl: string (optional)
-    //   - createdAt: timestamp (required)
-    //
-    // ===============================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
 
     // ===============================================================
-    // Helper Functions
+    // Helper Primitives
     // ===============================================================
-    function isAuthenticated() {
+    function isSignedIn() {
       return request.auth != null;
     }
 
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
     function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+      return isSignedIn() && request.auth.uid == userId;
     }
 
     function isAdmin() {
-      return request.auth != null && 
+      return isVerifiedUser() && 
         (request.auth.uid == "4bR0uGO1auPi2ftCvnnfR9cUtJD3" || 
-         ('email' in request.auth.token && request.auth.token.email == "michael.kokonya@washpivot.com"));
+         (request.auth.token.email == "michael.kokonya@washpivot.com"));
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
     }
 
     function isValidEmail(email) {
@@ -67,217 +46,175 @@ service cloud.firestore {
     }
 
     function hasOnlyAllowedFields(fields) {
-      return request.resource.data.keys().hasOnly(fields);
+      return incoming().keys().hasOnly(fields);
     }
 
     // ===============================================================
-    // Domain Validators
+    // Domain Validation Blueprints
     // ===============================================================
-    function isValidUser(data, userId) {
+
+    function isValidUser(data) {
       let isAnonymous = request.auth.token.firebase.sign_in_provider == 'anonymous';
       return hasOnlyAllowedFields(['uid', 'displayName', 'email', 'role', 'expertise', 'academics', 'bio', 'createdAt', 'photoURL', 'hasSeenWelcome', 'onboardingCompleted', 'expertJoinedAt', 'isApproved', 'showContacts', 'phoneNumber', 'lastLogin', 'updatedAt', 'subSpecialty', 'yearsOfExperience', 'keyProjects', 'availability', 'phone', 'contactEmail']) &&
-             data.uid == userId &&
-             data.displayName is string && data.displayName.size() >= 0 && data.displayName.size() < 100 &&
+             data.uid == request.auth.uid &&
+             data.displayName is string && data.displayName.size() <= 100 &&
              (isAnonymous ? (data.email == "" || isValidEmail(data.email)) : isValidEmail(data.email)) &&
              data.role in ['user', 'expert', 'admin'] &&
              data.isApproved is bool &&
              data.showContacts is bool &&
              (!('phoneNumber' in data) || (data.phoneNumber is string && data.phoneNumber.size() < 20)) &&
              (!('expertise' in data) || (data.expertise is string && data.expertise.size() < 200)) &&
-             (!('academics' in data) || (data.academics is string && data.academics.size() < 500)) &&
              (!('bio' in data) || (data.bio is string && data.bio.size() < 5000)) &&
              (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() < 1000)) &&
-             (!('hasSeenWelcome' in data) || data.hasSeenWelcome is bool) &&
-             (!('onboardingCompleted' in data) || data.onboardingCompleted is bool) &&
-             (!('expertJoinedAt' in data) || data.expertJoinedAt is string) &&
-             (!('lastLogin' in data) || data.lastLogin is timestamp) &&
-             (!('updatedAt' in data) || data.updatedAt is timestamp) &&
-             (!('subSpecialty' in data) || (data.subSpecialty is string && data.subSpecialty.size() < 200)) &&
-             (!('yearsOfExperience' in data) || (data.yearsOfExperience is string || data.yearsOfExperience is number)) &&
-             (!('keyProjects' in data) || (data.keyProjects is string && data.keyProjects.size() < 2000)) &&
-             (!('availability' in data) || data.availability is list) &&
-             (!('phone' in data) || (data.phone is string && data.phone.size() < 20)) &&
-             (!('contactEmail' in data) || isValidEmail(data.contactEmail));
+             (!('createdAt' in data) || data.createdAt == request.time) &&
+             (!('updatedAt' in data) || data.updatedAt == request.time);
     }
 
-    function isValidPublicProfile(data, userId) {
+    function isValidPublicProfile(data) {
       return hasOnlyAllowedFields(['uid', 'displayName', 'role', 'expertise', 'academics', 'bio', 'photoURL', 'expertJoinedAt', 'isApproved', 'showContacts', 'phoneNumber', 'updatedAt', 'subSpecialty', 'yearsOfExperience', 'keyProjects', 'availability', 'phone', 'contactEmail']) &&
-             data.uid == userId &&
-             data.displayName is string && data.displayName.size() > 0 && data.displayName.size() < 100 &&
+             data.uid is string &&
+             data.displayName is string && data.displayName.size() > 0 &&
              data.role == 'expert' &&
              data.isApproved is bool &&
              data.showContacts is bool &&
-             (!('phoneNumber' in data) || (data.phoneNumber is string && data.phoneNumber.size() < 20)) &&
-             data.expertise is string && data.expertise.size() < 200 &&
-             data.academics is string && data.academics.size() < 500 &&
-             data.bio is string && data.bio.size() < 5000 &&
-             (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() < 1000)) &&
-             data.expertJoinedAt is string &&
-             (!('updatedAt' in data) || data.updatedAt is timestamp) &&
-             (!('subSpecialty' in data) || (data.subSpecialty is string && data.subSpecialty.size() < 200)) &&
-             (!('yearsOfExperience' in data) || (data.yearsOfExperience is string || data.yearsOfExperience is number)) &&
-             (!('keyProjects' in data) || (data.keyProjects is string && data.keyProjects.size() < 2000)) &&
-             (!('availability' in data) || data.availability is list) &&
-             (!('phone' in data) || (data.phone is string && data.phone.size() < 20)) &&
-             (!('contactEmail' in data) || isValidEmail(data.contactEmail));
+             data.expertise is string &&
+             (!('updatedAt' in data) || data.updatedAt == request.time);
     }
 
     function isValidProduct(data) {
-      return hasOnlyAllowedFields(['name', 'description', 'price', 'category', 'subCategory', 'imageUrl', 'createdAt']) &&
+      return hasOnlyAllowedFields(['name', 'description', 'price', 'category', 'subCategory', 'imageUrl', 'createdAt', 'ratings', 'updatedAt']) &&
              data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
              data.description is string && data.description.size() < 5000 &&
-             data.price is number && data.price >= 0 &&
+             (!('price' in data) || (data.price is number && data.price >= 0)) &&
              data.category in ['Solar', 'Water Treatment', 'Sanitation'] &&
              (!('subCategory' in data) || data.subCategory in ['Fluoride Removal', 'Filtration', 'Chlorination', 'Solar Panels', 'Batteries', 'Charge Controller', 'Inverter', 'Accessories', 'Exhaust Services', 'None']) &&
              (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() < 1000)) &&
-             (!('createdAt' in data) || data.createdAt is timestamp);
+             (!('createdAt' in data) || data.createdAt == request.time) &&
+             (!('updatedAt' in data) || data.updatedAt == request.time) &&
+             (!('ratings' in data) || data.ratings is list);
     }
 
     function isValidProject(data) {
-      return hasOnlyAllowedFields(['title', 'description', 'ownerUid', 'ownerName', 'targetFunding', 'currentFunding', 'category', 'imageUrl', 'milestones', 'createdAt', 'isApproved', 'status']) &&
+      return hasOnlyAllowedFields(['title', 'description', 'ownerUid', 'ownerName', 'targetFunding', 'currentFunding', 'category', 'imageUrl', 'milestones', 'createdAt', 'isApproved', 'status', 'isCertified', 'media']) &&
              data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
-             data.description is string && data.description.size() < 5000 &&
              data.ownerUid == request.auth.uid &&
-             data.ownerName is string && data.ownerName.size() > 0 && data.ownerName.size() < 100 &&
              data.targetFunding is number && data.targetFunding > 0 &&
              data.currentFunding is number && data.currentFunding >= 0 &&
              data.category in ['Solar', 'Water Treatment', 'Sanitation'] &&
-             (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() < 1000)) &&
-             (!('milestones' in data) || data.milestones is list) &&
-             (!('createdAt' in data) || data.createdAt is timestamp) &&
+             (!('createdAt' in data) || data.createdAt == request.time) &&
              data.isApproved is bool &&
              data.status in ['pending', 'active', 'completed', 'rejected'];
-    }
-
-    function isValidReview(data) {
-      return hasOnlyAllowedFields(['productId', 'userId', 'userName', 'rating', 'comment', 'createdAt']) &&
-             data.productId is string && data.productId.size() < 100 &&
-             data.userId == request.auth.uid &&
-             data.userName is string && data.userName.size() > 0 && data.userName.size() < 100 &&
-             data.rating is number && data.rating >= 1 && data.rating <= 5 &&
-             data.comment is string && data.comment.size() > 0 && data.comment.size() < 2000 &&
-             (!('createdAt' in data) || data.createdAt is timestamp);
-    }
-
-    function isValidOrder(data) {
-      return hasOnlyAllowedFields(['userId', 'userEmail', 'items', 'totalAmount', 'status', 'paymentMethod', 'shippingInfo', 'createdAt', 'paidAt']) &&
-             data.userId == request.auth.uid &&
-             data.userEmail is string && isValidEmail(data.userEmail) &&
-             data.items is list && data.items.size() > 0 && data.items.size() < 50 &&
-             data.totalAmount is number && data.totalAmount >= 0 &&
-             data.status in ['pending', 'paid', 'failed', 'shipped', 'delivered'] &&
-             data.paymentMethod in ['card', 'mpesa'] &&
-             data.shippingInfo is map &&
-             (!('createdAt' in data) || data.createdAt is timestamp) &&
-             (!('paidAt' in data) || data.paidAt is timestamp);
     }
 
     function isValidServiceProvider(data) {
       return hasOnlyAllowedFields(['name', 'category', 'subCategory', 'description', 'imageUrl', 'contactEmail', 'contactPhone', 'location', 'isApproved', 'createdAt']) &&
              data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
              data.category in ['Installation', 'Maintenance', 'Consulting', 'Engineering', 'Drilling', 'Water Treatment', 'Solar', 'Sanitation'] &&
-             (!('subCategory' in data) || data.subCategory in ['Fluoride Removal', 'Filtration', 'Chlorination', 'Solar Panels', 'Batteries', 'Charge Controller', 'Inverter', 'Accessories', 'Exhaust Services', 'None']) &&
-             data.description is string && data.description.size() < 5000 &&
-             data.imageUrl is string && data.imageUrl.size() < 1000 &&
              isValidEmail(data.contactEmail) &&
-             data.contactPhone is string && data.contactPhone.size() < 20 &&
-             data.location is string && data.location.size() < 200 &&
              data.isApproved is bool &&
-             (!('createdAt' in data) || data.createdAt is timestamp);
+             (!('createdAt' in data) || data.createdAt == request.time);
+    }
+
+    function isValidSetting(data) {
+      return hasOnlyAllowedFields(['value', 'updatedAt']) &&
+             data.value is map &&
+             (!('updatedAt' in data) || data.updatedAt is string);
+    }
+
+    function isValidReview(data) {
+      return hasOnlyAllowedFields(['productId', 'userId', 'userName', 'rating', 'comment', 'createdAt']) &&
+             data.productId is string &&
+             data.userId == request.auth.uid &&
+             data.rating is number && data.rating >= 1 && data.rating <= 5 &&
+             (!('createdAt' in data) || data.createdAt == request.time);
     }
 
     function isValidSolarKit(data) {
       return hasOnlyAllowedFields(['userId', 'kitName', 'loadRequirements', 'totalDailyLoadWh', 'totalPeakLoadW', 'recommendations', 'createdAt']) &&
              data.userId == request.auth.uid &&
-             data.kitName is string && data.kitName.size() > 0 && data.kitName.size() < 200 &&
-             data.loadRequirements is list &&
-             data.totalDailyLoadWh is number &&
-             data.totalPeakLoadW is number &&
-             (!('recommendations' in data) || data.recommendations is map) &&
-             (!('createdAt' in data) || data.createdAt is timestamp);
+             data.kitName is string &&
+             (!('createdAt' in data) || data.createdAt == request.time);
     }
 
     // ===============================================================
-    // Rules
+    // Collection Rules
     // ===============================================================
 
-    // Default deny: No one can read or write anything unless explicitly allowed below
-    match /{allPaths=**} {
-      allow read, write: if false;
-    }
-
-    // Users Collection: Contains sensitive PII (email, phone)
     match /users/{userId} {
-      // Only the owner or an admin can read the full user document
-      allow read: if isOwner(userId) || isAdmin();
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin();
       
-      // Only the owner can create their profile. Role must be 'user' by default unless admin.
-      allow create: if isAuthenticated() && 
-                      isValidUser(request.resource.data, userId) && 
-                      (isOwner(userId) && (request.resource.data.role == 'user' || isAdmin()));
-      
-      // Only the owner or admin can update. Owner cannot change their own role.
-      allow update: if isAuthenticated() && 
-                      isValidUser(request.resource.data, userId) && 
-                      ((isOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin());
-      
+      allow create: if isVerifiedUser() && isOwner(userId) && isValidUser(incoming()) && incoming().role == 'user';
+      allow update: if isVerifiedUser() && (
+        (isOwner(userId) && isValidUser(incoming()) && incoming().role == existing().role && incoming().isApproved == existing().isApproved) ||
+        isAdmin()
+      );
       allow delete: if isAdmin();
     }
 
-    // Public Profiles: Subset of user data for public viewing (Experts)
     match /public_profiles/{userId} {
-      allow read: if true; // Publicly readable
-      allow create: if isOwner(userId) && isValidPublicProfile(request.resource.data, userId);
-      allow update: if (isOwner(userId) && isValidPublicProfile(request.resource.data, userId)) || isAdmin();
-      allow delete: if isOwner(userId) || isAdmin();
+      allow get: if isValidId(userId);
+      allow list: if true;
+      allow create: if isVerifiedUser() && isOwner(userId) && isValidPublicProfile(incoming());
+      allow update: if isVerifiedUser() && ((isOwner(userId) && isValidPublicProfile(incoming())) || isAdmin());
+      allow delete: if isAdmin() || isOwner(userId);
+    }
+
+    match /settings/{settingId} {
+      allow get: if isValidId(settingId);
+      allow list: if true;
+      allow write: if isAdmin() && isValidSetting(incoming());
     }
 
     match /products/{productId} {
-      allow read: if true;
-      allow write: if isAdmin() && isValidProduct(request.resource.data);
+      allow get: if isValidId(productId);
+      allow list: if true;
+      allow write: if isAdmin() && isValidProduct(incoming());
     }
 
     match /projects/{projectId} {
-      allow read: if true;
-      allow create: if isAuthenticated() && isValidProject(request.resource.data) && 
-                      (isAdmin() || (request.resource.data.isApproved == false && request.resource.data.status == 'pending'));
-      allow update: if isAuthenticated() && (isAdmin() || (request.auth.uid == resource.data.ownerUid && 
-                                                          isValidProject(request.resource.data) && 
-                                                          request.resource.data.isApproved == resource.data.isApproved && 
-                                                          request.resource.data.status == resource.data.status));
-      allow delete: if isAdmin() || (isAuthenticated() && request.auth.uid == resource.data.ownerUid);
+      allow get: if isValidId(projectId);
+      allow list: if true;
+      
+      allow create: if isVerifiedUser() && isValidProject(incoming()) && incoming().isApproved == false && incoming().status == 'pending';
+      allow update: if isVerifiedUser() && (
+        (isAdmin() && isValidProject(incoming())) ||
+        (isOwner(existing().ownerUid) && isValidProject(incoming()) && 
+         incoming().isApproved == existing().isApproved && 
+         incoming().status == existing().status &&
+         incoming().currentFunding == existing().currentFunding)
+      );
+      allow delete: if isAdmin() || isOwner(existing().ownerUid);
     }
 
     match /reviews/{reviewId} {
-      allow read: if true;
-      allow create: if isAuthenticated() && isValidReview(request.resource.data);
-      allow update: if isAuthenticated() && request.auth.uid == resource.data.userId && isValidReview(request.resource.data);
-      allow delete: if isAdmin() || (isAuthenticated() && request.auth.uid == resource.data.userId);
+      allow get: if isValidId(reviewId);
+      allow list: if true;
+      allow create: if isVerifiedUser() && isValidReview(incoming());
+      allow update: if isVerifiedUser() && isOwner(existing().userId) && isValidReview(incoming()) && incoming().userId == existing().userId;
+      allow delete: if isAdmin() || isOwner(existing().userId);
     }
 
     match /orders/{orderId} {
-      // Only the customer or admin can see orders
-      allow read: if isAuthenticated() && (isAdmin() || request.auth.uid == resource.data.userId);
-      
-      // Anyone authenticated can create an order for themselves
-      allow create: if isAuthenticated() && isValidOrder(request.resource.data);
-      
-      // Only admin can update order status (e.g. to 'shipped')
-      allow update: if isAdmin() && isValidOrder(request.resource.data);
-      
+      allow get: if isValidId(orderId) && (isOwner(existing().userId) || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isVerifiedUser() && incoming().userId == request.auth.uid;
+      allow update: if isAdmin();
       allow delete: if isAdmin();
     }
-
+    
     match /service_providers/{serviceId} {
-      allow read: if true;
-      allow write: if isAdmin() && isValidServiceProvider(request.resource.data);
+      allow get: if isValidId(serviceId);
+      allow list: if true;
+      allow write: if isAdmin() && isValidServiceProvider(incoming());
     }
 
     match /solar_kits/{kitId} {
-      allow read: if isAuthenticated() && (isAdmin() || request.auth.uid == resource.data.userId);
-      allow create: if isAuthenticated() && isValidSolarKit(request.resource.data);
-      allow update: if isAuthenticated() && request.auth.uid == resource.data.userId && isValidSolarKit(request.resource.data);
-      allow delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow get: if isValidId(kitId) && (isOwner(existing().userId) || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isVerifiedUser() && isValidSolarKit(incoming());
+      allow update: if isVerifiedUser() && isOwner(existing().userId) && isValidSolarKit(incoming());
+      allow delete: if isVerifiedUser() && isOwner(existing().userId);
     }
   }
 }

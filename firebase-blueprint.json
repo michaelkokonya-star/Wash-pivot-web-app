@@ -25,17 +25,24 @@
     },
     "Product": {
       "title": "Marketplace Product",
-      "description": "Sustainable solutions products.",
+      "description": "Sustainable solutions products with multiple ratings.",
       "type": "object",
       "properties": {
         "name": { "type": "string" },
         "description": { "type": "string" },
-        "price": { "type": "number" },
+        "price": { "type": "number", "description": "Optional: Legacy fixed price or base price" },
+        "ratings": { 
+          "type": "array", 
+          "items": { "type": "string" },
+          "description": "Available specs/ratings for this product"
+        },
         "category": { "type": "string", "enum": ["Solar", "Water Treatment", "Sanitation"] },
         "subCategory": { "type": "string", "enum": ["Fluoride Removal", "Filtration", "Chlorination", "Solar Panels", "Batteries", "Charge Controller", "Inverter", "Accessories", "Exhaust Services", "None"] },
-        "imageUrl": { "type": "string" }
+        "imageUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["name", "price", "category"]
+      "required": ["name", "category"]
     },
     "Project": {
       "title": "WASH Project",
