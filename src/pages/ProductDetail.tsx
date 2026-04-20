@@ -133,7 +133,8 @@ const ProductDetail = () => {
           if (productData.imageUrl) {
             setSelectedImage(productData.imageUrl);
           }
-          setCurrentRating(productData.rating || '');
+          const initialRating = productData.ratings?.[0] || productData.rating || '';
+          setCurrentRating(initialRating);
           setCurrentPrice(productData.price || 0);
           fetchRelated(productData.category, id);
         }
@@ -373,11 +374,11 @@ const ProductDetail = () => {
             )}
             <h1 className="text-5xl font-bold tracking-tighter mb-4 leading-tight">{product.name}</h1>
             
-            {ratingOptions[product.subCategory] && (
+            {product.subCategory && (
               <div className="mb-8 p-6 bg-stone-50 rounded-3xl border border-black/5">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-black/40 mb-4 block">Select Capacity / Rating</label>
                 <div className="flex flex-wrap gap-3">
-                  {ratingOptions[product.subCategory].map((rating) => (
+                  {((product.ratings && product.ratings.length > 0) ? product.ratings : (ratingOptions[product.subCategory] || [])).map((rating: string) => (
                     <button
                       key={rating}
                       onClick={() => setCurrentRating(rating)}

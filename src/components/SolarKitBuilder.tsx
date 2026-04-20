@@ -30,6 +30,8 @@ import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 
+import { useSettings } from '../context/SettingsContext';
+
 interface Appliance {
   id: string;
   name: string;
@@ -42,11 +44,17 @@ interface Appliance {
 interface MarketplaceProduct {
   id: string;
   name: string;
-  price: number;
+  price?: number;
   category: string;
   subCategory: string;
   imageUrl?: string;
   description?: string;
+  ratings?: string[];
+}
+
+interface SelectedHardwareItem extends MarketplaceProduct {
+  selectedRating: string;
+  selectedPrice: number;
 }
 
 const PRESET_APPLIANCES = [
@@ -59,11 +67,13 @@ const PRESET_APPLIANCES = [
 ];
 
 const SolarKitBuilder: React.FC = () => {
+  const { pricingRules } = useSettings();
   const [step, setStep] = useState(1);
   const [kitName, setKitName] = useState('My Custom Solar Kit');
   const [loadItems, setLoadItems] = useState<Appliance[]>([]);
   const [marketplaceProducts, setMarketplaceProducts] = useState<MarketplaceProduct[]>([]);
-  const [selectedHardware, setSelectedHardware] = useState<MarketplaceProduct[]>([]);
+  const [selectedHardware, setSelectedHardware] = useState<SelectedHardwareItem[]>([]);
+  const [productRatings, setProductRatings] = useState<Record<string, string>>({});
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -106,7 +116,19 @@ const SolarKitBuilder: React.FC = () => {
   const recommendedBatteryWh = Math.ceil((totalDailyLoadWh * 1.5) / BATTERY_DOD); // 1.5 days autonomy
   const recommendedInverterW = Math.ceil(totalPeakLoadW * 1.25); // 25% safety margin
 
-  const totalPriceEstimate = selectedHardware.reduce((sum, p) => sum + p.price, 0);
+  const calculatePriceForProduct = (subCategory: string, rating: string) => {
+    if (!pricingRules || !subCategory || !rating) return 0;
+    const pricePerUnit = pricingRules[subCategory];
+    if (!pricePerUnit) return 0;
+
+    let ratingValue = parseFloat(rating.replace(/[^\d.]/g, ''));
+    if (rating.toUpperCase().includes('KW')) {
+      ratingValue = ratingValue * 1000;
+    }
+    return Math.round(ratingValue * pricePerUnit);
+  };
+
+  const totalPriceEstimate = selectedHardware.reduce((sum, p) => sum + p.selectedPrice, 0);
 
   const addAppliance = (preset?: typeof PRESET_APPLIANCES[0]) => {
     const newItem: Appliance = {
@@ -199,11 +221,12 @@ const SolarKitBuilder: React.FC = () => {
         
         autoTable(doc, {
           startY: recTableEndY + 20,
-          head: [['Category', 'Product Name', 'Price (KSh)']],
+          head: [['Category', 'Product Name', 'Specs/Rating', 'Price (KSh)']],
           body: selectedHardware.map(p => [
             p.subCategory,
             p.name,
-            p.price.toLocaleString()
+            p.selectedRating,
+            p.selectedPrice.toLocaleString()
           ]),
           theme: 'striped',
           headStyles: { fillColor: [0, 0, 0] },
@@ -260,7 +283,13 @@ const SolarKitBuilder: React.FC = () => {
         userId: user.uid,
         kitName,
         loadRequirements: loadItems.map(({ id, icon, ...rest }) => rest),
-        selectedHardware: selectedHardware.map(p => ({ id: p.id, name: p.name, price: p.price, subCategory: p.subCategory })),
+        selectedHardware: selectedHardware.map(p => ({ 
+          id: p.id, 
+          name: p.name, 
+          rating: p.selectedRating,
+          price: p.selectedPrice, 
+          subCategory: p.subCategory 
+        })),
         totalDailyLoadWh,
         totalPeakLoadW,
         totalPriceEstimate,
@@ -576,14 +605,15 @@ const SolarKitBuilder: React.FC = () => {
                       </div>
                     )}
                     {selectedHardware.map((product) => (
-                      <div key={product.id} className="p-4 bg-white border border-black/5 rounded-2xl flex justify-between items-center group">
+                      <div key={`${product.id}-${product.selectedRating}`} className="p-4 bg-white border border-black/5 rounded-2xl flex justify-between items-center group">
                         <div>
                           <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">{product.subCategory}</p>
                           <p className="text-sm font-bold truncate max-w-[150px]">{product.name}</p>
-                          <p className="text-xs font-bold">KSh {product.price.toLocaleString()}</p>
+                          <p className="text-xs text-black/40 mb-0.5">{product.selectedRating}</p>
+                          <p className="text-xs font-bold">KSh {product.selectedPrice.toLocaleString()}</p>
                         </div>
                         <button 
-                          onClick={() => setSelectedHardware(selectedHardware.filter(p => p.id !== product.id))}
+                          onClick={() => setSelectedHardware(selectedHardware.filter(p => !(p.id === product.id && p.selectedRating === product.selectedRating)))}
                           className="p-2 text-black/10 hover:text-red-500 transition-colors"
                         >
                           <Trash2 size={16} />
@@ -602,42 +632,69 @@ const SolarKitBuilder: React.FC = () => {
                         <p className="text-sm text-black/40">Loading marketplace products...</p>
                       </div>
                     ) : marketplaceProducts.length > 0 ? (
-                      marketplaceProducts.map((product) => (
-                        <div 
-                          key={product.id} 
-                          className="p-4 bg-stone-50 border border-black/5 rounded-2xl hover:border-emerald-500 transition-all flex flex-col justify-between"
-                        >
-                          <div>
-                            <div className="flex justify-between items-start mb-2">
-                              <span className="text-[10px] font-bold uppercase tracking-widest text-black/40 bg-white px-2 py-1 rounded-md border border-black/5">
-                                {product.subCategory}
-                              </span>
-                              <button 
-                                onClick={() => {
-                                  if (!selectedHardware.find(p => p.id === product.id)) {
-                                    setSelectedHardware([...selectedHardware, product]);
-                                    toast.success(`Added ${product.name}`);
-                                  } else {
-                                    toast.error("Already added to selection");
-                                  }
-                                }}
-                                className="p-2 bg-white rounded-xl shadow-sm hover:bg-emerald-500 hover:text-white transition-all"
-                              >
-                                <Plus size={16} />
-                              </button>
+                      marketplaceProducts.map((product) => {
+                        const availableVariants = product.ratings || [];
+                        const selectedRating = productRatings[product.id] || availableVariants[0] || '';
+                        const calculatedPrice = calculatePriceForProduct(product.subCategory, selectedRating);
+
+                        return (
+                          <div 
+                            key={product.id} 
+                            className="p-4 bg-stone-50 border border-black/5 rounded-2xl hover:border-emerald-500 transition-all flex flex-col justify-between"
+                          >
+                            <div>
+                              <div className="flex justify-between items-start mb-2">
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-black/40 bg-white px-2 py-1 rounded-md border border-black/5">
+                                  {product.subCategory}
+                                </span>
+                                <button 
+                                  onClick={() => {
+                                    if (!selectedRating) {
+                                      toast.error("Please select a rating first");
+                                      return;
+                                    }
+                                    const hardwareItem: SelectedHardwareItem = {
+                                      ...product,
+                                      selectedRating,
+                                      selectedPrice: calculatedPrice
+                                    };
+                                    setSelectedHardware([...selectedHardware, hardwareItem]);
+                                    toast.success(`Added ${product.name} (${selectedRating})`);
+                                  }}
+                                  className="p-2 bg-white rounded-xl shadow-sm hover:bg-emerald-500 hover:text-white transition-all outline-none"
+                                >
+                                  <Plus size={16} />
+                                </button>
+                              </div>
+                              <h5 className="font-bold text-sm mb-1 line-clamp-1">{product.name}</h5>
+                              
+                              {availableVariants.length > 0 ? (
+                                <div className="mt-2 mb-3">
+                                  <label className="text-[9px] uppercase tracking-widest text-black/40 font-bold mb-1 block">Desired Rating</label>
+                                  <select
+                                    value={selectedRating}
+                                    onChange={(e) => setProductRatings({ ...productRatings, [product.id]: e.target.value })}
+                                    className="w-full text-xs bg-white border border-black/5 rounded-lg px-2 py-1.5 focus:border-emerald-500 outline-none appearance-none"
+                                  >
+                                    {availableVariants.map(v => (
+                                      <option key={v} value={v}>{v}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              ) : (
+                                <p className="text-xs text-black/40 line-clamp-1 mb-3">{product.description}</p>
+                              )}
                             </div>
-                            <h5 className="font-bold text-sm mb-1 line-clamp-2">{product.name}</h5>
-                            <p className="text-xs text-black/40 line-clamp-2 mb-3">{product.description}</p>
-                          </div>
-                          <div className="flex justify-between items-center pt-3 border-t border-black/5">
-                            <span className="text-sm font-bold">KSh {product.price.toLocaleString()}</span>
-                            <div className="flex items-center space-x-1 text-[10px] font-bold text-emerald-600">
-                              <CheckCircle2 size={12} />
-                              <span>In Stock</span>
+                            <div className="flex justify-between items-center pt-3 border-t border-black/5">
+                              <span className="text-sm font-bold">KSh {calculatedPrice > 0 ? calculatedPrice.toLocaleString() : (product.price?.toLocaleString() || 'N/A')}</span>
+                              <div className="flex items-center space-x-1 text-[10px] font-bold text-emerald-600">
+                                <CheckCircle2 size={12} />
+                                <span>In Stock</span>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))
+                        );
+                      })
                     ) : (
                       <div className="col-span-full py-20 text-center bg-stone-50 rounded-3xl border border-dashed border-black/10">
                         <p className="text-black/40 text-sm">No solar products found in the marketplace.</p>
@@ -736,10 +793,10 @@ const SolarKitBuilder: React.FC = () => {
                   <div className="space-y-4">
                     <h6 className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Marketplace Selection</h6>
                     <div className="space-y-2">
-                      {selectedHardware.slice(0, 3).map(p => (
-                        <div key={p.id} className="flex justify-between text-sm">
-                          <span className="text-white/60 truncate max-w-[120px]">{p.name}</span>
-                          <span className="font-bold">KSh {p.price.toLocaleString()}</span>
+                      {selectedHardware.slice(0, 3).map((p, idx) => (
+                        <div key={`${p.id}-${idx}`} className="flex justify-between text-sm">
+                          <span className="text-white/60 truncate max-w-[120px]">{p.name} ({p.selectedRating})</span>
+                          <span className="font-bold">KSh {p.selectedPrice.toLocaleString()}</span>
                         </div>
                       ))}
                       {selectedHardware.length > 3 && (

@@ -25,40 +25,20 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
 
   const [formData, setFormData] = useState({
     name: '',
-    price: '',
     category: 'Solar',
-    subCategory: 'None',
-    rating: '',
+    subCategory: 'Solar Panels',
+    ratings: [] as string[],
     description: '',
     imageUrl: ''
   });
 
-  const calculatePrice = () => {
-    if (!formData.subCategory || !formData.rating) {
-      toast.error("Please select a sub-category and rating first.");
-      return;
-    }
-
-    if (!pricingRules) {
-      toast.error("Pricing rules not loaded.");
-      return;
-    }
-
-    const pricePerUnit = pricingRules[formData.subCategory];
-    
-    if (pricePerUnit) {
-      let ratingValue = parseFloat(formData.rating.replace(/[^\d.]/g, ''));
-      
-      if (formData.rating.toUpperCase().includes('KW')) {
-        ratingValue = ratingValue * 1000;
-      }
-      
-      const calculatedPrice = ratingValue * pricePerUnit;
-      setFormData({ ...formData, price: Math.round(calculatedPrice).toString() });
-      toast.success(`Price calculated based on ${formData.subCategory} rules.`);
-    } else {
-      toast.error(`No pricing rule found for ${formData.subCategory}.`);
-    }
+  const toggleRating = (rating: string) => {
+    setFormData(prev => ({
+      ...prev,
+      ratings: prev.ratings.includes(rating)
+        ? prev.ratings.filter(r => r !== rating)
+        : [...prev.ratings, rating]
+    }));
   };
 
   const ratingOptions: Record<string, string[]> = {
@@ -72,10 +52,9 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
     if (product) {
       setFormData({
         name: product.name || '',
-        price: product.price?.toString() || '',
         category: product.category || 'Solar',
-        subCategory: product.subCategory || 'None',
-        rating: product.rating || '',
+        subCategory: product.subCategory || 'Solar Panels',
+        ratings: product.ratings || (product.rating ? [product.rating] : []),
         description: product.description || '',
         imageUrl: product.imageUrl || ''
       });
@@ -133,7 +112,6 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
       await updateDoc(doc(db, 'products', product.id), {
         ...formData,
         imageUrl: finalImageUrl,
-        price: parseFloat(formData.price),
         updatedAt: serverTimestamp()
       });
 
@@ -179,38 +157,16 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
             </div>
 
             <form onSubmit={handleSubmit} className="p-8 space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Product Name</label>
-                  <input
-                    required
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors"
-                    placeholder="e.g. Solar Home Kit"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Price (KSh)</label>
-                  <div className="relative">
-                    <input
-                      required
-                      type="number"
-                      value={formData.price}
-                      onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                      className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors pr-24"
-                      placeholder="58500"
-                    />
-                    <button
-                      type="button"
-                      onClick={calculatePrice}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-black text-white text-[9px] font-bold uppercase tracking-widest rounded-lg hover:bg-stone-800 transition-colors"
-                    >
-                      Calculate
-                    </button>
-                  </div>
-                </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Product Name / Model</label>
+                <input
+                  required
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors"
+                  placeholder="e.g. Mono Crystalline Solar Panel"
+                />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -271,7 +227,7 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
                     <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Sub-Category</label>
                     <select
                       value={formData.subCategory}
-                      onChange={(e) => setFormData({ ...formData, subCategory: e.target.value, rating: '' })}
+                      onChange={(e) => setFormData({ ...formData, subCategory: e.target.value })}
                       className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors appearance-none"
                     >
                       <option value="None">None</option>
@@ -282,28 +238,42 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
               </div>
 
               {formData.subCategory !== 'None' && (
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Technical Rating / Capacity</label>
-                  {ratingOptions[formData.subCategory] ? (
-                    <select
-                      value={formData.rating}
-                      onChange={(e) => setFormData({ ...formData, rating: e.target.value })}
-                      className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors appearance-none"
-                    >
-                      <option value="">Select Rating</option>
-                      {ratingOptions[formData.subCategory].map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  ) : (
+                <div className="space-y-3">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Available Ratings / Specs</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {ratingOptions[formData.subCategory]?.map((opt) => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => toggleRating(opt)}
+                        className={`px-3 py-2 text-[10px] font-bold rounded-lg border transition-all ${
+                          formData.ratings.includes(opt)
+                            ? 'bg-emerald-600 text-white border-emerald-600'
+                            : 'bg-stone-50 text-black/60 border-black/5 hover:border-black/20'
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="pt-2">
                     <input
                       type="text"
-                      value={formData.rating}
-                      onChange={(e) => setFormData({ ...formData, rating: e.target.value })}
-                      className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors"
-                      placeholder="e.g. 500L, 2HP, etc."
+                      placeholder="Add custom rating (comma separated)..."
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const val = e.currentTarget.value.trim();
+                          if (val) {
+                            const newRatings = val.split(',').map(r => r.trim()).filter(r => r && !formData.ratings.includes(r));
+                            setFormData(prev => ({ ...prev, ratings: [...prev.ratings, ...newRatings] }));
+                            e.currentTarget.value = '';
+                          }
+                        }
+                      }}
+                      className="w-full px-4 py-2 bg-stone-50 border border-black/5 rounded-xl text-xs focus:outline-none focus:border-emerald-600"
                     />
-                  )}
+                  </div>
                 </div>
               )}
 

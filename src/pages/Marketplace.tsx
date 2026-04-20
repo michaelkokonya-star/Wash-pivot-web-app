@@ -32,12 +32,15 @@ const ProductCard: React.FC<ProductCardProps & { ratingFilter: string }> = ({
   ratingOptions,
   ratingFilter
 }) => {
-  const options = ratingOptions[product.subCategory] || [];
+  const options = (product.ratings && product.ratings.length > 0) 
+    ? product.ratings 
+    : (ratingOptions[product.subCategory] || []);
+
   const [currentRating, setCurrentRating] = useState(() => {
     if (ratingFilter !== 'All' && options.includes(ratingFilter)) {
       return ratingFilter;
     }
-    return product.rating || '';
+    return product.ratings?.[0] || product.rating || (options[0]) || '';
   });
   const [currentPrice, setCurrentPrice] = useState(product.price || 0);
   const [added, setAdded] = useState(false);
@@ -145,7 +148,7 @@ const ProductCard: React.FC<ProductCardProps & { ratingFilter: string }> = ({
             <div className="mb-6">
               <label className="text-[9px] font-bold uppercase tracking-widest text-black/30 mb-2 block">Choose Rating:</label>
               <div className="flex flex-wrap gap-1.5">
-                {options.map((opt) => (
+                {options.map((opt: string) => (
                   <button
                     key={opt}
                     onClick={() => setCurrentRating(opt)}
