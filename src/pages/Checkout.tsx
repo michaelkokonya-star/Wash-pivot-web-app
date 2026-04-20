@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { useSettings } from '../context/SettingsContext';
 import { motion } from 'motion/react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
@@ -32,6 +33,7 @@ const MpesaLogo = ({ className = "h-8", light = false }) => (
 const Checkout = () => {
   const { cart, cartTotal, cartCount, clearCart } = useCart();
   const { user, profile, authFetch } = useAuth();
+  const { deliveryRules } = useSettings();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'mpesa' | 'manual_mpesa'>('card');
@@ -48,30 +50,13 @@ const Checkout = () => {
     distance: '0',
   });
 
-  const [deliveryRules, setDeliveryRules] = useState<any>({
-    baseRate: 200,
-    ratePerKm: 50,
-    freeThreshold: 50000
-  });
-
-  React.useEffect(() => {
-    const fetchDeliveryRules = async () => {
-      try {
-        const response = await fetch('/api/settings/delivery-rules');
-        if (response.ok) {
-          const data = await response.json();
-          setDeliveryRules(data);
-        }
-      } catch (error) {
-        console.error("Error fetching delivery rules:", error);
-      }
-    };
-    fetchDeliveryRules();
-  }, []);
-
   const distanceNum = parseFloat(formData.distance) || 0;
-  const rawDeliveryCharge = Math.max(deliveryRules.baseRate, distanceNum * deliveryRules.ratePerKm);
-  const deliveryCharge = cartTotal >= deliveryRules.freeThreshold ? 0 : rawDeliveryCharge;
+  const baseRate = deliveryRules?.baseRate ?? 200;
+  const ratePerKm = deliveryRules?.ratePerKm ?? 50;
+  const freeThreshold = deliveryRules?.freeThreshold ?? 50000;
+  
+  const rawDeliveryCharge = Math.max(baseRate, distanceNum * ratePerKm);
+  const deliveryCharge = cartTotal >= freeThreshold ? 0 : rawDeliveryCharge;
   const finalTotal = cartTotal + deliveryCharge;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -281,7 +266,7 @@ const Checkout = () => {
                     onChange={handleInputChange}
                     className="w-full p-4 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600"
                   />
-                  <p className="text-[9px] text-black/30 italic">Used to calculate delivery charges (Min KES {deliveryRules.baseRate})</p>
+                  <p className="text-[9px] text-black/30 italic">Used to calculate delivery charges (Min KES {deliveryRules?.baseRate ?? 200})</p>
                 </div>
               </div>
             </section>

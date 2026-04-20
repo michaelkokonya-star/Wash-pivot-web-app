@@ -56,12 +56,17 @@ const AdminProjectDetails = () => {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          status: approved ? 'active' : 'rejected'
+          status: approved ? 'active' : 'rejected',
+          isApproved: approved
         })
       });
       
       if (response.ok) {
-        setProject({ ...project, status: approved ? 'active' : 'rejected' });
+        setProject({ 
+          ...project, 
+          status: approved ? 'active' : 'rejected',
+          isApproved: approved
+        });
         toast.success(`Project ${approved ? 'approved' : 'rejected'} successfully`);
       } else {
         throw new Error('Failed to update status');

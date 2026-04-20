@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import { useSettings } from '../context/SettingsContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { Helmet } from 'react-helmet-async';
 import { ShoppingCart, ArrowLeft, Sun, Droplets, ShieldCheck, CheckCircle2, Star, MessageSquare, Send, User, ArrowRight, Facebook, Twitter, Linkedin, Share2, Link as LinkIcon, Globe, ChevronDown, ChevronUp, Trash2, Loader2 } from 'lucide-react';
@@ -12,6 +13,7 @@ const ProductDetail = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
   const { addToCart } = useCart();
+  const { pricingRules } = useSettings();
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [addedToCart, setAddedToCart] = useState(false);
@@ -28,7 +30,6 @@ const ProductDetail = () => {
   const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
   const [currentRating, setCurrentRating] = useState<string>('');
   const [currentPrice, setCurrentPrice] = useState<number>(0);
-  const [pricingRules, setPricingRules] = useState<any>(null);
 
   const ratingOptions: Record<string, string[]> = {
     'Solar Panels': ['100W', '120W', '200W', '300W', '450W', '595W', '610W', '710W'],
@@ -77,20 +78,7 @@ const ProductDetail = () => {
       }
     };
 
-    const fetchPricingRules = async () => {
-      try {
-        const response = await fetch('/api/settings/pricing-rules');
-        if (response.ok) {
-          const data = await response.json();
-          setPricingRules(data);
-        }
-      } catch (error) {
-        console.error("Error fetching pricing rules:", error);
-      }
-    };
-
     fetchRates();
-    fetchPricingRules();
   }, []);
 
   const formatPrice = (price: number) => {

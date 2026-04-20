@@ -6,6 +6,7 @@ import { Helmet } from 'react-helmet-async';
 import OptimizedImage from '../components/OptimizedImage';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import { useSettings } from '../context/SettingsContext';
 import AddProductModal from '../components/AddProductModal';
 import EditProductModal from '../components/EditProductModal';
 
@@ -198,6 +199,7 @@ const ProductCard: React.FC<ProductCardProps & { ratingFilter: string }> = ({
 };
 
 const Marketplace = () => {
+  const { pricingRules } = useSettings();
   const [products, setProducts] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -212,23 +214,10 @@ const Marketplace = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
-  const [pricingRules, setPricingRules] = useState<any>(null);
   const { user, profile, signIn } = useAuth();
   const { addToCart } = useCart();
 
   const isAdmin = user?.email?.toLowerCase() === 'michael.kokonya@washpivot.com';
-
-  const fetchPricingRules = async () => {
-    try {
-      const response = await fetch('/api/settings/pricing-rules');
-      if (response.ok) {
-        const data = await response.json();
-        setPricingRules(data);
-      }
-    } catch (error) {
-      console.error("Error fetching rules:", error);
-    }
-  };
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -325,11 +314,6 @@ const Marketplace = () => {
   useEffect(() => {
     fetchProducts();
     fetchServices();
-    fetchPricingRules();
-    
-    // Refresh pricing rules every 60 seconds to keep them synced
-    const interval = setInterval(fetchPricingRules, 60000);
-    return () => clearInterval(interval);
   }, [filter, subFilter, ratingFilter]);
 
   const ratingOptions: Record<string, string[]> = {

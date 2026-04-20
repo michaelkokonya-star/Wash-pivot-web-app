@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Upload, Plus, Loader2, Image as ImageIcon } from 'lucide-react';
 import { auth } from '../firebase';
+import { useSettings } from '../context/SettingsContext';
 import { compressImage, sanitizeFilename, fileToDataUrl } from '../lib/image-utils';
 import { toast } from 'sonner';
 
@@ -12,6 +13,7 @@ interface AddProductModalProps {
 }
 
 const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSuccess }) => {
+  const { pricingRules } = useSettings();
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'compressing' | 'uploading' | 'saving'>('idle');
@@ -23,60 +25,38 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
     name: '',
     price: '',
     category: 'Solar',
-    subCategory: 'None',
+    subCategory: 'Solar Panels',
     rating: '',
     description: '',
     imageUrl: ''
   });
-  const [pricingRules, setPricingRules] = useState<any>({});
 
-  useEffect(() => {
-    const fetchRules = async () => {
-      try {
-        const response = await fetch('/api/settings/pricing-rules');
-        if (response.ok) {
-          const data = await response.json();
-          setPricingRules(data);
-        }
-      } catch (error) {
-        console.error("Error fetching rules:", error);
-      }
-    };
-    fetchRules();
-  }, []);
-
-  const calculatePrice = async () => {
+  const calculatePrice = () => {
     if (!formData.subCategory || !formData.rating) {
       toast.error("Please select a sub-category and rating first.");
       return;
     }
 
-    try {
-      const response = await fetch('/api/settings/pricing-rules');
-      if (response.ok) {
-        const rules = await response.json();
-        const pricePerUnit = rules[formData.subCategory];
-        
-        if (pricePerUnit) {
-          // Parse rating value (e.g. "450W" -> 450, "100AH" -> 100, "1KW" -> 1000)
-          let ratingValue = parseFloat(formData.rating.replace(/[^\d.]/g, ''));
-          
-          if (formData.rating.toUpperCase().includes('KW')) {
-            ratingValue = ratingValue * 1000;
-          }
-          
-          const calculatedPrice = ratingValue * pricePerUnit;
-          setFormData({ ...formData, price: Math.round(calculatedPrice).toString() });
-          toast.success(`Price calculated based on ${formData.subCategory} rules.`);
-        } else {
-          toast.error(`No pricing rule found for ${formData.subCategory}.`);
-        }
-      } else {
-        toast.error("Pricing rules not configured in settings.");
+    if (!pricingRules) {
+      toast.error("Pricing rules not loaded.");
+      return;
+    }
+
+    const pricePerUnit = pricingRules[formData.subCategory];
+    
+    if (pricePerUnit) {
+      // Parse rating value (e.g. "450W" -> 450, "100AH" -> 100, "1KW" -> 1000)
+      let ratingValue = parseFloat(formData.rating.replace(/[^\d.]/g, ''));
+      
+      if (formData.rating.toUpperCase().includes('KW')) {
+        ratingValue = ratingValue * 1000;
       }
-    } catch (error) {
-      console.error("Error calculating price:", error);
-      toast.error("Failed to calculate price.");
+      
+      const calculatedPrice = ratingValue * pricePerUnit;
+      setFormData({ ...formData, price: Math.round(calculatedPrice).toString() });
+      toast.success(`Price calculated based on ${formData.subCategory} rules.`);
+    } else {
+      toast.error(`No pricing rule found for ${formData.subCategory}.`);
     }
   };
 

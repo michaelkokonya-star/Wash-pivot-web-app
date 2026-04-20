@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, useLocation, Link } from 'react
 import { HelmetProvider } from 'react-helmet-async';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
+import { SettingsProvider } from './context/SettingsContext';
 import Navbar from './components/Navbar';
 import Logo from './components/Logo';
 import { motion, AnimatePresence } from 'motion/react';
@@ -170,11 +171,13 @@ function App() {
   return (
     <HelmetProvider>
       <AuthProvider>
-        <CartProvider>
-          <Router>
-            <AppContent />
-          </Router>
-        </CartProvider>
+        <SettingsProvider>
+          <CartProvider>
+            <Router>
+              <AppContent />
+            </Router>
+          </CartProvider>
+        </SettingsProvider>
       </AuthProvider>
     </HelmetProvider>
   );
