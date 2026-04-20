@@ -8,6 +8,8 @@ import {
   Clock, AlertCircle, ExternalLink
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { db } from '../firebase';
+import { doc, getDoc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 
 const AdminProjectDetails = () => {
   const { id } = useParams();
@@ -27,50 +29,31 @@ const AdminProjectDetails = () => {
   useEffect(() => {
     if (!id) return;
 
-    const fetchProject = async () => {
-      try {
-        const response = await fetch(`/api/data/projects/${id}`);
-        if (response.ok) {
-          const data = await response.json();
-          setProject(data);
-        } else {
-          setProject(null);
-        }
-      } catch (error) {
-        console.error("Error fetching project:", error);
-      } finally {
-        setLoading(false);
+    const unsubscribe = onSnapshot(doc(db, 'projects', id), (docSnap) => {
+      if (docSnap.exists()) {
+        setProject({ id: docSnap.id, ...docSnap.data() });
+      } else {
+        setProject(null);
       }
-    };
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching project:", error);
+      setLoading(false);
+    });
 
-    fetchProject();
-    const interval = setInterval(fetchProject, 5000);
-    return () => clearInterval(interval);
+    return () => unsubscribe();
   }, [id]);
 
   const handleApproveProject = async (approved: boolean) => {
     if (!project) return;
     setActionLoading(true);
     try {
-      const response = await fetch(`/api/data/projects/${project.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status: approved ? 'active' : 'rejected',
-          isApproved: approved
-        })
+      await updateDoc(doc(db, 'projects', project.id), {
+        status: approved ? 'active' : 'rejected',
+        isApproved: approved
       });
       
-      if (response.ok) {
-        setProject({ 
-          ...project, 
-          status: approved ? 'active' : 'rejected',
-          isApproved: approved
-        });
-        toast.success(`Project ${approved ? 'approved' : 'rejected'} successfully`);
-      } else {
-        throw new Error('Failed to update status');
-      }
+      toast.success(`Project ${approved ? 'approved' : 'rejected'} successfully`);
     } catch (error) {
       console.error("Error updating project status:", error);
       toast.error("Failed to update project status");
@@ -85,16 +68,9 @@ const AdminProjectDetails = () => {
 
     setActionLoading(true);
     try {
-      const response = await fetch(`/api/data/projects/${project.id}`, {
-        method: 'DELETE'
-      });
-      
-      if (response.ok) {
-        toast.success("Project deleted successfully");
-        navigate('/admin');
-      } else {
-        throw new Error('Failed to delete project');
-      }
+      await deleteDoc(doc(db, 'projects', project.id));
+      toast.success("Project deleted successfully");
+      navigate('/admin');
     } catch (error) {
       console.error("Error deleting project:", error);
       toast.error("Failed to delete project");

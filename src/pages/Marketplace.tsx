@@ -9,6 +9,8 @@ import { useCart } from '../context/CartContext';
 import { useSettings } from '../context/SettingsContext';
 import AddProductModal from '../components/AddProductModal';
 import EditProductModal from '../components/EditProductModal';
+import { db } from '../firebase';
+import { collection, query, where, getDocs, orderBy, deleteDoc, doc } from 'firebase/firestore';
 
 interface ProductCardProps {
   product: any;
@@ -222,41 +224,40 @@ const Marketplace = () => {
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/data/products');
-      if (response.ok) {
-        let productsData = await response.json();
-        
-        // Apply category/subcategory filters BEFORE grouping
-        if (filter !== 'All') {
-          productsData = productsData.filter((p: any) => p.category === filter);
-        }
-        if (subFilter !== 'All') {
-          productsData = productsData.filter((p: any) => p.subCategory === subFilter);
-        }
-
-        // Group by name
-        const groupedMap = new Map();
-        productsData.forEach((p: any) => {
-          if (!groupedMap.has(p.name)) {
-            groupedMap.set(p.name, p);
-          }
-        });
-        
-        let filteredProducts = Array.from(groupedMap.values());
-        
-        // Apply rating filter on groups
-        if (ratingFilter !== 'All') {
-          filteredProducts = filteredProducts.filter((p: any) => {
-            // Check if product record has this rating
-            if (p.rating === ratingFilter) return true;
-            // Or check if this rating is a valid option for this subcategory
-            const options = ratingOptions[p.subCategory] || [];
-            return options.includes(ratingFilter);
-          });
-        }
-        
-        setProducts(filteredProducts);
+      const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'));
+      const snapshot = await getDocs(q);
+      let productsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // Apply category/subcategory filters BEFORE grouping
+      if (filter !== 'All') {
+        productsData = productsData.filter((p: any) => p.category === filter);
       }
+      if (subFilter !== 'All') {
+        productsData = productsData.filter((p: any) => p.subCategory === subFilter);
+      }
+
+      // Group by name
+      const groupedMap = new Map();
+      productsData.forEach((p: any) => {
+        if (!groupedMap.has(p.name)) {
+          groupedMap.set(p.name, p);
+        }
+      });
+      
+      let filteredProducts = Array.from(groupedMap.values());
+      
+      // Apply rating filter on groups
+      if (ratingFilter !== 'All') {
+        filteredProducts = filteredProducts.filter((p: any) => {
+          // Check if product record has this rating
+          if (p.rating === ratingFilter) return true;
+          // Or check if this rating is a valid option for this subcategory
+          const options = ratingOptions[p.subCategory] || [];
+          return options.includes(ratingFilter);
+        });
+      }
+      
+      setProducts(filteredProducts);
     } catch (error) {
       console.error("Error fetching products:", error);
     } finally {
@@ -267,26 +268,19 @@ const Marketplace = () => {
   const fetchServices = async () => {
     setServicesLoading(true);
     try {
-      const response = await fetch('/api/data/service_providers');
-      if (response.ok) {
-        let servicesData = await response.json();
-        
-        // Filter by approved status
-        servicesData = servicesData.filter((s: any) => s.isApproved === true);
-        
-        // Apply client-side filtering
-        if (filter !== 'All') {
-          servicesData = servicesData.filter((s: any) => s.category === filter);
-        }
-        if (subFilter !== 'All') {
-          servicesData = servicesData.filter((s: any) => s.subCategory === subFilter);
-        }
-        
-        // Sort by createdAt desc
-        servicesData.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        
-        setServices(servicesData);
+      const q = query(collection(db, 'service_providers'), where('isApproved', '==', true), orderBy('createdAt', 'desc'));
+      const snapshot = await getDocs(q);
+      let servicesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // Apply client-side filtering
+      if (filter !== 'All') {
+        servicesData = servicesData.filter((s: any) => s.category === filter);
       }
+      if (subFilter !== 'All') {
+        servicesData = servicesData.filter((s: any) => s.subCategory === subFilter);
+      }
+      
+      setServices(servicesData);
     } catch (error) {
       console.error("Error fetching services:", error);
     } finally {
@@ -297,10 +291,8 @@ const Marketplace = () => {
   const handleDeleteProduct = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this product?')) return;
     try {
-      const response = await fetch(`/api/data/products/${id}`, { method: 'DELETE' });
-      if (response.ok) {
-        fetchProducts();
-      }
+      await deleteDoc(doc(db, 'products', id));
+      fetchProducts();
     } catch (error) {
       console.error("Error deleting product:", error);
     }

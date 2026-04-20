@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { Users, ShoppingBag, Droplets, Shield, CheckCircle2, XCircle, Search, Filter, Edit, Trash2, Plus, Eye, EyeOff, Key, Package, TrendingUp, DollarSign, PieChart, Check, X, BarChart as BarChartIcon, Activity, Briefcase, Award, Mail, Loader2, Sun, Truck } from 'lucide-react';
+import { useSettings } from '../context/SettingsContext';
+import { db } from '../firebase';
+import { collection, query, getDocs, doc, updateDoc, deleteDoc, setDoc, orderBy, where, onSnapshot } from 'firebase/firestore';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   BarChart, Bar, Legend, AreaChart, Area, PieChart as RePieChart, Pie, Cell, LabelList, Sector 
@@ -75,7 +78,7 @@ const CustomTooltip = ({ active, payload }: any) => {
 };
 
 const PricingSettings = ({ onSuccess, onError }: { onSuccess: () => void, onError: (err: string) => void }) => {
-  const { authFetch } = useAuth();
+  const { pricingRules: globalPricingRules, updatePricingRules } = useSettings();
   const [rules, setRules] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -85,33 +88,16 @@ const PricingSettings = ({ onSuccess, onError }: { onSuccess: () => void, onErro
   const HARDCODED_RULES = ['Solar Panels', 'Batteries', 'Inverter', 'Inverters', 'Charge Controller'];
 
   useEffect(() => {
-    const fetchRules = async () => {
-      try {
-        const response = await fetch('/api/settings/pricing-rules');
-        if (response.ok) {
-          const data = await response.json();
-          // Normalize 'Inverters' to 'Inverter' for consistent lookup
-          if (data['Inverters'] && !data['Inverter']) {
-            data['Inverter'] = data['Inverters'];
-          }
-          setRules(data);
-        } else {
-          // Default rules if fetch fails
-          setRules({
-            'Solar Panels': 150,
-            'Batteries': 800,
-            'Inverter': 25,
-            'Charge Controller': 500
-          });
-        }
-      } catch (error) {
-        console.error("Error fetching pricing rules:", error);
-      } finally {
-        setLoading(false);
+    if (globalPricingRules) {
+      const data = { ...globalPricingRules };
+      // Normalize 'Inverters' to 'Inverter' for consistent lookup
+      if (data['Inverters'] && !data['Inverter']) {
+        data['Inverter'] = data['Inverters'];
       }
-    };
-    fetchRules();
-  }, []);
+      setRules(data);
+      setLoading(false);
+    }
+  }, [globalPricingRules]);
 
   const handleAddRule = () => {
     if (!newRuleName || !newRuleValue) return;
@@ -134,19 +120,11 @@ const PricingSettings = ({ onSuccess, onError }: { onSuccess: () => void, onErro
       if (payload['Inverter']) payload['Inverters'] = payload['Inverter'];
       if (payload['Inverters']) payload['Inverter'] = payload['Inverters'];
 
-      const response = await authFetch('/api/settings/pricing-rules', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (response.ok) {
-        onSuccess();
-      } else {
-        const err = await response.json();
-        onError(err.error || 'Failed to save rules');
-      }
+      await updatePricingRules(payload);
+      onSuccess();
     } catch (error: any) {
-      onError(error.message);
+      console.error("Error saving pricing rules:", error);
+      onError(error.message || 'Failed to save rules');
     } finally {
       setSaving(false);
     }
@@ -314,7 +292,7 @@ const PricingSettings = ({ onSuccess, onError }: { onSuccess: () => void, onErro
 };
 
 const DeliverySettings = ({ onSuccess, onError }: { onSuccess: () => void, onError: (err: string) => void }) => {
-  const { authFetch } = useAuth();
+  const { deliveryRules: globalDeliveryRules, updateDeliveryRules } = useSettings();
   const [rules, setRules] = useState<any>({
     baseRate: 200,
     ratePerKm: 50,
@@ -324,21 +302,11 @@ const DeliverySettings = ({ onSuccess, onError }: { onSuccess: () => void, onErr
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const fetchRules = async () => {
-      try {
-        const response = await fetch('/api/settings/delivery-rules');
-        if (response.ok) {
-          const data = await response.json();
-          setRules(data);
-        }
-      } catch (error) {
-        console.error("Error fetching delivery rules:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchRules();
-  }, []);
+    if (globalDeliveryRules) {
+      setRules(globalDeliveryRules);
+      setLoading(false);
+    }
+  }, [globalDeliveryRules]);
 
   const handleSave = async () => {
     if (rules.baseRate < 200) {
@@ -347,19 +315,11 @@ const DeliverySettings = ({ onSuccess, onError }: { onSuccess: () => void, onErr
     }
     setSaving(true);
     try {
-      const response = await authFetch('/api/settings/delivery-rules', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(rules)
-      });
-      if (response.ok) {
-        onSuccess();
-      } else {
-        const err = await response.json();
-        onError(err.error || 'Failed to save rules');
-      }
+      await updateDeliveryRules(rules);
+      onSuccess();
     } catch (error: any) {
-      onError(error.message);
+      console.error("Error saving delivery rules:", error);
+      onError(error.message || 'Failed to save rules');
     } finally {
       setSaving(false);
     }
@@ -571,160 +531,133 @@ const AdminDashboard = () => {
     setLoading(true);
     try {
       if (activeTab === 'users') {
-        try {
-          const response = await fetch('/api/data/users');
-          if (response.ok) {
-            const fetchedUsers = await response.json();
-            setUsers(fetchedUsers);
-            setStats(prev => ({ ...prev, userCount: fetchedUsers.length }));
-          }
-        } catch (error) {
-          console.error("Error fetching users:", error);
-        }
+        const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
+        const snapshot = await getDocs(q);
+        const fetchedUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setUsers(fetchedUsers);
+        setStats(prev => ({ ...prev, userCount: fetchedUsers.length }));
       } else if (activeTab === 'products') {
-        try {
-          const response = await fetch('/api/data/products');
-          if (response.ok) {
-            const fetchedProducts = await response.json();
-            setProducts(fetchedProducts);
-          }
-        } catch (error) {
-          console.error("Error fetching products:", error);
-        }
+        const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'));
+        const snapshot = await getDocs(q);
+        const fetchedProducts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setProducts(fetchedProducts);
       } else if (activeTab === 'services') {
-        try {
-          const response = await fetch('/api/data/service_providers');
-          if (response.ok) {
-            const fetchedServices = await response.json();
-            setServices(fetchedServices);
-          }
-        } catch (error) {
-          console.error("Error fetching services:", error);
-        }
+        const q = query(collection(db, 'service_providers'), orderBy('createdAt', 'desc'));
+        const snapshot = await getDocs(q);
+        const fetchedServices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setServices(fetchedServices);
       } else if (activeTab === 'orders') {
-        try {
-          const response = await fetch('/api/data/orders');
-          if (response.ok) {
-            const fetchedOrders = await response.json();
-            setOrders(fetchedOrders);
-            
-            // Calculate stats
-            const revenue = fetchedOrders.reduce((acc: number, order: any) => order.status === 'paid' ? acc + (order.totalAmount || 0) : acc, 0);
-            const catSales = { Solar: 0, Water: 0, Sanitation: 0 };
-            fetchedOrders.forEach((order: any) => {
-              if (order.status === 'paid' && order.items) {
-                order.items.forEach((item: any) => {
-                  const cat = item.category;
-                  if (cat && cat in catSales) {
-                    catSales[cat as keyof typeof catSales] += (item.price || 0) * (item.quantity || 0);
-                  }
-                });
+        const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
+        const snapshot = await getDocs(q);
+        const fetchedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setOrders(fetchedOrders);
+        
+        // Calculate stats
+        const revenue = fetchedOrders.reduce((acc: number, order: any) => order.status === 'paid' ? acc + (order.totalAmount || 0) : acc, 0);
+        const catSales = { Solar: 0, Water: 0, Sanitation: 0 };
+        fetchedOrders.forEach((order: any) => {
+          if (order.status === 'paid' && order.items) {
+            order.items.forEach((item: any) => {
+              const cat = item.category;
+              if (cat && cat in catSales) {
+                catSales[cat as keyof typeof catSales] += (item.price || 0) * (item.quantity || 0);
               }
             });
-
-            setStats(prev => ({
-              ...prev,
-              totalRevenue: revenue,
-              orderCount: fetchedOrders.length,
-              categorySales: catSales
-            }));
           }
-        } catch (error) {
-          console.error("Error fetching orders:", error);
-        }
+        });
+
+        setStats(prev => ({
+          ...prev,
+          totalRevenue: revenue,
+          orderCount: fetchedOrders.length,
+          categorySales: catSales
+        }));
       } else if (activeTab === 'projects') {
-        try {
-          const response = await fetch('/api/data/projects');
-          if (response.ok) {
-            const fetchedProjects = await response.json();
-            setProjects(fetchedProjects);
-            setStats(prev => ({ ...prev, projectCount: fetchedProjects.length }));
-          }
-        } catch (error) {
-          console.error("Error fetching projects:", error);
-        }
+        const q = query(collection(db, 'projects'), orderBy('createdAt', 'desc'));
+        const snapshot = await getDocs(q);
+        const fetchedProjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setProjects(fetchedProjects);
+        setStats(prev => ({ ...prev, projectCount: fetchedProjects.length }));
       } else if (activeTab === 'analytics') {
-        try {
-          const ordersRes = await fetch('/api/data/orders');
-          const usersRes = await fetch('/api/data/users');
-          
-          const fetchedOrders = await ordersRes.json();
-          const fetchedUsers = await usersRes.json();
+        const [ordersSnap, usersSnap] = await Promise.all([
+          getDocs(query(collection(db, 'orders'), orderBy('createdAt', 'desc'))),
+          getDocs(query(collection(db, 'users'), orderBy('createdAt', 'desc')))
+        ]);
+        
+        const fetchedOrders = ordersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const fetchedUsers = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-          // Process Revenue by Month
-          const revenueMap: { [key: string]: number } = {};
-          fetchedOrders.forEach((order: any) => {
-            if (order.status === 'paid' && order.createdAt) {
-              const date = new Date(order.createdAt);
-              const month = date.toLocaleString('default', { month: 'short', year: 'numeric' });
-              revenueMap[month] = (revenueMap[month] || 0) + (order.totalAmount || 0);
-            }
-          });
+        // Process Revenue by Month
+        const revenueMap: { [key: string]: number } = {};
+        fetchedOrders.forEach((order: any) => {
+          if (order.status === 'paid' && order.createdAt) {
+            const date = new Date(order.createdAt.seconds ? order.createdAt.seconds * 1000 : order.createdAt);
+            const month = date.toLocaleString('default', { month: 'short', year: 'numeric' });
+            revenueMap[month] = (revenueMap[month] || 0) + (order.totalAmount || 0);
+          }
+        });
 
-          const revenueData = Object.entries(revenueMap)
-            .map(([name, total]) => ({ name, total }))
-            .sort((a, b) => new Date(a.name).getTime() - new Date(b.name).getTime());
+        const revenueData = Object.entries(revenueMap)
+          .map(([name, total]) => ({ name, total }))
+          .sort((a, b) => new Date(a.name).getTime() - new Date(b.name).getTime());
 
-          // Process Sales by Product
-          const productSalesMap: { [key: string]: number } = {};
-          fetchedOrders.forEach((order: any) => {
-            if (order.status === 'paid' && order.items) {
-              order.items.forEach((item: any) => {
-                const name = item.name || 'Unknown Product';
-                productSalesMap[name] = (productSalesMap[name] || 0) + (item.price || 0) * (item.quantity || 0);
-              });
-            }
-          });
+        // Process Sales by Product
+        const productSalesMap: { [key: string]: number } = {};
+        fetchedOrders.forEach((order: any) => {
+          if (order.status === 'paid' && order.items) {
+            order.items.forEach((item: any) => {
+              const name = item.name || 'Unknown Product';
+              productSalesMap[name] = (productSalesMap[name] || 0) + (item.price || 0) * (item.quantity || 0);
+            });
+          }
+        });
 
-          const productSalesData = Object.entries(productSalesMap)
-            .map(([name, total]) => ({ name, total }))
-            .sort((a, b) => b.total - a.total)
-            .slice(0, 5); // Top 5 products
+        const productSalesData = Object.entries(productSalesMap)
+          .map(([name, total]) => ({ name, total }))
+          .sort((a, b) => b.total - a.total)
+          .slice(0, 5); // Top 5 products
 
-          // Process Sales by Region
-          const regionSalesMap: { [key: string]: number } = {};
-          fetchedOrders.forEach((order: any) => {
-            if (order.status === 'paid' && order.shippingInfo?.city) {
-              const region = order.shippingInfo.city;
-              regionSalesMap[region] = (regionSalesMap[region] || 0) + (order.totalAmount || 0);
-            }
-          });
+        // Process Sales by Region
+        const regionSalesMap: { [key: string]: number } = {};
+        fetchedOrders.forEach((order: any) => {
+          if (order.status === 'paid' && order.shippingInfo?.city) {
+            const region = order.shippingInfo.city;
+            regionSalesMap[region] = (regionSalesMap[region] || 0) + (order.totalAmount || 0);
+          }
+        });
 
-          const totalRegionSales = Object.values(regionSalesMap).reduce((a, b) => a + b, 0);
-          const regionSalesData = Object.entries(regionSalesMap)
-            .map(([name, value]) => ({ 
-              name, 
-              value,
-              percent: totalRegionSales > 0 ? value / totalRegionSales : 0
-            }))
-            .sort((a, b) => b.value - a.value);
+        const totalRegionSales = Object.values(regionSalesMap).reduce((a, b) => a + b, 0);
+        const regionSalesData = Object.entries(regionSalesMap)
+          .map(([name, value]) => ({ 
+            name, 
+            value,
+            percent: totalRegionSales > 0 ? value / totalRegionSales : 0
+          }))
+          .sort((a, b) => b.value - a.value);
 
-          // Process User Growth by Month
-          const userMap: { [key: string]: number } = {};
-          fetchedUsers.forEach((u: any) => {
-            if (u.createdAt) {
-              const date = new Date(u.createdAt);
-              const month = date.toLocaleString('default', { month: 'short', year: 'numeric' });
-              userMap[month] = (userMap[month] || 0) + 1;
-            }
-          });
+        // Process User Growth by Month
+        const userMap: { [key: string]: number } = {};
+        fetchedUsers.forEach((u: any) => {
+          if (u.createdAt) {
+            const date = new Date(u.createdAt.seconds ? u.createdAt.seconds * 1000 : u.createdAt);
+            const month = date.toLocaleString('default', { month: 'short', year: 'numeric' });
+            userMap[month] = (userMap[month] || 0) + 1;
+          }
+        });
 
-          const userData = Object.entries(userMap)
-            .map(([name, count]) => ({ name, count }))
-            .sort((a, b) => new Date(a.name).getTime() - new Date(b.name).getTime());
+        const userData = Object.entries(userMap)
+          .map(([name, count]) => ({ name, count }))
+          .sort((a, b) => new Date(a.name).getTime() - new Date(b.name).getTime());
 
-          setAnalyticsData({
-            revenueByMonth: revenueData,
-            userGrowthByMonth: userData,
-            salesByProduct: productSalesData,
-            salesByRegion: regionSalesData
-          });
-        } catch (error) {
-          console.error("Error fetching analytics:", error);
-        }
+        setAnalyticsData({
+          revenueByMonth: revenueData,
+          userGrowthByMonth: userData,
+          salesByProduct: productSalesData,
+          salesByRegion: regionSalesData
+        });
       }
     } catch (error) {
-      console.error(`Error fetching ${activeTab}:`, error);
+      console.error(`Error fetching data for ${activeTab}:`, error);
     } finally {
       setLoading(false);
     }
@@ -763,23 +696,17 @@ const AdminDashboard = () => {
 
   const handleToggleApproval = async (userId: string, currentStatus: boolean) => {
     try {
-      const response = await authFetch(`/api/data/users/${userId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isApproved: !currentStatus })
-      });
+      await updateDoc(doc(db, 'users', userId), { isApproved: !currentStatus });
       
-      if (response.ok) {
-        // Also update public profile if it exists
-        await authFetch(`/api/data/public_profiles/${userId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ isApproved: !currentStatus })
-        });
-        
-        setUsers(users.map(u => u.id === userId ? { ...u, isApproved: !currentStatus } : u));
-        setMessage({ type: 'success', text: `User ${!currentStatus ? 'approved' : 'unapproved'} successfully` });
+      // Also update public profile if it exists
+      try {
+        await updateDoc(doc(db, 'public_profiles', userId), { isApproved: !currentStatus });
+      } catch (e) {
+        // Public profile might not exist, that's okay
       }
+      
+      setUsers(users.map(u => u.id === userId ? { ...u, isApproved: !currentStatus } : u));
+      setMessage({ type: 'success', text: `User ${!currentStatus ? 'approved' : 'unapproved'} successfully` });
     } catch (error) {
       console.error("Error toggling approval:", error);
       setMessage({ type: 'error', text: 'Failed to update approval status' });
@@ -788,15 +715,9 @@ const AdminDashboard = () => {
 
   const handleToggleServiceApproval = async (serviceId: string, currentStatus: boolean) => {
     try {
-      const response = await authFetch(`/api/data/service_providers/${serviceId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isApproved: !currentStatus })
-      });
-      if (response.ok) {
-        setServices(services.map(s => s.id === serviceId ? { ...s, isApproved: !currentStatus } : s));
-        setMessage({ type: 'success', text: `Service provider ${!currentStatus ? 'approved' : 'unapproved'} successfully` });
-      }
+      await updateDoc(doc(db, 'service_providers', serviceId), { isApproved: !currentStatus });
+      setServices(services.map(s => s.id === serviceId ? { ...s, isApproved: !currentStatus } : s));
+      setMessage({ type: 'success', text: `Service provider ${!currentStatus ? 'approved' : 'unapproved'} successfully` });
     } catch (error) {
       console.error("Error toggling service approval:", error);
       setMessage({ type: 'error', text: 'Failed to update service approval status' });
@@ -805,15 +726,9 @@ const AdminDashboard = () => {
 
   const handleToggleContacts = async (userId: string, currentStatus: boolean) => {
     try {
-      const response = await authFetch(`/api/data/users/${userId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ showContacts: !currentStatus })
-      });
-      if (response.ok) {
-        setUsers(users.map(u => u.id === userId ? { ...u, showContacts: !currentStatus } : u));
-        setMessage({ type: 'success', text: `Contacts ${!currentStatus ? 'revealed' : 'hidden'} successfully` });
-      }
+      await updateDoc(doc(db, 'users', userId), { showContacts: !currentStatus });
+      setUsers(users.map(u => u.id === userId ? { ...u, showContacts: !currentStatus } : u));
+      setMessage({ type: 'success', text: `Contacts ${!currentStatus ? 'revealed' : 'hidden'} successfully` });
     } catch (error) {
       console.error("Error toggling contacts:", error);
       setMessage({ type: 'error', text: 'Failed to update contact visibility' });
@@ -834,8 +749,10 @@ const AdminDashboard = () => {
   const handleDeleteUser = async (userId: string) => {
     if (!window.confirm('Are you sure you want to delete this user? This action is irreversible.')) return;
     try {
-      await authFetch(`/api/data/users/${userId}`, { method: 'DELETE' });
-      await authFetch(`/api/data/public_profiles/${userId}`, { method: 'DELETE' });
+      await deleteDoc(doc(db, 'users', userId));
+      try {
+        await deleteDoc(doc(db, 'public_profiles', userId));
+      } catch (e) {}
       setUsers(users.filter(u => u.id !== userId));
       setMessage({ type: 'success', text: 'User deleted successfully' });
     } catch (error) {
@@ -847,7 +764,7 @@ const AdminDashboard = () => {
   const handleDeleteProduct = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this product?')) return;
     try {
-      await authFetch(`/api/data/products/${id}`, { method: 'DELETE' });
+      await deleteDoc(doc(db, 'products', id));
       fetchData();
       setMessage({ type: 'success', text: 'Product deleted successfully' });
     } catch (error) {
@@ -864,7 +781,7 @@ const AdminDashboard = () => {
   const handleDeleteService = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this service provider?')) return;
     try {
-      await authFetch(`/api/data/service_providers/${id}`, { method: 'DELETE' });
+      await deleteDoc(doc(db, 'service_providers', id));
       fetchData();
       setMessage({ type: 'success', text: 'Service provider deleted successfully' });
     } catch (error) {
@@ -892,23 +809,15 @@ const AdminDashboard = () => {
 
       const updatedTimeline = [...(currentOrder.trackingTimeline || []), timelineEntry];
 
-      const response = await authFetch(`/api/data/orders/${orderId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          status: newStatus,
-          trackingTimeline: updatedTimeline
-        })
+      await updateDoc(doc(db, 'orders', orderId), {
+        status: newStatus,
+        trackingTimeline: updatedTimeline
       });
-      if (response.ok) {
-        setOrders(orders.map(o => o.id === orderId ? { ...o, status: newStatus, trackingTimeline: updatedTimeline } : o));
-        setMessage({ type: 'success', text: 'Order status updated successfully' });
-        setIsUpdateStatusModalOpen(false);
-        setNewStatusNote('');
-      } else {
-        const err = await response.json();
-        setMessage({ type: 'error', text: err.error || 'Failed to update order status' });
-      }
+      
+      setOrders(orders.map(o => o.id === orderId ? { ...o, status: newStatus, trackingTimeline: updatedTimeline } : o));
+      setMessage({ type: 'success', text: 'Order status updated successfully' });
+      setIsUpdateStatusModalOpen(false);
+      setNewStatusNote('');
     } catch (error: any) {
       console.error("Error updating order status:", error);
       setMessage({ type: 'error', text: error.message || 'Failed to update order status' });

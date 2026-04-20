@@ -3,6 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, Mail, Shield, CheckCircle2, XCircle, Phone, Eye, EyeOff, Save, Loader2, Award, GraduationCap, Briefcase, Clock, Settings, LogOut, Sparkles, Package, ExternalLink, Lock, Camera, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { db } from '../firebase';
+import { collection, query, where, getDocs, orderBy, updateDoc, doc } from 'firebase/firestore';
 
 interface OrderItem {
   id: string;
@@ -65,14 +67,14 @@ const Profile = () => {
     const fetchOrders = async () => {
       if (!user) return;
       try {
-        const response = await authFetch('/api/data/orders');
-        if (response.ok) {
-          const allOrders = await response.json();
-          const userOrders = allOrders
-            .filter((o: any) => o.userId === user.uid)
-            .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-          setOrders(userOrders);
-        }
+        const q = query(
+          collection(db, 'orders'), 
+          where('userId', '==', user.uid),
+          orderBy('createdAt', 'desc')
+        );
+        const snapshot = await getDocs(q);
+        const userOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Order[];
+        setOrders(userOrders);
       } catch (error) {
         console.error("Error fetching orders:", error);
       } finally {
@@ -97,28 +99,19 @@ const Profile = () => {
         showContacts: formData.showContacts
       };
 
-      const response = await authFetch(`/api/data/users/${user.uid}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updateData)
-      });
+      await updateDoc(doc(db, 'users', user.uid), updateData);
 
-      if (response.ok) {
-        // Also update public profile if it exists
-        if (profile?.role === 'expert') {
-          const publicRes = await authFetch(`/api/data/public_profiles/${user.uid}`);
-          if (publicRes.ok) {
-            await authFetch(`/api/data/public_profiles/${user.uid}`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(updateData)
-            });
-          }
+      // Also update public profile if it exists
+      if (profile?.role === 'expert') {
+        try {
+          await updateDoc(doc(db, 'public_profiles', user.uid), updateData);
+        } catch (e) {
+          // Public profile might not exist
         }
-
-        setMessage({ type: 'success', text: 'Profile updated successfully!' });
-        setIsEditing(false);
       }
+
+      setMessage({ type: 'success', text: 'Profile updated successfully!' });
+      setIsEditing(false);
     } catch (error) {
       console.error("Error updating profile:", error);
       setMessage({ type: 'error', text: 'Failed to update profile. Please try again.' });

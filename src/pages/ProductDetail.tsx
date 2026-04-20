@@ -7,6 +7,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Helmet } from 'react-helmet-async';
 import { ShoppingCart, ArrowLeft, Sun, Droplets, ShieldCheck, CheckCircle2, Star, MessageSquare, Send, User, ArrowRight, Facebook, Twitter, Linkedin, Share2, Link as LinkIcon, Globe, ChevronDown, ChevronUp, Trash2, Loader2 } from 'lucide-react';
 import OptimizedImage from '../components/OptimizedImage';
+import { db } from '../firebase';
+import { doc, getDoc, collection, query, where, getDocs, addDoc, serverTimestamp, deleteDoc, orderBy, onSnapshot } from 'firebase/firestore';
 
 const ProductDetail = () => {
   const { id } = useParams();
@@ -124,11 +126,13 @@ const ProductDetail = () => {
     const fetchProduct = async () => {
       try {
         if (!id) return;
-        const response = await fetch(`/api/data/products/${id}`);
-        if (response.ok) {
-          const productData = await response.json();
+        const docSnap = await getDoc(doc(db, 'products', id));
+        if (docSnap.exists()) {
+          const productData = { id: docSnap.id, ...docSnap.data() };
           setProduct(productData);
-          setSelectedImage(productData.imageUrl);
+          if (productData.imageUrl) {
+            setSelectedImage(productData.imageUrl);
+          }
           setCurrentRating(productData.rating || '');
           setCurrentPrice(productData.price || 0);
           fetchRelated(productData.category, id);
@@ -142,24 +146,23 @@ const ProductDetail = () => {
 
     const fetchRelated = async (category: string, currentId: string) => {
       try {
-        const response = await fetch('/api/data/products');
-        if (response.ok) {
-          const allProducts = await response.json();
-          
-          // Group by name to avoid duplicates
-          const groupedMap = new Map();
-          allProducts.forEach((p: any) => {
-            if (!groupedMap.has(p.name)) {
-              groupedMap.set(p.name, p);
-            }
-          });
-          const uniqueProducts = Array.from(groupedMap.values());
+        const q = query(collection(db, 'products'), where('category', '==', category));
+        const snapshot = await getDocs(q);
+        const allProducts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        // Group by name to avoid duplicates
+        const groupedMap = new Map();
+        allProducts.forEach((p: any) => {
+          if (!groupedMap.has(p.name)) {
+            groupedMap.set(p.name, p);
+          }
+        });
+        const uniqueProducts = Array.from(groupedMap.values());
 
-          const related = uniqueProducts
-            .filter((p: any) => p.category === category && p.id !== currentId)
-            .slice(0, 4);
-          setRelatedProducts(related);
-        }
+        const related = uniqueProducts
+          .filter((p: any) => p.id !== currentId)
+          .slice(0, 4);
+        setRelatedProducts(related);
       } catch (error) {
         console.error("Error fetching related products:", error);
       }
@@ -172,24 +175,18 @@ const ProductDetail = () => {
   useEffect(() => {
     if (!id) return;
 
-    const fetchReviews = async () => {
-      try {
-        const response = await fetch('/api/data/reviews');
-        if (response.ok) {
-          const allReviews = await response.json();
-          const productReviews = allReviews
-            .filter((r: any) => r.productId === id)
-            .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-          setReviews(productReviews);
-        }
-      } catch (error) {
+    const fetchReviews = () => {
+      const q = query(collection(db, 'reviews'), where('productId', '==', id), orderBy('createdAt', 'desc'));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const productReviews = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setReviews(productReviews);
+      }, (error) => {
         console.error("Error fetching reviews:", error);
-      }
+      });
+      return unsubscribe;
     };
 
-    fetchReviews();
-    const interval = setInterval(fetchReviews, 5000); // Poll every 5s
-    return () => clearInterval(interval);
+    return fetchReviews();
   }, [id]);
 
   const averageRating = reviews.length > 0 
@@ -200,7 +197,7 @@ const ProductDetail = () => {
     if (!window.confirm('Are you sure you want to delete your review?')) return;
     setDeletingReviewId(reviewId);
     try {
-      await fetch(`/api/data/reviews/${reviewId}`, { method: 'DELETE' });
+      await deleteDoc(doc(db, 'reviews', reviewId));
       setReviews(reviews.filter(r => r.id !== reviewId));
     } catch (error) {
       console.error("Error deleting review:", error);
@@ -215,32 +212,17 @@ const ProductDetail = () => {
 
     setSubmittingReview(true);
     try {
-      const response = await fetch('/api/data/reviews', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          productId: id,
-          userId: user.uid,
-          userName: profile?.displayName || user.displayName || 'Anonymous',
-          rating: newRating,
-          comment: newComment,
-          createdAt: new Date().toISOString()
-        })
+      await addDoc(collection(db, 'reviews'), {
+        productId: id,
+        userId: user.uid,
+        userName: profile?.displayName || user.displayName || 'Anonymous',
+        rating: newRating,
+        comment: newComment,
+        createdAt: new Date().toISOString()
       });
 
-      if (response.ok) {
-        setNewComment('');
-        setNewRating(5);
-        // Refresh reviews
-        const res = await fetch('/api/data/reviews');
-        if (res.ok) {
-          const allReviews = await res.json();
-          const productReviews = allReviews
-            .filter((r: any) => r.productId === id)
-            .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-          setReviews(productReviews);
-        }
-      }
+      setNewComment('');
+      setNewRating(5);
     } catch (error) {
       console.error("Error submitting review:", error);
     } finally {

@@ -16,6 +16,13 @@ if (!firestoreDatabaseId) {
 }
 
 export const getDb = () => {
-    // In firebase-admin, we can get a named database via getFirestore
-    return getFirestore(admin.app(), firestoreDatabaseId || '(default)');
+    try {
+      // In firebase-admin, we can get a named database via getFirestore
+      return getFirestore(admin.app(), firestoreDatabaseId || '(default)');
+    } catch (error: any) {
+      if (error.message.includes('Could not load the default credentials')) {
+        throw new Error('Firebase Admin Authentication Error: Could not load credentials. Please provide a service account JSON in the FIREBASE_SERVICE_ACCOUNT environment variable via the Secrets panel.');
+      }
+      throw error;
+    }
 };

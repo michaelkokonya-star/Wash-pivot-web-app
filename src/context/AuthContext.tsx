@@ -12,7 +12,8 @@ import {
   updatePassword,
   sendEmailVerification
 } from 'firebase/auth';
-import { auth } from '../firebase';
+import { auth, db } from '../firebase';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 
 interface AuthContextType {
   user: User | null;
@@ -43,19 +44,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(user);
       if (user) {
         try {
-          const response = await fetch(`/api/data/users/${user.uid}`);
-          if (response.ok) {
-            const data = await response.json();
+          const docRef = doc(db, 'users', user.uid);
+          const docSnap = await getDoc(docRef);
+          
+          if (docSnap.exists()) {
+            const data = docSnap.data();
             if (user.email === 'michael.kokonya@washpivot.com' && data.role !== 'admin') {
               const updatedProfile = { ...data, role: 'admin', isApproved: true };
-              await fetch(`/api/data/users/${user.uid}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updatedProfile)
-              });
+              await updateDoc(docRef, { role: 'admin', isApproved: true });
               setProfile(updatedProfile);
             } else {
-              setProfile(data);
+              setProfile({ id: docSnap.id, ...data });
             }
           } else {
             const isGoogleUser = user.providerData.some(p => p.providerId === 'google.com');
@@ -72,11 +71,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               hasSeenWelcome: false,
               createdAt: new Date().toISOString(),
             };
-            await fetch('/api/data/users', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(initialProfile)
-            });
+            await setDoc(docRef, initialProfile);
             setProfile(initialProfile);
           }
         } catch (error) {

@@ -6,6 +6,8 @@ import { motion } from 'motion/react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { ChevronLeft, CreditCard, Smartphone, Loader2, AlertCircle, ArrowRight, ShieldCheck, Truck } from 'lucide-react';
+import { db } from '../firebase';
+import { collection, addDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
 
 const VisaIcon = () => (
   <svg viewBox="0 0 48 48" className="h-4 w-auto" xmlns="http://www.w3.org/2000/svg">
@@ -70,7 +72,7 @@ const Checkout = () => {
     setError(null);
 
     try {
-      // 1. Save Order to Generic Data API (Initial state: Pending)
+      // 1. Save Order to Firestore (Initial state: Pending)
       const orderData = {
         userId: user?.uid,
         userEmail: user?.email,
@@ -92,18 +94,8 @@ const Checkout = () => {
         createdAt: new Date().toISOString(),
       };
 
-      const orderResponse = await authFetch('/api/data/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(orderData)
-      });
-
-      if (!orderResponse.ok) {
-        throw new Error('Failed to create order');
-      }
-
-      const orderResult = await orderResponse.json();
-      const orderId = orderResult.id;
+      const docRef = await addDoc(collection(db, 'orders'), orderData);
+      const orderId = docRef.id;
 
       if (paymentMethod === 'card') {
         // 2a. Stripe Checkout
