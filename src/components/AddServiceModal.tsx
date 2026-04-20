@@ -2,7 +2,8 @@ import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Upload, Plus, Loader2, Mail, Phone, MapPin, Image as ImageIcon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { auth } from '../firebase';
+import { auth, db } from '../firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { compressImage } from '../lib/image-utils';
 import { toast } from 'sonner';
 
@@ -78,36 +79,29 @@ const AddServiceModal: React.FC<AddServiceModalProps> = ({ isOpen, onClose, onSu
       }
 
       setUploadStatus('saving');
-      const response = await fetch('/api/data/service_providers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          imageUrl: finalImageUrl,
-          isApproved: false,
-          createdAt: new Date().toISOString()
-        })
+      await addDoc(collection(db, 'service_providers'), {
+        ...formData,
+        imageUrl: finalImageUrl,
+        isApproved: false,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
       });
 
-      if (response.ok) {
-        onSuccess();
-        onClose();
-        toast.success("Service provider added successfully!");
-        setFormData({
-          name: '',
-          category: 'Installation',
-          subCategory: 'None',
-          description: '',
-          imageUrl: '',
-          contactEmail: '',
-          contactPhone: '',
-          location: ''
-        });
-        setImageFile(null);
-        setImagePreview(null);
-      } else {
-        throw new Error('Failed to save service provider');
-      }
+      onSuccess();
+      onClose();
+      toast.success("Service provider added successfully!");
+      setFormData({
+        name: '',
+        category: 'Installation',
+        subCategory: 'None',
+        description: '',
+        imageUrl: '',
+        contactEmail: '',
+        contactPhone: '',
+        location: ''
+      });
+      setImageFile(null);
+      setImagePreview(null);
     } catch (error) {
       console.error("Error adding service provider:", error);
       toast.error("Failed to add service provider. Please try again.");

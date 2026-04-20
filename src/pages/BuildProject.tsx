@@ -8,6 +8,8 @@ import SolarAIAdvisor from '../components/SolarAIAdvisor';
 import SolarKitBuilder from '../components/SolarKitBuilder';
 import ProjectVisualizer from '../components/ProjectVisualizer';
 import AICreativeStudio from '../components/AICreativeStudio';
+import { db } from '../firebase';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 
 const BuildProject = () => {
   const [activeTab, setActiveTab] = useState<'quote' | 'kit' | 'ai'>('quote');
@@ -20,20 +22,15 @@ const BuildProject = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const pRes = await fetch('/api/data/products');
-        if (pRes.ok) {
-          setProducts(await pRes.json());
-        }
+        const pSnap = await getDocs(collection(db, 'products'));
+        setProducts(pSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       } catch (error) {
         console.error("Error fetching products:", error);
       }
 
       try {
-        const eRes = await fetch('/api/data/public_profiles');
-        if (eRes.ok) {
-          const allProfiles = await eRes.json();
-          setExperts(allProfiles.filter((p: any) => p.role === 'expert'));
-        }
+        const eSnap = await getDocs(query(collection(db, 'public_profiles'), where('role', '==', 'expert')));
+        setExperts(eSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       } catch (error) {
         console.error("Error fetching experts:", error);
       }

@@ -5,6 +5,8 @@ import { Helmet } from 'react-helmet-async';
 import { Plus, Target, Users, TrendingUp, Heart, ListTodo, X, Shield, Loader2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import AddProjectModal from '../components/AddProjectModal';
+import { db } from '../firebase';
+import { collection, getDocs, query, where, updateDoc, doc } from 'firebase/firestore';
 
 const MicroFunding = () => {
   const { user, profile } = useAuth();
@@ -14,15 +16,15 @@ const MicroFunding = () => {
 
   const fetchProjects = async () => {
     try {
-      const response = await fetch('/api/data/projects');
-      if (response.ok) {
-        const allProjects = await response.json();
-        // Only show approved projects to regular users
-        if (profile?.role === 'admin') {
-          setProjects(allProjects);
-        } else {
-          setProjects(allProjects.filter((p: any) => p.isApproved === true));
-        }
+      const q = collection(db, 'projects');
+      const snapshot = await getDocs(q);
+      const allProjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // Only show approved projects to regular users
+      if (profile?.role === 'admin') {
+        setProjects(allProjects);
+      } else {
+        setProjects(allProjects.filter((p: any) => p.isApproved === true));
       }
     } catch (error) {
       console.error("Error fetching projects:", error);
@@ -36,16 +38,11 @@ const MicroFunding = () => {
   const handleSupport = async (projectId: string, current: number) => {
     if (!user) return alert('Please sign in to support projects');
     try {
-      const response = await fetch(`/api/data/projects/${projectId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          currentFunding: current + 5000 // Mock support amount in KSh
-        })
+      const newFunding = current + 5000;
+      await updateDoc(doc(db, 'projects', projectId), {
+        currentFunding: newFunding
       });
-      if (response.ok) {
-        window.location.reload();
-      }
+      fetchProjects();
     } catch (error) {
       console.error("Error supporting project:", error);
     }

@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Users, ShoppingBag, Droplets, Shield, CheckCircle2, XCircle, Search, Filter, Edit, Trash2, Plus, Eye, EyeOff, Key, Package, TrendingUp, DollarSign, PieChart, Check, X, BarChart as BarChartIcon, Activity, Briefcase, Award, Mail, Loader2, Sun, Truck } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
 import { db } from '../firebase';
-import { collection, query, getDocs, doc, updateDoc, deleteDoc, setDoc, orderBy, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, getDocs, doc, updateDoc, deleteDoc, setDoc, orderBy, where, onSnapshot, serverTimestamp } from 'firebase/firestore';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   BarChart, Bar, Legend, AreaChart, Area, PieChart as RePieChart, Pie, Cell, LabelList, Sector 
@@ -672,21 +672,16 @@ const AdminDashboard = () => {
     setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
 
     try {
-      const response = await authFetch(`/api/data/users/${userId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: newRole })
+      await updateDoc(doc(db, 'users', userId), { 
+        role: newRole,
+        updatedAt: serverTimestamp()
       });
       
-      if (response.ok) {
-        // If demoted from expert, remove public profile
-        if (newRole !== 'expert') {
-          await authFetch(`/api/data/public_profiles/${userId}`, { method: 'DELETE' });
-        }
-        setMessage({ type: 'success', text: 'User role updated successfully' });
-      } else {
-        throw new Error('Failed to update role');
+      // If demoted from expert, remove public profile
+      if (newRole !== 'expert') {
+        await deleteDoc(doc(db, 'public_profiles', userId));
       }
+      setMessage({ type: 'success', text: 'User role updated successfully' });
     } catch (error) {
       console.error("Error updating role:", error);
       setUsers(previousUsers);
@@ -827,7 +822,7 @@ const AdminDashboard = () => {
   const handleDeleteOrder = async (orderId: string) => {
     if (!window.confirm('Are you sure you want to delete this order?')) return;
     try {
-      await fetch(`/api/data/orders/${orderId}`, { method: 'DELETE' });
+      await deleteDoc(doc(db, 'orders', orderId));
       setOrders(orders.filter(o => o.id !== orderId));
       setMessage({ type: 'success', text: 'Order deleted successfully' });
     } catch (error) {
@@ -838,18 +833,12 @@ const AdminDashboard = () => {
 
   const handleApproveProject = async (projectId: string, approve: boolean) => {
     try {
-      const response = await fetch(`/api/data/projects/${projectId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          isApproved: approve,
-          status: approve ? 'active' : 'rejected'
-        })
+      await updateDoc(doc(db, 'projects', projectId), { 
+        isApproved: approve,
+        status: approve ? 'active' : 'rejected'
       });
-      if (response.ok) {
-        setProjects(projects.map(p => p.id === projectId ? { ...p, isApproved: approve, status: approve ? 'active' : 'rejected' } : p));
-        setMessage({ type: 'success', text: `Project ${approve ? 'approved' : 'rejected'} successfully` });
-      }
+      setProjects(projects.map(p => p.id === projectId ? { ...p, isApproved: approve, status: approve ? 'active' : 'rejected' } : p));
+      setMessage({ type: 'success', text: `Project ${approve ? 'approved' : 'rejected'} successfully` });
     } catch (error) {
       console.error("Error updating project status:", error);
       setMessage({ type: 'error', text: 'Failed to update project status' });
@@ -858,15 +847,9 @@ const AdminDashboard = () => {
 
   const handleCertifyProject = async (projectId: string, certify: boolean) => {
     try {
-      const response = await fetch(`/api/data/projects/${projectId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isCertified: certify })
-      });
-      if (response.ok) {
-        setProjects(projects.map(p => p.id === projectId ? { ...p, isCertified: certify } : p));
-        setMessage({ type: 'success', text: `Project ${certify ? 'certified' : 'uncertified'} successfully` });
-      }
+      await updateDoc(doc(db, 'projects', projectId), { isCertified: certify });
+      setProjects(projects.map(p => p.id === projectId ? { ...p, isCertified: certify } : p));
+      setMessage({ type: 'success', text: `Project ${certify ? 'certified' : 'uncertified'} successfully` });
     } catch (error) {
       console.error("Error certifying project:", error);
       setMessage({ type: 'error', text: 'Failed to certify project' });
@@ -1822,11 +1805,9 @@ const AdminDashboard = () => {
                           onClick={async () => {
                             if (window.confirm('Delete this project?')) {
                               try {
-                                const response = await fetch(`/api/data/projects/${project.id}`, { method: 'DELETE' });
-                                if (response.ok) {
-                                  fetchData();
-                                  setMessage({ type: 'success', text: 'Project deleted successfully' });
-                                }
+                                await deleteDoc(doc(db, 'projects', project.id));
+                                fetchData();
+                                setMessage({ type: 'success', text: 'Project deleted successfully' });
                               } catch (error) {
                                 console.error("Error deleting project:", error);
                                 setMessage({ type: 'error', text: 'Failed to delete project' });

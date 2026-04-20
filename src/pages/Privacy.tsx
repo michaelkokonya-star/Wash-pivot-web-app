@@ -3,6 +3,8 @@ import { motion } from 'motion/react';
 import { Shield, Check, AlertCircle, ArrowRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
+import { db } from '../firebase';
+import { doc, updateDoc } from 'firebase/firestore';
 
 const Privacy = () => {
   const { user, profile } = useAuth();
@@ -16,20 +18,12 @@ const Privacy = () => {
 
     setAccepting(true);
     try {
-      const response = await fetch(`/api/data/users/${user.uid}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          hasAcceptedPrivacy: true,
-          privacyAcceptedAt: new Date().toISOString()
-        })
+      await updateDoc(doc(db, 'users', user.uid), {
+        hasAcceptedPrivacy: true,
+        privacyAcceptedAt: new Date().toISOString()
       });
 
-      if (response.ok) {
-        toast.success("Privacy policy accepted successfully!");
-      } else {
-        throw new Error('Failed to update privacy acceptance');
-      }
+      toast.success("Privacy policy accepted successfully!");
     } catch (error) {
       console.error("Error accepting privacy policy:", error);
       toast.error("Failed to save acceptance. Please try again.");

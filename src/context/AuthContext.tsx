@@ -127,11 +127,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       hasSeenWelcome: false,
       createdAt: new Date().toISOString(),
     };
-    await fetch('/api/data/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(initialProfile)
-    });
+    await setDoc(doc(db, 'users', user.uid), initialProfile);
     setProfile(initialProfile);
   };
 
@@ -166,15 +162,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateProfile = async (data: any) => {
     if (!user) return;
-    const token = await user.getIdToken();
-    await fetch(`/api/data/users/${user.uid}`, {
-      method: 'PATCH',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify(data)
-    });
+    await updateDoc(doc(db, 'users', user.uid), data);
     setProfile((prev: any) => ({ ...prev, ...data }));
   };
 

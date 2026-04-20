@@ -3,6 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import { motion } from 'motion/react';
 import { User, Briefcase, GraduationCap, Search, Filter, Mail, Award, Sparkles, Trash2 } from 'lucide-react';
 import ExpertOnboardingModal from '../components/ExpertOnboardingModal';
+import { db } from '../firebase';
+import { collection, getDocs, query, where, deleteDoc, doc } from 'firebase/firestore';
 
 const Recruitment = () => {
   const { user, profile } = useAuth();
@@ -17,12 +19,14 @@ const Recruitment = () => {
   const fetchExperts = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/data/public_profiles');
-      if (response.ok) {
-        const data = await response.json();
-        const expertsData = data.filter((p: any) => p.role === 'expert' && p.isApproved === true);
-        setExperts(expertsData);
-      }
+      const q = query(
+        collection(db, 'public_profiles'), 
+        where('role', '==', 'expert'),
+        where('isApproved', '==', true)
+      );
+      const snapshot = await getDocs(q);
+      const expertsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setExperts(expertsData);
     } catch (error) {
       console.error("Error fetching experts:", error);
     } finally {
@@ -33,9 +37,8 @@ const Recruitment = () => {
   const handleDeleteExpert = async (expertId: string) => {
     if (!window.confirm('Are you sure you want to remove this expert?')) return;
     try {
-      // Delete from both collections via API
-      await fetch(`/api/data/users/${expertId}`, { method: 'DELETE' });
-      await fetch(`/api/data/public_profiles/${expertId}`, { method: 'DELETE' });
+      await deleteDoc(doc(db, 'users', expertId));
+      await deleteDoc(doc(db, 'public_profiles', expertId));
       setExperts(experts.filter(e => e.id !== expertId));
     } catch (error) {
       console.error("Error deleting expert:", error);

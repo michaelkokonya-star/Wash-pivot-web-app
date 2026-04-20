@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { Helmet } from 'react-helmet-async';
 import { ArrowLeft, CheckCircle2, Circle, Heart, Users, Target, Calendar, ShieldCheck, TrendingUp, Facebook, Twitter, Linkedin, MessageSquare, Link as LinkIcon, Shield, Play } from 'lucide-react';
+import { db } from '../firebase';
+import { doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 
 const ProjectDetail = () => {
   const { id } = useParams();
@@ -16,26 +18,19 @@ const ProjectDetail = () => {
   useEffect(() => {
     if (!id) return;
 
-    const fetchProject = async () => {
-      try {
-        const response = await fetch(`/api/data/projects/${id}`);
-        if (response.ok) {
-          const data = await response.json();
-          setProject(data);
-        } else {
-          setProject(null);
-        }
-      } catch (error) {
-        console.error("Error fetching project:", error);
-      } finally {
-        setLoading(false);
+    const unsubscribe = onSnapshot(doc(db, 'projects', id), (docSnap) => {
+      if (docSnap.exists()) {
+        setProject({ id: docSnap.id, ...docSnap.data() });
+      } else {
+        setProject(null);
       }
-    };
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching project:", error);
+      setLoading(false);
+    });
 
-    fetchProject();
-    // Set up polling instead of onSnapshot since we are using S3 JSON
-    const interval = setInterval(fetchProject, 5000);
-    return () => clearInterval(interval);
+    return () => unsubscribe();
   }, [id]);
 
   const handleToggleMilestone = async (milestoneId: string) => {
@@ -47,15 +42,9 @@ const ProjectDetail = () => {
         m.id === milestoneId ? { ...m, isCompleted: !m.isCompleted } : m
       );
 
-      const response = await fetch(`/api/data/projects/${project.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ milestones: updatedMilestones })
-      });
+      await updateDoc(doc(db, 'projects', project.id), { milestones: updatedMilestones });
       
-      if (response.ok) {
-        setProject({ ...project, milestones: updatedMilestones });
-      }
+      setProject({ ...project, milestones: updatedMilestones });
     } catch (error) {
       console.error("Error updating milestone:", error);
     } finally {
@@ -68,16 +57,11 @@ const ProjectDetail = () => {
     if (!project) return;
 
     try {
-      const response = await fetch(`/api/data/projects/${project.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          currentFunding: project.currentFunding + 5000 // Mock support amount
-        })
+      const newFunding = project.currentFunding + 5000;
+      await updateDoc(doc(db, 'projects', project.id), {
+        currentFunding: newFunding
       });
-      if (response.ok) {
-        setProject({ ...project, currentFunding: project.currentFunding + 5000 });
-      }
+      setProject({ ...project, currentFunding: newFunding });
     } catch (error) {
       console.error("Error supporting project:", error);
     }

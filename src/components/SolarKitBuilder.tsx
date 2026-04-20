@@ -27,6 +27,8 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
+import { db } from '../firebase';
+import { collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 
 interface Appliance {
   id: string;
@@ -78,12 +80,13 @@ const SolarKitBuilder: React.FC = () => {
     const fetchSolarProducts = async () => {
       setIsLoadingProducts(true);
       try {
-        const response = await fetch('/api/data/products');
-        if (response.ok) {
-          const allProducts = await response.json();
-          const products = allProducts.filter((p: any) => p.category === 'Solar');
-          setMarketplaceProducts(products);
-        }
+        const q = query(collection(db, 'products'), where('category', '==', 'Solar'));
+        const querySnapshot = await getDocs(q);
+        const products: MarketplaceProduct[] = [];
+        querySnapshot.forEach((doc) => {
+          products.push({ id: doc.id, ...doc.data() } as MarketplaceProduct);
+        });
+        setMarketplaceProducts(products);
       } catch (error) {
         console.error("Error fetching solar products:", error);
         toast.error("Failed to load marketplace products.");
@@ -253,32 +256,25 @@ const SolarKitBuilder: React.FC = () => {
 
     setIsSaving(true);
     try {
-      const response = await fetch('/api/data/solar_kits', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.uid,
-          kitName,
-          loadRequirements: loadItems.map(({ id, icon, ...rest }) => rest),
-          selectedHardware: selectedHardware.map(p => ({ id: p.id, name: p.name, price: p.price, subCategory: p.subCategory })),
-          totalDailyLoadWh,
-          totalPeakLoadW,
-          totalPriceEstimate,
-          recommendations: {
-            panelW: recommendedPanelW,
-            batteryWh: recommendedBatteryWh,
-            inverterW: recommendedInverterW
-          },
-          createdAt: new Date().toISOString()
-        })
+      await addDoc(collection(db, 'solar_kits'), {
+        userId: user.uid,
+        kitName,
+        loadRequirements: loadItems.map(({ id, icon, ...rest }) => rest),
+        selectedHardware: selectedHardware.map(p => ({ id: p.id, name: p.name, price: p.price, subCategory: p.subCategory })),
+        totalDailyLoadWh,
+        totalPeakLoadW,
+        totalPriceEstimate,
+        recommendations: {
+          panelW: recommendedPanelW,
+          batteryWh: recommendedBatteryWh,
+          inverterW: recommendedInverterW
+        },
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
       });
 
-      if (response.ok) {
-        toast.success("Solar Kit saved to your profile!");
-        setStep(4);
-      } else {
-        throw new Error('Failed to save kit');
-      }
+      toast.success("Solar Kit saved to your profile!");
+      setStep(4);
     } catch (error) {
       console.error("Error saving kit:", error);
       toast.error("Failed to save kit.");

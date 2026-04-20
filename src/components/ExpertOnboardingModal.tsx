@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, CheckCircle2, Award, GraduationCap, Briefcase, ArrowRight, ArrowLeft, Sparkles, ShieldCheck, Mail, MapPin, Clock, ListChecks, Eye } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { db } from '../firebase';
+import { doc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 interface ExpertOnboardingModalProps {
   isOpen: boolean;
@@ -100,30 +102,22 @@ const ExpertOnboardingModal: React.FC<ExpertOnboardingModalProps> = ({ isOpen, o
         expertise: formData.expertise === 'Other' ? formData.customExpertise : formData.expertise,
         role: 'expert',
         onboardingCompleted: true,
-        expertJoinedAt,
         isApproved: false,
-        updatedAt: new Date().toISOString()
+        updatedAt: serverTimestamp()
       };
 
-      // Update private user document via API
-      await fetch(`/api/data/users/${user.uid}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(expertData)
-      });
+      // Update private user document directly
+      await updateDoc(doc(db, 'users', user.uid), expertData);
 
-      // Create public profile via API
-      await fetch('/api/data/public_profiles', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: user.uid,
-          uid: user.uid,
-          displayName: profile.displayName,
-          photoURL: profile.photoURL || null,
-          ...expertData
-        })
-      });
+      // Create/Update public profile directly
+      await setDoc(doc(db, 'public_profiles', user.uid), {
+        ...expertData,
+        id: user.uid,
+        uid: user.uid,
+        displayName: profile.displayName || '',
+        photoURL: profile.photoURL || null,
+        expertJoinedAt: serverTimestamp()
+      }, { merge: true });
 
       onComplete();
       onClose();

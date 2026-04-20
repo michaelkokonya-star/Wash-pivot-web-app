@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Upload, Plus, Loader2, Image as ImageIcon, Video, Trash2 } from 'lucide-react';
-import { auth } from '../firebase';
+import { auth, db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { compressImage, sanitizeFilename, fileToDataUrl } from '../lib/image-utils';
 import { toast } from 'sonner';
 
@@ -154,28 +155,25 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSu
       }
 
       setUploadStatus('saving');
-      const response = await fetch('/api/data/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          media: uploadedMedia,
-          imageUrl: finalImageUrl,
-          targetFunding: parseFloat(formData.targetFunding),
-          currentFunding: 0,
-          status: 'pending',
-          isApproved: false,
-          isCertified: false,
-          ownerUid: user.uid,
-          ownerName: profile?.displayName || user.displayName || 'Admin',
-        })
+      await addDoc(collection(db, 'projects'), {
+        ...formData,
+        media: uploadedMedia,
+        imageUrl: finalImageUrl,
+        targetFunding: parseFloat(formData.targetFunding),
+        currentFunding: 0,
+        status: 'pending',
+        isApproved: false,
+        isCertified: false,
+        ownerUid: user.uid,
+        ownerName: profile?.displayName || user.displayName || 'Admin',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
       });
 
-      if (response.ok) {
-        onSuccess();
-        onClose();
-        toast.success("Project created successfully!");
-        setFormData({
+      onSuccess();
+      onClose();
+      toast.success("Project created successfully!");
+      setFormData({
           title: '',
           description: '',
           targetFunding: '',
@@ -187,9 +185,6 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSu
         setImageFile(null);
         setImagePreview(null);
         setMediaFiles([]);
-      } else {
-        throw new Error('Failed to save project');
-      }
     } catch (error) {
       console.error("Error adding project:", error);
       toast.error("Failed to create project. Please try again.");

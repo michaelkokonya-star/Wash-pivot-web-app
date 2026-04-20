@@ -23,7 +23,8 @@ try {
   console.log('Note: firebase-applet-config.json not found or invalid. Using environment variables instead.');
 }
 
-// Initialize Firebase Admin
+// Initialize Firebase Admin only if explicitly configured
+let adminDb: any = null;
 try {
   const projectId = process.env.FIREBASE_PROJECT_ID || firebaseConfig.projectId;
   const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
@@ -32,23 +33,27 @@ try {
     projectId: projectId,
   };
 
+  let initialized = false;
   if (serviceAccount) {
     try {
       const cert = JSON.parse(serviceAccount);
       options.credential = admin.credential.cert(cert);
       console.log('Firebase Admin: Using service account from FIREBASE_SERVICE_ACCOUNT env var');
+      initialized = true;
     } catch (e) {
-      console.error('Firebase Admin: Failed to parse FIREBASE_SERVICE_ACCOUNT environment variable. Ensure it is a valid JSON string.');
+      console.error('Firebase Admin: Failed to parse FIREBASE_SERVICE_ACCOUNT environment variable.');
     }
   } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
     console.log('Firebase Admin: Using credentials from GOOGLE_APPLICATION_CREDENTIALS file');
-  } else {
-    console.warn('Firebase Admin: No service account provided. Falling back to Application Default Credentials (ADC). This may fail in local development or sandbox environments.');
+    initialized = true;
   }
 
-  if (admin.apps.length === 0) {
+  if (initialized && admin.apps.length === 0) {
     admin.initializeApp(options);
+    adminDb = admin.firestore();
     console.log(`Firebase Admin Initialized for project: ${projectId}`);
+  } else if (!initialized) {
+    console.warn('Firebase Admin: No service account provided. Falling back to Application Default Credentials (ADC) is disabled for stability.');
   }
 } catch (error) {
   console.error('Firebase Admin Initialization Error:', error);

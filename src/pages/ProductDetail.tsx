@@ -128,7 +128,7 @@ const ProductDetail = () => {
         if (!id) return;
         const docSnap = await getDoc(doc(db, 'products', id));
         if (docSnap.exists()) {
-          const productData = { id: docSnap.id, ...docSnap.data() };
+          const productData = { id: docSnap.id, ...docSnap.data() } as any;
           setProduct(productData);
           if (productData.imageUrl) {
             setSelectedImage(productData.imageUrl);

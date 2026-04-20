@@ -4,6 +4,8 @@ import { motion } from 'motion/react';
 import { Helmet } from 'react-helmet-async';
 import { CheckCircle2, ShoppingBag, ArrowRight, Mail, Package } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { db } from '../firebase';
+import { doc, updateDoc } from 'firebase/firestore';
 
 const CheckoutSuccess = () => {
   const { clearCart } = useCart();
@@ -18,13 +20,9 @@ const CheckoutSuccess = () => {
       clearCart();
       if (orderId) {
         try {
-          await fetch(`/api/data/orders/${orderId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              status: isManualMpesa ? 'pending_verification' : 'paid',
-              paidAt: isManualMpesa ? null : new Date().toISOString()
-            })
+          await updateDoc(doc(db, 'orders', orderId), {
+            status: isManualMpesa ? 'pending_verification' : 'paid',
+            paidAt: isManualMpesa ? null : new Date().toISOString()
           });
         } catch (error) {
           console.error("Error updating order status:", error);

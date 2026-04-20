@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Upload, Save, Loader2, Image as ImageIcon } from 'lucide-react';
-import { auth } from '../firebase';
+import { auth, db } from '../firebase';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useSettings } from '../context/SettingsContext';
 import { compressImage, sanitizeFilename, fileToDataUrl } from '../lib/image-utils';
 import { toast } from 'sonner';
@@ -129,23 +130,17 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
       }
 
       setUploadStatus('saving');
-      const response = await fetch(`/api/data/products/${product.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          imageUrl: finalImageUrl,
-          price: parseFloat(formData.price)
-        })
+      await updateDoc(doc(db, 'products', product.id), {
+        ...formData,
+        imageUrl: finalImageUrl,
+        price: parseFloat(formData.price),
+        updatedAt: serverTimestamp()
       });
 
-      if (response.ok) {
-        onSuccess();
-        onClose();
-        toast.success("Product updated successfully!");
-      }
+      onSuccess();
+      onClose();
+      toast.success("Product updated successfully!");
     } catch (error) {
-      console.error("Error updating product:", error);
       toast.error("Failed to update product. Please try again.");
     } finally {
       setLoading(false);

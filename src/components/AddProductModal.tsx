@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Upload, Plus, Loader2, Image as ImageIcon } from 'lucide-react';
-import { auth } from '../firebase';
+import { auth, db } from '../firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useSettings } from '../context/SettingsContext';
 import { compressImage, sanitizeFilename, fileToDataUrl } from '../lib/image-utils';
 import { toast } from 'sonner';
@@ -113,32 +114,28 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
       }
 
       setUploadStatus('saving');
-      const response = await fetch('/api/data/products', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          imageUrl: finalImageUrl,
-          price: parseFloat(formData.price)
-        })
+      await addDoc(collection(db, 'products'), {
+        ...formData,
+        imageUrl: finalImageUrl,
+        price: parseFloat(formData.price),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
       });
 
-      if (response.ok) {
-        onSuccess();
-        onClose();
-        toast.success("Product added successfully!");
-        setFormData({
-          name: '',
-          price: '',
-          category: 'Solar',
-          subCategory: 'None',
-          rating: '',
-          description: '',
-          imageUrl: ''
-        });
-        setImageFile(null);
-        setImagePreview(null);
-      }
+      onSuccess();
+      onClose();
+      toast.success("Product added successfully!");
+      setFormData({
+        name: '',
+        price: '',
+        category: 'Solar',
+        subCategory: 'None',
+        rating: '',
+        description: '',
+        imageUrl: ''
+      });
+      setImageFile(null);
+      setImagePreview(null);
     } catch (error) {
       console.error("Error adding product:", error);
       toast.error("Failed to add product. Please try again.");

@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Upload, Save, Loader2, Mail, Phone, MapPin, Image as ImageIcon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { auth } from '../firebase';
+import { auth, db } from '../firebase';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { compressImage } from '../lib/image-utils';
 import { toast } from 'sonner';
 
@@ -95,22 +96,15 @@ const EditServiceModal: React.FC<EditServiceModalProps> = ({ isOpen, onClose, on
       }
 
       setUploadStatus('saving');
-      const response = await fetch(`/api/data/service_providers/${service.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          imageUrl: finalImageUrl
-        })
+      await updateDoc(doc(db, 'service_providers', service.id), {
+        ...formData,
+        imageUrl: finalImageUrl,
+        updatedAt: serverTimestamp()
       });
 
-      if (response.ok) {
-        onSuccess();
-        onClose();
-        toast.success("Service provider updated successfully!");
-      } else {
-        throw new Error('Failed to update service provider');
-      }
+      onSuccess();
+      onClose();
+      toast.success("Service provider updated successfully!");
     } catch (error) {
       console.error("Error updating service provider:", error);
       toast.error("Failed to update service provider. Please try again.");

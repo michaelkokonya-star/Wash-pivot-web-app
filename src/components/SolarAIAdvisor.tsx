@@ -3,7 +3,8 @@ import { GoogleGenAI, GenerateContentResponse, ThinkingLevel } from "@google/gen
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, Zap, Battery, Sun, MapPin, Home, Tv, Loader2, Info, ExternalLink, MessageSquare, Copy, Check, Plus, X, Save, Send, User, Bot } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { auth } from '../firebase';
+import { auth, db } from '../firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
 import Markdown from 'react-markdown';
 
@@ -81,9 +82,9 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
     const loadSavedPreferences = async () => {
       if (user) {
         try {
-          const response = await fetch(`/api/data/user_preferences/${user.uid}`);
-          if (response.ok) {
-            const data = await response.json();
+          const docSnap = await getDoc(doc(db, 'user_preferences', user.uid));
+          if (docSnap.exists()) {
+            const data = docSnap.data();
             if (data.selectedAppliances) {
               // Handle legacy format (string array) vs new format (Appliance array)
               const formatted = data.selectedAppliances.map((item: any) => 
@@ -220,22 +221,15 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
 
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/data/user_preferences/${user.uid}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          selectedAppliances,
-          premisesSize: inputs.premisesSize,
-          location: inputs.location,
-          updatedAt: new Date().toISOString()
-        })
-      });
+      await setDoc(doc(db, 'user_preferences', user.uid), {
+        selectedAppliances,
+        premisesSize: inputs.premisesSize,
+        location: inputs.location,
+        userId: user.uid,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
       
-      if (response.ok) {
-        toast.success("Preferences saved successfully!");
-      } else {
-        throw new Error('Failed to save preferences');
-      }
+      toast.success("Preferences saved successfully!");
     } catch (error) {
       console.error("Error saving preferences:", error);
       toast.error("Failed to save preferences.");

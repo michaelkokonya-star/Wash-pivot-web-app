@@ -167,7 +167,7 @@ const Profile = () => {
     setMessage(null);
 
     const formData = new FormData();
-    formData.append('photo', file);
+    formData.append('file', file);
 
     try {
       const response = await fetch('/api/upload', {
@@ -184,21 +184,14 @@ const Profile = () => {
       const photoURL = data.url;
 
       // Update user document
-      await authFetch(`/api/data/users/${user.uid}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ photoURL })
-      });
+      await updateDoc(doc(db, 'users', user.uid), { photoURL });
 
       // Update public profile if expert
       if (profile?.role === 'expert') {
-        const publicRes = await authFetch(`/api/data/public_profiles/${user.uid}`);
-        if (publicRes.ok) {
-          await authFetch(`/api/data/public_profiles/${user.uid}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ photoURL })
-          });
+        try {
+          await updateDoc(doc(db, 'public_profiles', user.uid), { photoURL });
+        } catch (e) {
+          // Public profile might not exist
         }
       }
 

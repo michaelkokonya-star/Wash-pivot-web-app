@@ -4,6 +4,8 @@ import { motion } from 'motion/react';
 import { Helmet } from 'react-helmet-async';
 import { ChevronLeft, Package, Truck, CheckCircle2, Clock, MapPin, AlertCircle, ShoppingBag, ArrowRight, Activity } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { db } from '../firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 interface OrderTimelineEntry {
   status: string;
@@ -33,27 +35,24 @@ const OrderTracking = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchOrder = async () => {
-      try {
-        const response = await authFetch(`/api/data/orders/${orderId}`);
-        if (response.ok) {
-          const data = await response.json();
-          setOrder(data);
-        } else {
-          setError('Order not found');
-        }
-      } catch (err) {
-        console.error('Error fetching order:', err);
-        setError('Failed to load order details');
-      } finally {
-        setLoading(false);
-      }
-    };
+    if (!orderId) return;
 
-    if (orderId) {
-      fetchOrder();
-    }
-  }, [orderId, authFetch]);
+    const unsubscribe = onSnapshot(doc(db, 'orders', orderId), (docSnap) => {
+      if (docSnap.exists()) {
+        setOrder({ id: docSnap.id, ...docSnap.data() } as Order);
+        setError(null);
+      } else {
+        setError('Order not found');
+      }
+      setLoading(false);
+    }, (err) => {
+      console.error('Error fetching order:', err);
+      setError('Failed to load order details');
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [orderId]);
 
   if (loading) {
     return (
