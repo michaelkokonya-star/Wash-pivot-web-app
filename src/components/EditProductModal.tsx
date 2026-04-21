@@ -29,7 +29,8 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
     subCategory: 'Solar Panels',
     ratings: [] as string[],
     description: '',
-    imageUrl: ''
+    imageUrl: '',
+    price: 0
   });
 
   const toggleRating = (rating: string) => {
@@ -56,7 +57,8 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
         subCategory: product.subCategory || 'Solar Panels',
         ratings: product.ratings || (product.rating ? [product.rating] : []),
         description: product.description || '',
-        imageUrl: product.imageUrl || ''
+        imageUrl: product.imageUrl || '',
+        price: product.price || 0
       });
       setImagePreview(product.imageUrl || null);
     }
@@ -277,6 +279,18 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
                   </div>
                 </div>
               )}
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Base Price (KSh)</label>
+                <input
+                  type="number"
+                  value={formData.price || ''}
+                  onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
+                  className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors"
+                  placeholder="e.g. 15000"
+                />
+                <p className="text-[9px] text-black/40">Note: Rule-based products will calculate their price dynamically in the marketplace.</p>
+              </div>
 
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Product Image</label>

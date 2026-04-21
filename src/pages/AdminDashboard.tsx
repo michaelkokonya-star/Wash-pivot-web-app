@@ -54,7 +54,7 @@ const renderActiveShape = (props: any) => {
       />
       <path d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`} stroke={fill} fill="none" />
       <circle cx={ex} cy={ey} r={2} fill={fill} stroke="none" />
-      <text x={ex + (cos >= 0 ? 1 : -1) * 12} y={ey} textAnchor={textAnchor} fill="#333" style={{ fontSize: '10px', fontWeight: 'bold' }}>{`KSh ${value.toLocaleString()}`}</text>
+      <text x={ex + (cos >= 0 ? 1 : -1) * 12} y={ey} textAnchor={textAnchor} fill="#333" style={{ fontSize: '10px', fontWeight: 'bold' }}>{`KSh ${(value || 0).toLocaleString()}`}</text>
       <text x={ex + (cos >= 0 ? 1 : -1) * 12} y={ey} dy={18} textAnchor={textAnchor} fill="#999" style={{ fontSize: '10px' }}>
         {`(${(percent * 100).toFixed(2)}%)`}
       </text>
@@ -67,7 +67,7 @@ const CustomTooltip = ({ active, payload }: any) => {
     return (
       <div className="bg-white p-4 rounded-2xl shadow-xl border border-black/5">
         <p className="text-[10px] font-bold uppercase tracking-widest text-black/40 mb-1">{payload[0].name}</p>
-        <p className="text-sm font-bold text-emerald-600">KSh {payload[0].value.toLocaleString()}</p>
+        <p className="text-sm font-bold text-emerald-600">KSh {(payload[0].value || 0).toLocaleString()}</p>
         {payload[0].payload.percent && (
           <p className="text-[10px] text-black/40 mt-1">{(payload[0].payload.percent * 100).toFixed(1)}% of total</p>
         )}
@@ -1426,7 +1426,7 @@ const AdminDashboard = () => {
                             </span>
                           </td>
                           <td className="px-8 py-6">
-                            <p className="text-sm font-bold tracking-tight">KSh {product.price.toLocaleString()}</p>
+                            <p className="text-sm font-bold tracking-tight">KSh {product.price?.toLocaleString() || '0'}</p>
                           </td>
                           <td className="px-8 py-6">
                             <div className="flex items-center space-x-2">
@@ -1511,7 +1511,7 @@ const AdminDashboard = () => {
                         <h4 className="font-bold text-lg mb-1 line-clamp-1">{product.name}</h4>
                         <p className="text-black/40 text-xs mb-4 line-clamp-2 leading-relaxed">{product.description}</p>
                         <div className="mt-auto flex items-center justify-between">
-                          <span className="text-lg font-bold tracking-tighter">KSh {product.price.toLocaleString()}</span>
+                          <span className="text-lg font-bold tracking-tighter">KSh {product.price?.toLocaleString() || '0'}</span>
                         </div>
                       </div>
                     </motion.div>
@@ -1668,7 +1668,7 @@ const AdminDashboard = () => {
                       <p className="text-xs text-black/40">{order.shippingInfo?.firstName} {order.shippingInfo?.lastName}</p>
                     </td>
                     <td className="px-8 py-6">
-                      <p className="text-sm font-bold tracking-tight">KSh {order.totalAmount.toLocaleString()}</p>
+                      <p className="text-sm font-bold tracking-tight">KSh {order.totalAmount?.toLocaleString() || '0'}</p>
                     </td>
                     <td className="px-8 py-6">
                       <button
@@ -1779,7 +1779,7 @@ const AdminDashboard = () => {
                       <p className="font-bold text-sm">{project.ownerName}</p>
                     </td>
                     <td className="px-8 py-6">
-                      <p className="text-sm font-bold tracking-tight">KSh {project.targetFunding?.toLocaleString()}</p>
+                      <p className="text-sm font-bold tracking-tight">KSh {project.targetFunding?.toLocaleString() || '0'}</p>
                     </td>
                     <td className="px-8 py-6">
                       <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
@@ -1887,7 +1887,7 @@ const AdminDashboard = () => {
                       axisLine={false} 
                       tickLine={false} 
                       tick={{ fontSize: 10, fontWeight: 600, fill: '#9ca3af' }}
-                      tickFormatter={(value) => `KSh ${value.toLocaleString()}`}
+                      tickFormatter={(value) => `KSh ${(value || 0).toLocaleString()}`}
                     />
                     <Tooltip 
                       contentStyle={{ 
@@ -1974,7 +1974,7 @@ const AdminDashboard = () => {
                   </div>
                   <div className="flex justify-between items-center p-4 bg-white rounded-2xl border border-black/5">
                     <span className="text-sm font-medium text-black/60">Avg Order Value</span>
-                    <span className="text-sm font-bold">KSh {(stats.totalRevenue / (stats.orderCount || 1)).toLocaleString()}</span>
+                    <span className="text-sm font-bold">KSh {((stats.totalRevenue / (stats.orderCount || 1)) || 0).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between items-center p-4 bg-white rounded-2xl border border-black/5">
                     <span className="text-sm font-medium text-black/60">Project Success Rate</span>
@@ -2019,7 +2019,7 @@ const AdminDashboard = () => {
                         cursor={{ fill: '#f5f5f4' }}
                         itemStyle={{ fontSize: '12px', fontWeight: 'bold', color: '#059669' }}
                         labelStyle={{ fontSize: '10px', fontWeight: 'bold', color: '#9ca3af', marginBottom: '4px' }}
-                        formatter={(value: any) => `KSh ${value.toLocaleString()}`}
+                        formatter={(value: any) => `KSh ${(value || 0).toLocaleString()}`}
                       />
                       <Bar dataKey="total" radius={[0, 4, 4, 0]} barSize={20}>
                         {analyticsData.salesByProduct.map((entry, index) => (

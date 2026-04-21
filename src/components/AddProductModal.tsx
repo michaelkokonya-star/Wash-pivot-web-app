@@ -29,7 +29,8 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
     subCategory: 'Solar Panels',
     ratings: [] as string[],
     description: '',
-    imageUrl: ''
+    imageUrl: '',
+    price: 0
   });
 
   useEffect(() => {
@@ -40,7 +41,8 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
         subCategory: clonedProduct.subCategory || 'Solar Panels',
         ratings: clonedProduct.ratings || [],
         description: clonedProduct.description || '',
-        imageUrl: clonedProduct.imageUrl || ''
+        imageUrl: clonedProduct.imageUrl || '',
+        price: clonedProduct.price || 0
       });
       setImagePreview(clonedProduct.imageUrl || null);
     } else if (!isOpen) {
@@ -51,7 +53,8 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
         subCategory: 'Solar Panels',
         ratings: [],
         description: '',
-        imageUrl: ''
+        imageUrl: '',
+        price: 0
       });
       setImageFile(null);
       setImagePreview(null);
@@ -136,7 +139,8 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
         subCategory: 'Solar Panels',
         ratings: [],
         description: '',
-        imageUrl: ''
+        imageUrl: '',
+        price: 0
       });
       setImageFile(null);
       setImagePreview(null);
@@ -302,6 +306,18 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
                   </div>
                 </div>
               )}
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Base Price (KSh)</label>
+                <input
+                  type="number"
+                  value={formData.price || ''}
+                  onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
+                  className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors"
+                  placeholder="e.g. 15000"
+                />
+                <p className="text-[9px] text-black/40">Note: Rule-based products will calculate their price dynamically in the marketplace.</p>
+              </div>
 
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Product Image</label>
