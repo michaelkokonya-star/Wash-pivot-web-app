@@ -102,11 +102,14 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
       let finalImageUrl = formData.imageUrl;
 
       if (imageFile) {
+        setUploadStatus('compressing');
+        const compressedFile = await compressImage(imageFile);
+        
         setUploadStatus('uploading');
         setUploadProgress(10);
         
         const uploadFormData = new FormData();
-        uploadFormData.append('file', imageFile);
+        uploadFormData.append('file', compressedFile);
 
         const uploadRes = await fetch('/api/upload', {
           method: 'POST',
@@ -118,7 +121,8 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
           finalImageUrl = uploadData.url;
           setUploadProgress(100);
         } else {
-          throw new Error('Upload failed');
+          const errorData = await uploadRes.json().catch(() => ({}));
+          throw new Error(errorData.error || 'Upload failed');
         }
       }
 
@@ -144,9 +148,11 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
       });
       setImageFile(null);
       setImagePreview(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error adding product:", error);
-      toast.error("Failed to add product. Please try again.");
+      toast.error(error.message === 'Upload failed' || error.message?.includes('upload') 
+        ? `Upload failed: ${error.message}. Please check your connection or image size.` 
+        : `Failed to add product: ${error.message || 'Please try again.'}`);
     } finally {
       setLoading(false);
     }

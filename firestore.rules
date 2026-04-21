@@ -165,13 +165,16 @@ service cloud.firestore {
     match /settings/{settingId} {
       allow get: if isValidId(settingId);
       allow list: if true;
-      allow write: if isAdmin() && isValidSetting(incoming());
+      allow create, update: if isAdmin() && isValidSetting(incoming());
+      allow delete: if isAdmin();
     }
 
     match /products/{productId} {
       allow get: if isValidId(productId);
       allow list: if true;
-      allow write: if isAdmin() && isValidProduct(incoming());
+      allow create: if isAdmin() && isValidProduct(incoming());
+      allow update: if isAdmin() && isValidProduct(incoming()) && (incoming().createdAt == existing().createdAt || !('createdAt' in existing()));
+      allow delete: if isAdmin();
     }
 
     match /projects/{projectId} {
@@ -208,7 +211,8 @@ service cloud.firestore {
     match /service_providers/{serviceId} {
       allow get: if isValidId(serviceId);
       allow list: if true;
-      allow write: if isAdmin() && isValidServiceProvider(incoming());
+      allow create, update: if isAdmin() && isValidServiceProvider(incoming());
+      allow delete: if isAdmin();
     }
 
     match /solar_kits/{kitId} {
