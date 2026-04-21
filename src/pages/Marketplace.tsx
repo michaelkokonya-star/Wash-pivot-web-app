@@ -168,9 +168,6 @@ const ProductCard: React.FC<ProductCardProps & { ratingFilter: string }> = ({
           <div className="mt-auto flex items-center justify-between relative">
             <div className="flex flex-col">
               <span className="text-2xl font-bold tracking-tighter">KSh {currentPrice.toLocaleString()}</span>
-              {product && pricingRules?.[product.subCategory] && currentRating && (
-                <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest mt-1">Rule-based Price</span>
-              )}
             </div>
             <div className="relative">
               <AnimatePresence>

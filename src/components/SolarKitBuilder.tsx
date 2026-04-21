@@ -77,6 +77,7 @@ const SolarKitBuilder: React.FC = () => {
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isApportioning, setIsApportioning] = useState(false);
 
   // Constants for calculation
   const PEAK_SUN_HOURS = 5; // Average for Kenya
@@ -129,6 +130,88 @@ const SolarKitBuilder: React.FC = () => {
   };
 
   const totalPriceEstimate = selectedHardware.reduce((sum, p) => sum + p.selectedPrice, 0);
+
+  const autoApportionHardware = () => {
+    if (marketplaceProducts.length === 0) {
+      toast.error("No marketplace products available to apportion.");
+      return;
+    }
+
+    setIsApportioning(true);
+    const newSelection: SelectedHardwareItem[] = [];
+    
+    // Requirements map
+    const requirements = [
+      { subCategory: 'Solar Panels', target: recommendedPanelW, unit: 'W' },
+      { subCategory: 'Batteries', target: recommendedBatteryWh, unit: 'Wh' },
+      { subCategory: 'Inverter', target: recommendedInverterW, unit: 'W' },
+      { subCategory: 'Charge Controller', target: Math.ceil(recommendedPanelW / SYSTEM_VOLTAGE), unit: 'A' }
+    ];
+
+    requirements.forEach(req => {
+      const categoryProducts = marketplaceProducts.filter(p => p.subCategory === req.subCategory);
+      if (categoryProducts.length === 0) return;
+
+      // Find the best matching product and rating
+      let bestProduct: MarketplaceProduct | null = null;
+      let bestRating = '';
+      let bestRatingValue = Infinity;
+
+      categoryProducts.forEach(product => {
+        if (!product.ratings || product.ratings.length === 0) return;
+        
+        product.ratings.forEach(rating => {
+          let value = parseFloat(rating.replace(/[^\d.]/g, ''));
+          if (rating.toUpperCase().includes('KW')) value *= 1000;
+          
+          // Special case for batteries if they are in Ah (assuming 12V for now as per SYSTEM_VOLTAGE)
+          if (req.subCategory === 'Batteries' && rating.toUpperCase().includes('AH')) {
+            value *= SYSTEM_VOLTAGE; // Convert Ah to Wh
+          }
+
+          // We want the smallest rating that meets or slightly exceeds the requirement
+          if (value >= req.target && value < bestRatingValue) {
+            bestRatingValue = value;
+            bestRating = rating;
+            bestProduct = product;
+          }
+        });
+      });
+
+      // If no single item exceeds, pick the largest one available
+      if (!bestProduct) {
+        let maxVal = -1;
+        categoryProducts.forEach(product => {
+          product.ratings?.forEach(rating => {
+            let value = parseFloat(rating.replace(/[^\d.]/g, ''));
+            if (rating.toUpperCase().includes('KW')) value *= 1000;
+            if (req.subCategory === 'Batteries' && rating.toUpperCase().includes('AH')) value *= SYSTEM_VOLTAGE;
+            
+            if (value > maxVal) {
+              maxVal = value;
+              bestRating = rating;
+              bestProduct = product;
+            }
+          });
+        });
+      }
+
+      if (bestProduct) {
+        const product = bestProduct as MarketplaceProduct;
+        const price = calculatePriceForProduct(product.subCategory, bestRating);
+        newSelection.push({
+          ...product,
+          selectedRating: bestRating,
+          selectedPrice: price
+        });
+      }
+    });
+
+    setSelectedHardware(newSelection);
+    setIsApportioning(false);
+    toast.success(`Automatically selected ${newSelection.length} matching components!`);
+    setStep(3); // Move to selection step to review
+  };
 
   const addAppliance = (preset?: typeof PRESET_APPLIANCES[0]) => {
     const newItem: Appliance = {
@@ -546,32 +629,40 @@ const SolarKitBuilder: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex justify-between items-center pt-8 border-t border-black/5">
-                <button
-                  onClick={() => setStep(1)}
-                  className="px-8 py-4 bg-stone-100 text-black font-bold rounded-2xl hover:bg-stone-200 transition-all flex items-center space-x-2"
-                >
-                  <ChevronLeft size={20} />
-                  <span>Back</span>
-                </button>
-                <div className="flex space-x-3">
-                  <button
-                    onClick={saveKit}
-                    disabled={isSaving}
-                    className="px-8 py-4 bg-white border border-black/10 text-black font-bold rounded-2xl hover:bg-stone-50 transition-all flex items-center space-x-2 disabled:opacity-50"
-                  >
-                    {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
-                    <span>Save Kit</span>
-                  </button>
-                  <button
-                    onClick={() => setStep(3)}
-                    className="px-8 py-4 bg-black text-white font-bold rounded-2xl hover:bg-emerald-600 transition-all flex items-center space-x-2"
-                  >
-                    <span>Select Hardware</span>
-                    <ChevronRight size={20} />
-                  </button>
-                </div>
-              </div>
+      <div className="flex justify-between items-center pt-8 border-t border-black/5">
+        <button
+          onClick={() => setStep(1)}
+          className="px-8 py-4 bg-stone-100 text-black font-bold rounded-2xl hover:bg-stone-200 transition-all flex items-center space-x-2"
+        >
+          <ChevronLeft size={20} />
+          <span>Back</span>
+        </button>
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={autoApportionHardware}
+            disabled={isApportioning || marketplaceProducts.length === 0}
+            className="px-8 py-4 bg-emerald-600 text-white font-bold rounded-2xl hover:bg-emerald-500 transition-all flex items-center space-x-2 disabled:opacity-50"
+          >
+            {isApportioning ? <Loader2 className="animate-spin" size={20} /> : <Zap size={20} />}
+            <span>Auto-Select Hardware</span>
+          </button>
+          <button
+            onClick={saveKit}
+            disabled={isSaving}
+            className="px-8 py-4 bg-white border border-black/10 text-black font-bold rounded-2xl hover:bg-stone-50 transition-all flex items-center space-x-2 disabled:opacity-50"
+          >
+            {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
+            <span>Save Kit</span>
+          </button>
+          <button
+            onClick={() => setStep(3)}
+            className="px-8 py-4 bg-black text-white font-bold rounded-2xl hover:bg-emerald-600 transition-all flex items-center space-x-2"
+          >
+            <span>Select Hardware</span>
+            <ChevronRight size={20} />
+          </button>
+        </div>
+      </div>
             </motion.div>
           )}
 

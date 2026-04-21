@@ -126,9 +126,9 @@ const AddServiceModal: React.FC<AddServiceModalProps> = ({ isOpen, onClose, onSu
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
+            className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
           >
-            <div className="p-8 border-b border-black/5 flex justify-between items-center sticky top-0 bg-white z-10">
+            <div className="p-8 border-b border-black/5 flex justify-between items-center shrink-0">
               <div>
                 <h2 className="text-2xl font-bold tracking-tight">Add Service Provider</h2>
                 <p className="text-sm text-black/40">List a new professional service on the marketplace.</p>
@@ -141,7 +141,7 @@ const AddServiceModal: React.FC<AddServiceModalProps> = ({ isOpen, onClose, onSu
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-8 space-y-6">
+            <form onSubmit={handleSubmit} className="p-8 space-y-6 overflow-y-auto">
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Provider Name</label>
                 <input

@@ -138,6 +138,16 @@ const Recruitment = () => {
                     ) : (
                       <p>{expert.academics}</p>
                     )}
+                    {expert.academicCredentials && expert.academicCredentials.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {expert.academicCredentials.map((cred: any, idx: number) => (
+                          <div key={idx} className="text-[10px] text-black/50 leading-tight">
+                            <span className="font-bold text-black/70">{cred.type}{cred.specialization ? ` in ${cred.specialization}` : ''}</span>
+                            {cred.institution && <span> • {cred.institution}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
                 {expert.specialisations && expert.specialisations.length > 0 && (

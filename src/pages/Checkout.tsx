@@ -10,9 +10,12 @@ import { db } from '../firebase';
 import { collection, addDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
 
 const VisaIcon = () => (
-  <svg viewBox="0 0 48 48" className="h-4 w-auto" xmlns="http://www.w3.org/2000/svg">
-    <path fill="#1A1F71" d="M18.5 29.5L21.4 12H16L13.1 29.5h5.4zm16.4-17.1c-1.1-.4-2.8-.8-4.9-.8-5.4 0-9.2 2.8-9.2 6.7 0 3 2.7 4.7 4.8 5.7 2.1 1 2.8 1.7 2.8 2.6 0 1.4-1.7 2-3.3 2-2.2 0-3.4-.3-5.2-1.1l-.7-.3-.8 4.7c1.3.6 3.7 1.1 6.2 1.1 5.8 0 9.5-2.8 9.5-7.1 0-2.4-1.4-4.2-4.6-5.7-2.1-1.1-3.4-1.8-3.4-2.9 0-1 .1-1.8 3.5-1.8 2 0 3.4.4 4.5.9l.5.2.7-4.5zM47 12h-4.2c-1.3 0-2.3.4-2.9 1.7l-8.2 15.8h5.6s1-2.5 1.2-3.1h6.6c.2.7.5 3.1.5 3.1h5L47 12zm-8.2 10.3c.4-1 3.2-8.1 3.2-8.1l.2.5s1.8 8.1 1.8 8.1L38.8 22.3zM9.5 12L4.2 24.3l-.6-2.9C2.4 16.5 2 12 2 12h7.5z" />
-  </svg>
+  <img 
+    src="https://upload.wikimedia.org/wikipedia/commons/d/d6/Visa_2021.svg" 
+    alt="Visa" 
+    className="h-5 w-auto"
+    referrerPolicy="no-referrer"
+  />
 );
 
 const MastercardIcon = () => (
@@ -24,12 +27,12 @@ const MastercardIcon = () => (
 );
 
 const MpesaLogo = ({ className = "h-8", light = false }) => (
-  <div className={`flex items-center gap-1 select-none ${className}`}>
-    <span className="font-black italic text-[#EB1B2D] text-lg leading-none transform translate-y-[2px]">M-</span>
-    <div className={`px-2.5 py-1.5 rounded-lg flex items-center justify-center shadow-lg ${light ? 'bg-white' : 'bg-[#4CAF50]'}`}>
-      <span className={`font-black uppercase text-[12px] tracking-tighter leading-none ${light ? 'text-[#4CAF50]' : 'text-white'}`}>PESA</span>
-    </div>
-  </div>
+  <img 
+    src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/M-PESA_LOGO-01.svg/512px-M-PESA_LOGO-01.svg.png" 
+    alt="M-Pesa" 
+    className={`object-contain ${className} ${light ? 'brightness-0 invert' : ''}`}
+    referrerPolicy="no-referrer"
+  />
 );
 
 const Checkout = () => {

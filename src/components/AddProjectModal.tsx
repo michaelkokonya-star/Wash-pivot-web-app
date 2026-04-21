@@ -209,9 +209,9 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSu
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl overflow-hidden"
+            className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
           >
-          <div className="p-8 border-b border-black/5 flex justify-between items-center bg-white sticky top-0 z-10">
+          <div className="p-8 border-b border-black/5 flex justify-between items-center bg-white shrink-0">
             <div>
               <h2 className="text-2xl font-bold tracking-tight">Create New Project</h2>
               <p className="text-sm text-black/40">Fill in the details to launch a new WASH project.</p>
@@ -224,7 +224,7 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSu
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-8 space-y-6 max-h-[80vh] overflow-y-auto">
+          <form onSubmit={handleSubmit} className="p-8 space-y-6 overflow-y-auto flex-grow">
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Project Title</label>
                 <input

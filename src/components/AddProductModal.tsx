@@ -137,9 +137,9 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl overflow-hidden"
+            className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
           >
-            <div className="p-8 border-b border-black/5 flex justify-between items-center">
+            <div className="p-8 border-b border-black/5 flex justify-between items-center shrink-0">
               <div>
                 <h2 className="text-2xl font-bold tracking-tight">Add New Product</h2>
                 <p className="text-sm text-black/40">Fill in the details to list a new item.</p>
@@ -152,7 +152,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-8 space-y-6">
+            <form onSubmit={handleSubmit} className="p-8 space-y-6 overflow-y-auto">
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Product Name / Model</label>
                 <input

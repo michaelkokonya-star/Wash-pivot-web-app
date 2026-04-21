@@ -53,6 +53,7 @@ const ExpertOnboardingModal: React.FC<ExpertOnboardingModalProps> = ({ isOpen, o
     customExpertise: '',
     specialisations: [] as string[],
     academics: [] as string[],
+    academicCredentials: [] as { id: string, type: string, institution: string, specialization: string }[],
     yearsOfExperience: '',
     keyProjects: '',
     availability: [] as string[],
@@ -128,6 +129,32 @@ const ExpertOnboardingModal: React.FC<ExpertOnboardingModalProps> = ({ isOpen, o
     }
   };
 
+  const addAcademicCredential = () => {
+    setFormData(prev => ({
+      ...prev,
+      academicCredentials: [
+        ...prev.academicCredentials,
+        { id: Math.random().toString(36).substr(2, 9), type: '', institution: '', specialization: '' }
+      ]
+    }));
+  };
+
+  const removeAcademicCredential = (id: string) => {
+    setFormData(prev => ({
+      ...prev,
+      academicCredentials: prev.academicCredentials.filter(c => c.id !== id)
+    }));
+  };
+
+  const updateAcademicCredential = (id: string, field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      academicCredentials: prev.academicCredentials.map(c => 
+        c.id === id ? { ...c, [field]: value } : c
+      )
+    }));
+  };
+
   const toggleAcademic = (option: string) => {
     setFormData(prev => ({
       ...prev,
@@ -193,6 +220,20 @@ const ExpertOnboardingModal: React.FC<ExpertOnboardingModalProps> = ({ isOpen, o
           </div>
         )}
 
+        {formData.academicCredentials.length > 0 && (
+          <div className="space-y-2 mt-2">
+            {formData.academicCredentials.map((cred, idx) => (
+              <div key={idx} className="bg-white p-3 rounded-xl border border-black/5 flex items-start space-x-3">
+                <GraduationCap size={16} className="text-emerald-600 mt-1 shrink-0" />
+                <div>
+                  <p className="text-xs font-bold">{cred.type}{cred.specialization ? ` in ${cred.specialization}` : ''}</p>
+                  {cred.institution && <p className="text-[10px] text-black/40">{cred.institution}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {formData.yearsOfExperience && (
           <div className="flex items-center space-x-2 text-sm text-black/60">
             <Clock size={14} />
@@ -236,10 +277,10 @@ const ExpertOnboardingModal: React.FC<ExpertOnboardingModalProps> = ({ isOpen, o
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="bg-white w-full max-w-5xl rounded-[2.5rem] overflow-hidden shadow-2xl relative"
+        className="bg-white w-full max-w-5xl rounded-[2.5rem] overflow-hidden shadow-2xl relative max-h-[90vh] flex flex-col"
       >
         {/* Progress Bar */}
-        <div className="absolute top-0 left-0 w-full h-1.5 bg-stone-100">
+        <div className="absolute top-0 left-0 w-full h-1.5 bg-stone-100 z-20">
           <motion.div
             initial={{ width: 0 }}
             animate={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
@@ -249,12 +290,12 @@ const ExpertOnboardingModal: React.FC<ExpertOnboardingModalProps> = ({ isOpen, o
 
         <button
           onClick={onClose}
-          className="absolute top-6 right-6 p-2 hover:bg-stone-100 rounded-full transition-colors z-10"
+          className="absolute top-6 right-6 p-2 hover:bg-stone-100 rounded-full transition-colors z-30"
         >
           <X size={20} className="text-black/40" />
         </button>
 
-        <div className="p-12">
+        <div className="p-8 lg:p-12 overflow-y-auto">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
             <div>
               <div className="flex items-center space-x-4 mb-8">
@@ -373,6 +414,81 @@ const ExpertOnboardingModal: React.FC<ExpertOnboardingModalProps> = ({ isOpen, o
                             </button>
                           ))}
                         </div>
+                      </div>
+
+                      <div className="space-y-4 pt-4 border-t border-black/5">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Detailed Academic Credentials</label>
+                          <button 
+                            type="button" 
+                            onClick={addAcademicCredential}
+                            className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest flex items-center space-x-1 hover:underline"
+                          >
+                            <span>+ Add Institution</span>
+                          </button>
+                        </div>
+                        
+                        {formData.academicCredentials.length === 0 ? (
+                          <div className="p-6 bg-stone-50 rounded-2xl border border-dashed border-black/10 text-center">
+                            <GraduationCap size={24} className="mx-auto text-black/10 mb-2" />
+                            <p className="text-[10px] text-black/30 font-medium">Add specific universities or tertiary institutions.</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            {formData.academicCredentials.map((cred) => (
+                              <motion.div 
+                                key={cred.id}
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="p-4 bg-stone-100 rounded-2xl border border-black/5 space-y-4 relative"
+                              >
+                                <button 
+                                  type="button"
+                                  onClick={() => removeAcademicCredential(cred.id)}
+                                  className="absolute top-4 right-4 text-black/20 hover:text-red-500"
+                                >
+                                  <X size={14} />
+                                </button>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div className="space-y-1">
+                                    <label className="text-[9px] font-bold text-black/40 uppercase">Qualification</label>
+                                    <select
+                                      value={cred.type}
+                                      onChange={(e) => updateAcademicCredential(cred.id, 'type', e.target.value)}
+                                      className="w-full p-2 bg-white border border-black/5 rounded-lg text-xs font-bold focus:ring-1 focus:ring-emerald-600 outline-none"
+                                    >
+                                      <option value="">Select Level</option>
+                                      {academicOptions.map(opt => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <label className="text-[9px] font-bold text-black/40 uppercase">Academic Specialisation</label>
+                                    <input
+                                      type="text"
+                                      value={cred.specialization}
+                                      onChange={(e) => updateAcademicCredential(cred.id, 'specialization', e.target.value)}
+                                      placeholder="e.g. Civil Engineering"
+                                      className="w-full p-2 bg-white border border-black/5 rounded-lg text-xs font-bold focus:ring-1 focus:ring-emerald-600 outline-none"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[9px] font-bold text-black/40 uppercase">University / Institution</label>
+                                  <input
+                                    type="text"
+                                    value={cred.institution}
+                                    onChange={(e) => updateAcademicCredential(cred.id, 'institution', e.target.value)}
+                                    placeholder="e.g. University of Nairobi"
+                                    className="w-full p-2 bg-white border border-black/5 rounded-lg text-xs font-bold focus:ring-1 focus:ring-emerald-600 outline-none"
+                                  />
+                                </div>
+                              </motion.div>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
                       <div className="space-y-2">

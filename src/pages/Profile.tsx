@@ -36,7 +36,11 @@ const Profile = () => {
   const [formData, setFormData] = useState({
     displayName: '',
     phoneNumber: '',
-    showContacts: true
+    showContacts: true,
+    expertise: '',
+    bio: '',
+    academics: [] as string[],
+    academicCredentials: [] as { id: string, type: string, institution: string, specialization: string }[]
   });
 
   const getPasswordStrength = (pass: string) => {
@@ -58,7 +62,11 @@ const Profile = () => {
       setFormData({
         displayName: profile.displayName || '',
         phoneNumber: profile.phoneNumber || '',
-        showContacts: profile.showContacts ?? true
+        showContacts: profile.showContacts ?? true,
+        expertise: profile.expertise || '',
+        bio: profile.bio || '',
+        academics: profile.academics || [],
+        academicCredentials: profile.academicCredentials || []
       });
     }
   }, [profile]);
@@ -93,11 +101,18 @@ const Profile = () => {
     setMessage(null);
 
     try {
-      const updateData = {
+      const updateData: any = {
         displayName: formData.displayName,
         phoneNumber: formData.phoneNumber,
         showContacts: formData.showContacts
       };
+
+      if (profile?.role === 'expert') {
+        updateData.expertise = formData.expertise;
+        updateData.bio = formData.bio;
+        updateData.academics = formData.academics;
+        updateData.academicCredentials = formData.academicCredentials;
+      }
 
       await updateDoc(doc(db, 'users', user.uid), updateData);
 
@@ -369,7 +384,7 @@ const Profile = () => {
                   </div>
                 </div>
 
-                <div className="pt-4">
+                <div className="pt-4 pb-6 border-b border-black/5">
                   <label className="flex items-center cursor-pointer group">
                     <div className="relative">
                       <input
@@ -390,6 +405,105 @@ const Profile = () => {
                     </div>
                   </label>
                 </div>
+
+                {profile.role === 'expert' && (
+                  <div className="space-y-8 pt-4">
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-black/40 mb-2 block ml-1">Professional Bio</label>
+                      <textarea
+                        value={formData.bio}
+                        onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+                        className="w-full p-4 bg-white border border-black/5 rounded-2xl focus:ring-2 focus:ring-emerald-600 outline-none font-medium transition-all h-32 resize-none text-sm"
+                        placeholder="Describe your professional journey..."
+                      />
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-black/40 ml-1">Academic Credentials</label>
+                        <button 
+                          type="button" 
+                          onClick={() => setFormData(prev => ({
+                            ...prev,
+                            academicCredentials: [
+                              ...prev.academicCredentials,
+                              { id: Math.random().toString(36).substr(2, 9), type: '', institution: '', specialization: '' }
+                            ]
+                          }))}
+                          className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest flex items-center space-x-1 hover:underline"
+                        >
+                          <span>+ Add Institution</span>
+                        </button>
+                      </div>
+                      
+                      <div className="space-y-4">
+                        {formData.academicCredentials.length === 0 ? (
+                          <div className="p-8 text-center bg-white rounded-[2rem] border border-dashed border-black/10">
+                            <GraduationCap size={24} className="mx-auto text-black/10 mb-2" />
+                            <p className="text-xs text-black/30 font-medium">No institutions added. Add your university history here.</p>
+                          </div>
+                        ) : (
+                          formData.academicCredentials.map((cred) => (
+                            <div key={cred.id} className="p-6 bg-white rounded-[2rem] border border-black/5 space-y-4 relative group">
+                              <button 
+                                type="button"
+                                onClick={() => setFormData(prev => ({
+                                  ...prev,
+                                  academicCredentials: prev.academicCredentials.filter(c => c.id !== cred.id)
+                                }))}
+                                className="absolute top-6 right-6 text-black/20 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <XCircle size={18} />
+                              </button>
+                              
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                  <label className="text-[9px] font-bold text-black/40 uppercase">Qualification</label>
+                                  <input
+                                    type="text"
+                                    value={cred.type}
+                                    onChange={(e) => setFormData(prev => ({
+                                      ...prev,
+                                      academicCredentials: prev.academicCredentials.map(c => c.id === cred.id ? { ...c, type: e.target.value } : c)
+                                    }))}
+                                    placeholder="e.g. Master's Degree"
+                                    className="w-full p-3 bg-stone-50 border border-black/5 rounded-xl text-xs font-bold outline-none focus:border-emerald-600"
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[9px] font-bold text-black/40 uppercase">Specialisation</label>
+                                  <input
+                                    type="text"
+                                    value={cred.specialization}
+                                    onChange={(e) => setFormData(prev => ({
+                                      ...prev,
+                                      academicCredentials: prev.academicCredentials.map(c => c.id === cred.id ? { ...c, specialization: e.target.value } : c)
+                                    }))}
+                                    placeholder="e.g. Civil Engineering"
+                                    className="w-full p-3 bg-stone-50 border border-black/5 rounded-xl text-xs font-bold outline-none focus:border-emerald-600"
+                                  />
+                                </div>
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[9px] font-bold text-black/40 uppercase">University / Institution</label>
+                                <input
+                                  type="text"
+                                  value={cred.institution}
+                                  onChange={(e) => setFormData(prev => ({
+                                    ...prev,
+                                    academicCredentials: prev.academicCredentials.map(c => c.id === cred.id ? { ...c, institution: e.target.value } : c)
+                                  }))}
+                                  placeholder="e.g. University of Nairobi"
+                                  className="w-full p-3 bg-stone-50 border border-black/5 rounded-xl text-xs font-bold outline-none focus:border-emerald-600"
+                                />
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex space-x-4 pt-4">
                   <button
@@ -469,6 +583,20 @@ const Profile = () => {
                           <div className="flex items-center space-x-2 font-bold text-lg">
                             <GraduationCap size={18} className="text-black/20" />
                             <span>{profile.academics}</span>
+                          </div>
+                        )}
+
+                        {profile.academicCredentials && profile.academicCredentials.length > 0 && (
+                          <div className="space-y-2 pt-2">
+                            {profile.academicCredentials.map((cred: any, idx: number) => (
+                              <div key={idx} className="bg-white p-3 rounded-xl border border-black/5 flex items-start space-x-3">
+                                <Award size={16} className="text-emerald-600 mt-1 shrink-0" />
+                                <div>
+                                  <p className="text-sm font-bold">{cred.type}{cred.specialization ? ` in ${cred.specialization}` : ''}</p>
+                                  {cred.institution && <p className="text-xs text-black/40">{cred.institution}</p>}
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>

@@ -12,6 +12,18 @@
         "role": { "type": "string", "enum": ["user", "expert", "admin"] },
         "expertise": { "type": "string", "description": "Area of specialization (Solar, Water, Sanitation)" },
         "academics": { "type": "string" },
+        "academicCredentials": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "type": { "type": "string" },
+              "institution": { "type": "string" },
+              "specialization": { "type": "string" }
+            }
+          }
+        },
         "bio": { "type": "string" },
         "hasSeenWelcome": { "type": "boolean" },
         "onboardingCompleted": { "type": "boolean" },
