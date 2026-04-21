@@ -10,12 +10,9 @@ import { db } from '../firebase';
 import { collection, addDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
 
 const VisaIcon = () => (
-  <img 
-    src="https://upload.wikimedia.org/wikipedia/commons/d/d6/Visa_2021.svg" 
-    alt="Visa" 
-    className="h-5 w-auto"
-    referrerPolicy="no-referrer"
-  />
+  <svg viewBox="0 0 48 48" className="h-6 w-auto" xmlns="http://www.w3.org/2000/svg">
+    <path d="M37.9 14.5h-5.2l-3.3 14.3h5.2l3.3-14.3zm9.2 0h-5.1c-1.6 0-2.8.9-3.4 2.4l-7.2 11.9h5.5l1.1-3.1h6.7l.6 3.1h4.8l-3-14.3zm-3.5 8.9l3.3-9.3 1.9 9.3h-5.2zM22.5 14.5L17.3 25l-2.1-10.5h-5.4l4.2 14.3h5.3l6.5-14.3h-3.3zM4.4 14.5C2 14.5 0 16.5 0 18.9v5.4c0 2.4 2 4.4 4.4 4.4s4.4-2 4.4-4.4v-5.4c0-2.4-2-4.4-4.4-4.4z" fill="#1A1F71" />
+  </svg>
 );
 
 const MastercardIcon = () => (
@@ -28,7 +25,7 @@ const MastercardIcon = () => (
 
 const MpesaLogo = ({ className = "h-8", light = false }) => (
   <img 
-    src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/M-PESA_LOGO-01.svg/512px-M-PESA_LOGO-01.svg.png" 
+    src="https://upload.wikimedia.org/wikipedia/commons/1/15/M-PESA_LOGO-01.svg" 
     alt="M-Pesa" 
     className={`object-contain ${className} ${light ? 'brightness-0 invert' : ''}`}
     referrerPolicy="no-referrer"

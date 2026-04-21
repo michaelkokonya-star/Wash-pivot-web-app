@@ -465,7 +465,7 @@ const ExpertOnboardingModal: React.FC<ExpertOnboardingModalProps> = ({ isOpen, o
                                     </select>
                                   </div>
                                   <div className="space-y-1">
-                                    <label className="text-[9px] font-bold text-black/40 uppercase">Academic Specialisation</label>
+                                    <label className="text-[9px] font-bold text-black/40 uppercase">Specific Academic Specialisation</label>
                                     <input
                                       type="text"
                                       value={cred.specialization}
@@ -476,7 +476,7 @@ const ExpertOnboardingModal: React.FC<ExpertOnboardingModalProps> = ({ isOpen, o
                                   </div>
                                 </div>
                                 <div className="space-y-1">
-                                  <label className="text-[9px] font-bold text-black/40 uppercase">University / Institution</label>
+                                  <label className="text-[9px] font-bold text-black/40 uppercase">University or Tertiary Institution</label>
                                   <input
                                     type="text"
                                     value={cred.institution}

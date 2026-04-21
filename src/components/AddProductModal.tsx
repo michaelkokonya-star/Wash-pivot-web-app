@@ -181,18 +181,19 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-8 space-y-6 overflow-y-auto">
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Product Name / Model</label>
-                <input
-                  required
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors"
-                  placeholder="e.g. Mono Crystalline Solar Panel"
-                />
-              </div>
+            <form onSubmit={handleSubmit} className="flex flex-col h-full overflow-hidden">
+              <div className="p-8 space-y-6 overflow-y-auto flex-1">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Product Name / Model</label>
+                  <input
+                    required
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors"
+                    placeholder="e.g. Mono Crystalline Solar Panel"
+                  />
+                </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div className="space-y-2">
@@ -348,38 +349,41 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Description</label>
-                <textarea
-                  required
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors h-32 resize-none"
-                  placeholder="Describe the product and its benefits..."
-                />
+                <div className="space-y-2 pb-4">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Description</label>
+                  <textarea
+                    required
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    className="w-full px-4 py-3 bg-stone-50 border border-black/5 rounded-xl focus:outline-none focus:border-emerald-600 transition-colors h-32 resize-none"
+                    placeholder="Describe the product and its benefits..."
+                  />
+                </div>
               </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-4 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all flex items-center justify-center space-x-2 shadow-xl shadow-emerald-600/20 disabled:opacity-50"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="animate-spin" size={20} />
-                    <span>
-                      {uploadStatus === 'compressing' ? 'Optimizing...' : 
-                       uploadStatus === 'uploading' ? `Uploading ${Math.round(uploadProgress)}%` : 
-                       uploadStatus === 'saving' ? 'Saving...' : 'Processing...'}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <Plus size={20} />
-                    <span>Add Product to Marketplace</span>
-                  </>
-                )}
-              </button>
+              <div className="p-8 border-t border-black/5 bg-white shrink-0">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-4 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all flex items-center justify-center space-x-2 shadow-xl shadow-emerald-600/20 disabled:opacity-50"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="animate-spin" size={20} />
+                      <span>
+                        {uploadStatus === 'compressing' ? 'Optimizing...' : 
+                         uploadStatus === 'uploading' ? `Uploading ${Math.round(uploadProgress)}%` : 
+                         uploadStatus === 'saving' ? 'Saving...' : 'Processing...'}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={20} />
+                      <span>{clonedProduct ? 'Create Cloned Product' : 'Add Product to Marketplace'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </form>
           </motion.div>
         </div>

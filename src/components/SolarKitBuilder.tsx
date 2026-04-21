@@ -55,6 +55,7 @@ interface MarketplaceProduct {
 interface SelectedHardwareItem extends MarketplaceProduct {
   selectedRating: string;
   selectedPrice: number;
+  quantity: number;
 }
 
 const PRESET_APPLIANCES = [
@@ -129,7 +130,7 @@ const SolarKitBuilder: React.FC = () => {
     return Math.round(ratingValue * pricePerUnit);
   };
 
-  const totalPriceEstimate = selectedHardware.reduce((sum, p) => sum + p.selectedPrice, 0);
+  const totalPriceEstimate = selectedHardware.reduce((sum, p) => sum + (p.selectedPrice * p.quantity), 0);
 
   const autoApportionHardware = () => {
     if (marketplaceProducts.length === 0) {
@@ -152,48 +153,60 @@ const SolarKitBuilder: React.FC = () => {
       const categoryProducts = marketplaceProducts.filter(p => p.subCategory === req.subCategory);
       if (categoryProducts.length === 0) return;
 
-      // Find the best matching product and rating
+      // Find the best matching variant across all products in this category
       let bestProduct: MarketplaceProduct | null = null;
       let bestRating = '';
-      let bestRatingValue = Infinity;
+      let bestRatingValue = 0;
+      let neededQuantity = 1;
+
+      // First pass: find the single largest variant to see if multiple are needed
+      let maxRatingValue = 0;
+      let maxRatingProduct: MarketplaceProduct | null = null;
+      let maxRatingString = '';
 
       categoryProducts.forEach(product => {
-        if (!product.ratings || product.ratings.length === 0) return;
-        
-        product.ratings.forEach(rating => {
+        product.ratings?.forEach(rating => {
           let value = parseFloat(rating.replace(/[^\d.]/g, ''));
           if (rating.toUpperCase().includes('KW')) value *= 1000;
+          if (req.subCategory === 'Batteries' && rating.toUpperCase().includes('AH')) value *= SYSTEM_VOLTAGE;
           
-          // Special case for batteries if they are in Ah (assuming 12V for now as per SYSTEM_VOLTAGE)
-          if (req.subCategory === 'Batteries' && rating.toUpperCase().includes('AH')) {
-            value *= SYSTEM_VOLTAGE; // Convert Ah to Wh
-          }
-
-          // We want the smallest rating that meets or slightly exceeds the requirement
-          if (value >= req.target && value < bestRatingValue) {
-            bestRatingValue = value;
-            bestRating = rating;
-            bestProduct = product;
+          if (value > maxRatingValue) {
+            maxRatingValue = value;
+            maxRatingProduct = product;
+            maxRatingString = rating;
           }
         });
       });
 
-      // If no single item exceeds, pick the largest one available
-      if (!bestProduct) {
-        let maxVal = -1;
+      if (maxRatingValue === 0) return;
+
+      if (maxRatingValue < req.target && (req.subCategory === 'Solar Panels' || req.subCategory === 'Batteries')) {
+        // Need multiple units of the largest one
+        neededQuantity = Math.ceil(req.target / maxRatingValue);
+        bestProduct = maxRatingProduct;
+        bestRating = maxRatingString;
+      } else {
+        // Find the smallest one that meets the requirement
+        let minMeetingValue = Infinity;
         categoryProducts.forEach(product => {
           product.ratings?.forEach(rating => {
             let value = parseFloat(rating.replace(/[^\d.]/g, ''));
             if (rating.toUpperCase().includes('KW')) value *= 1000;
             if (req.subCategory === 'Batteries' && rating.toUpperCase().includes('AH')) value *= SYSTEM_VOLTAGE;
-            
-            if (value > maxVal) {
-              maxVal = value;
-              bestRating = rating;
+
+            if (value >= req.target && value < minMeetingValue) {
+              minMeetingValue = value;
               bestProduct = product;
+              bestRating = rating;
             }
           });
         });
+
+        // If none meet, already handled by maxRatingValue logic above (which would just pick 1 if neededQuantity stays 1)
+        if (!bestProduct) {
+          bestProduct = maxRatingProduct;
+          bestRating = maxRatingString;
+        }
       }
 
       if (bestProduct) {
@@ -202,14 +215,15 @@ const SolarKitBuilder: React.FC = () => {
         newSelection.push({
           ...product,
           selectedRating: bestRating,
-          selectedPrice: price
+          selectedPrice: price,
+          quantity: neededQuantity
         });
       }
     });
 
     setSelectedHardware(newSelection);
     setIsApportioning(false);
-    toast.success(`Automatically selected ${newSelection.length} matching components!`);
+    toast.success(`Automatically selected components to meet your ${recommendedPanelW}W load!`);
     setStep(3); // Move to selection step to review
   };
 
@@ -304,12 +318,14 @@ const SolarKitBuilder: React.FC = () => {
         
         autoTable(doc, {
           startY: recTableEndY + 20,
-          head: [['Category', 'Product Name', 'Specs/Rating', 'Price (KSh)']],
+          head: [['Category', 'Product Name', 'Specs/Rating', 'Qty', 'Unit Price', 'Subtotal']],
           body: selectedHardware.map(p => [
             p.subCategory,
             p.name,
             p.selectedRating,
-            p.selectedPrice.toLocaleString()
+            p.quantity,
+            p.selectedPrice.toLocaleString(),
+            (p.selectedPrice * p.quantity).toLocaleString()
           ]),
           theme: 'striped',
           headStyles: { fillColor: [0, 0, 0] },
@@ -371,7 +387,8 @@ const SolarKitBuilder: React.FC = () => {
           name: p.name, 
           rating: p.selectedRating,
           price: p.selectedPrice, 
-          subCategory: p.subCategory 
+          subCategory: p.subCategory,
+          quantity: p.quantity
         })),
         totalDailyLoadWh,
         totalPeakLoadW,
@@ -695,17 +712,49 @@ const SolarKitBuilder: React.FC = () => {
                         <p className="text-xs text-black/30">No hardware selected yet.</p>
                       </div>
                     )}
-                    {selectedHardware.map((product) => (
-                      <div key={`${product.id}-${product.selectedRating}`} className="p-4 bg-white border border-black/5 rounded-2xl flex justify-between items-center group">
-                        <div>
+                    {selectedHardware.map((product, idx) => (
+                      <div key={`${product.id}-${product.selectedRating}-${idx}`} className="p-4 bg-white border border-black/5 rounded-2xl flex justify-between items-center group">
+                        <div className="flex-1 min-w-0">
                           <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">{product.subCategory}</p>
-                          <p className="text-sm font-bold truncate max-w-[150px]">{product.name}</p>
-                          <p className="text-xs text-black/40 mb-0.5">{product.selectedRating}</p>
-                          <p className="text-xs font-bold">KSh {product.selectedPrice.toLocaleString()}</p>
+                          <p className="text-sm font-bold truncate pr-2">{product.name}</p>
+                          <p className="text-[10px] text-black/40 mb-1">{product.selectedRating} • KSh {product.selectedPrice.toLocaleString()} / unit</p>
+                          
+                          <div className="flex items-center space-x-2">
+                            <button 
+                              onClick={() => {
+                                const newSelection = [...selectedHardware];
+                                if (newSelection[idx].quantity > 1) {
+                                  newSelection[idx].quantity--;
+                                  setSelectedHardware(newSelection);
+                                }
+                              }}
+                              className="w-6 h-6 rounded-md border border-black/5 flex items-center justify-center text-xs hover:bg-stone-50"
+                            >
+                              -
+                            </button>
+                            <span className="text-xs font-bold w-4 text-center">{product.quantity}</span>
+                            <button 
+                              onClick={() => {
+                                const newSelection = [...selectedHardware];
+                                newSelection[idx].quantity++;
+                                setSelectedHardware(newSelection);
+                              }}
+                              className="w-6 h-6 rounded-md border border-black/5 flex items-center justify-center text-xs hover:bg-stone-50"
+                            >
+                              +
+                            </button>
+                            <span className="text-xs font-bold text-black/60 ml-2">
+                              = KSh {(product.selectedPrice * product.quantity).toLocaleString()}
+                            </span>
+                          </div>
                         </div>
                         <button 
-                          onClick={() => setSelectedHardware(selectedHardware.filter(p => !(p.id === product.id && p.selectedRating === product.selectedRating)))}
-                          className="p-2 text-black/10 hover:text-red-500 transition-colors"
+                          onClick={() => {
+                            const newSelection = [...selectedHardware];
+                            newSelection.splice(idx, 1);
+                            setSelectedHardware(newSelection);
+                          }}
+                          className="p-2 text-black/10 hover:text-red-500 transition-colors shrink-0"
                         >
                           <Trash2 size={16} />
                         </button>
@@ -747,7 +796,8 @@ const SolarKitBuilder: React.FC = () => {
                                     const hardwareItem: SelectedHardwareItem = {
                                       ...product,
                                       selectedRating,
-                                      selectedPrice: calculatedPrice
+                                      selectedPrice: calculatedPrice,
+                                      quantity: 1
                                     };
                                     setSelectedHardware([...selectedHardware, hardwareItem]);
                                     toast.success(`Added ${product.name} (${selectedRating})`);
