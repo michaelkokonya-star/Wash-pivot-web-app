@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Upload, Plus, Loader2, Image as ImageIcon } from 'lucide-react';
+import { X, Upload, Plus, Loader2, Image as ImageIcon, Copy } from 'lucide-react';
 import { auth, db } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useSettings } from '../context/SettingsContext';
@@ -11,9 +11,10 @@ interface AddProductModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  clonedProduct?: any;
 }
 
-const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSuccess }) => {
+const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSuccess, clonedProduct }) => {
   const { pricingRules } = useSettings();
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -30,6 +31,32 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
     description: '',
     imageUrl: ''
   });
+
+  useEffect(() => {
+    if (clonedProduct && isOpen) {
+      setFormData({
+        name: clonedProduct.name || '',
+        category: clonedProduct.category || 'Solar',
+        subCategory: clonedProduct.subCategory || 'Solar Panels',
+        ratings: clonedProduct.ratings || [],
+        description: clonedProduct.description || '',
+        imageUrl: clonedProduct.imageUrl || ''
+      });
+      setImagePreview(clonedProduct.imageUrl || null);
+    } else if (!isOpen) {
+      // Reset form when closing
+      setFormData({
+        name: '',
+        category: 'Solar',
+        subCategory: 'Solar Panels',
+        ratings: [],
+        description: '',
+        imageUrl: ''
+      });
+      setImageFile(null);
+      setImagePreview(null);
+    }
+  }, [clonedProduct, isOpen]);
 
   const toggleRating = (rating: string) => {
     setFormData(prev => ({
@@ -141,8 +168,10 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
           >
             <div className="p-8 border-b border-black/5 flex justify-between items-center shrink-0">
               <div>
-                <h2 className="text-2xl font-bold tracking-tight">Add New Product</h2>
-                <p className="text-sm text-black/40">Fill in the details to list a new item.</p>
+                <h2 className="text-2xl font-bold tracking-tight">{clonedProduct ? 'Duplicate Product' : 'Add New Product'}</h2>
+                <p className="text-sm text-black/40">
+                  {clonedProduct ? 'Create a variation of an existing product.' : 'Fill in the details to list a new item.'}
+                </p>
               </div>
               <button 
                 onClick={onClose}

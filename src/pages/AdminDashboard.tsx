@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { Users, ShoppingBag, Droplets, Shield, CheckCircle2, XCircle, Search, Filter, Edit, Trash2, Plus, Eye, EyeOff, Key, Package, TrendingUp, DollarSign, PieChart, Check, X, BarChart as BarChartIcon, Activity, Briefcase, Award, Mail, Loader2, Sun, Truck } from 'lucide-react';
+import { Users, ShoppingBag, Droplets, Shield, CheckCircle2, XCircle, Search, Filter, Edit, Trash2, Plus, Eye, EyeOff, Key, Package, TrendingUp, DollarSign, PieChart, Check, X, BarChart as BarChartIcon, Activity, Briefcase, Award, Mail, Loader2, Sun, Truck, Copy } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
 import { db } from '../firebase';
 import { collection, query, getDocs, doc, updateDoc, deleteDoc, setDoc, orderBy, where, onSnapshot, serverTimestamp } from 'firebase/firestore';
@@ -497,6 +497,7 @@ const AdminDashboard = () => {
   const [isAddServiceModalOpen, setIsAddServiceModalOpen] = useState(false);
   const [isAddProjectModalOpen, setIsAddProjectModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [clonedProduct, setClonedProduct] = useState<any>(null);
   const [selectedService, setSelectedService] = useState<any>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [isUpdateStatusModalOpen, setIsUpdateStatusModalOpen] = useState(false);
@@ -771,6 +772,11 @@ const AdminDashboard = () => {
   const handleEditProduct = (product: any) => {
     setSelectedProduct(product);
     setIsEditModalOpen(true);
+  };
+
+  const handleCloneProduct = (product: any) => {
+    setClonedProduct(product);
+    setIsAddModalOpen(true);
   };
 
   const handleDeleteService = async (id: string) => {
@@ -1422,14 +1428,23 @@ const AdminDashboard = () => {
                           <td className="px-8 py-6">
                             <div className="flex items-center space-x-2">
                               <button
+                                onClick={() => handleCloneProduct(product)}
+                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                title="Duplicate Product"
+                              >
+                                <Copy size={18} />
+                              </button>
+                              <button
                                 onClick={() => handleEditProduct(product)}
                                 className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                                title="Edit Product"
                               >
                                 <Edit size={18} />
                               </button>
                               <button
                                 onClick={() => handleDeleteProduct(product.id)}
                                 className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                title="Delete Product"
                               >
                                 <Trash2 size={18} />
                               </button>
@@ -1467,14 +1482,23 @@ const AdminDashboard = () => {
                         </div>
                         <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
+                            onClick={() => handleCloneProduct(product)}
+                            className="p-2 bg-white rounded-full text-blue-600 shadow-lg hover:bg-blue-600 hover:text-white transition-all"
+                            title="Duplicate"
+                          >
+                            <Copy size={14} />
+                          </button>
+                          <button
                             onClick={() => handleEditProduct(product)}
                             className="p-2 bg-white rounded-full text-emerald-600 shadow-lg hover:bg-emerald-600 hover:text-white transition-all"
+                            title="Edit"
                           >
                             <Edit size={14} />
                           </button>
                           <button
                             onClick={() => handleDeleteProduct(product.id)}
                             className="p-2 bg-white rounded-full text-red-600 shadow-lg hover:bg-red-600 hover:text-white transition-all"
+                            title="Delete"
                           >
                             <Trash2 size={14} />
                           </button>
@@ -2073,8 +2097,12 @@ const AdminDashboard = () => {
 
       <AddProductModal 
         isOpen={isAddModalOpen} 
-        onClose={() => setIsAddModalOpen(false)} 
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setClonedProduct(null);
+        }} 
         onSuccess={fetchData} 
+        clonedProduct={clonedProduct}
       />
 
       <AddServiceModal
