@@ -233,6 +233,47 @@ async function startServer() {
       }
     });
 
+    // Paystack Checkout
+    app.post('/api/paystack/initialize', async (req, res) => {
+      const paystackSecret = process.env.PAYSTACK_SECRET_KEY;
+      if (!paystackSecret) {
+        return res.status(500).json({ error: 'Paystack is not configured' });
+      }
+
+      try {
+        const { email, amount, metadata } = req.body;
+
+        const response = await axios.post(
+          'https://api.paystack.co/transaction/initialize',
+          {
+            email,
+            amount: Math.round(amount * 100), // Paystack expects minor units (cents/kobo)
+            metadata: {
+              ...metadata,
+              custom_fields: metadata.items?.map((item: any) => ({
+                display_name: item.name,
+                variable_name: item.id,
+                value: item.quantity
+              }))
+            },
+            callback_url: `${process.env.APP_URL}/checkout/success?orderId=${metadata.orderId}&method=paystack`,
+            cancel_url: `${process.env.APP_URL}/cart`
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${paystackSecret}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        res.json(response.data);
+      } catch (error: any) {
+        console.error('Paystack Initialize Error:', error.response?.data || error.message);
+        res.status(500).json({ error: error.response?.data?.message || 'Failed to initialize Paystack transaction' });
+      }
+    });
+
     // Stripe Checkout
     app.post('/api/create-checkout-session', async (req, res) => {
       if (!stripe) {

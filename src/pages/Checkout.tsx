@@ -38,7 +38,7 @@ const Checkout = () => {
   const { deliveryRules } = useSettings();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'mpesa' | 'manual_mpesa'>('card');
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'paystack' | 'mpesa' | 'manual_mpesa'>('paystack');
   const [mpesaWaiting, setMpesaWaiting] = useState(false);
   const navigate = useNavigate();
 
@@ -97,7 +97,31 @@ const Checkout = () => {
       const docRef = await addDoc(collection(db, 'orders'), orderData);
       const orderId = docRef.id;
 
-      if (paymentMethod === 'card') {
+      if (paymentMethod === 'paystack') {
+        const response = await fetch('/api/paystack/initialize', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: formData.email,
+            amount: finalTotal,
+            metadata: {
+              orderId,
+              items: cart.map(item => ({ id: item.id, name: item.name, quantity: item.quantity }))
+            }
+          }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to initialize Paystack');
+
+        if (data.status && data.data.authorization_url) {
+          window.location.href = data.data.authorization_url;
+        } else {
+          throw new Error('No checkout URL received from Paystack');
+        }
+      } else if (paymentMethod === 'card') {
         // 2a. Stripe Checkout
         const response = await fetch('/api/create-checkout-session', {
           method: 'POST',
@@ -272,6 +296,34 @@ const Checkout = () => {
                 <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full uppercase tracking-widest">M-Pesa Temporarily Unavailable</span>
               </div>
               <div className="grid grid-cols-1 gap-4">
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('paystack')}
+                  className={`p-6 rounded-3xl border transition-all flex items-center justify-between group relative overflow-hidden ${
+                    paymentMethod === 'paystack' 
+                      ? 'border-blue-600 bg-blue-50/30 ring-2 ring-blue-600/10' 
+                      : 'border-black/5 bg-white hover:border-blue-200 hover:shadow-lg'
+                  }`}
+                >
+                  <div className="flex items-center gap-4 relative z-10">
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border transition-colors ${
+                      paymentMethod === 'paystack' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-stone-50 border-black/5 text-black/20'
+                    }`}>
+                      <CreditCard size={24} />
+                    </div>
+                    <div className="text-left">
+                      <p className="font-bold">Paystack</p>
+                      <p className="text-xs text-black/40">Pay with Card, Bank or Transfer</p>
+                    </div>
+                  </div>
+                  <img 
+                    src="https://paystack.com/assets/img/login/paystack-logo.png" 
+                    alt="Paystack" 
+                    className={`h-4 transition-all ${paymentMethod === 'paystack' ? 'opacity-100' : 'opacity-40 grayscale group-hover:grayscale-0 group-hover:opacity-100'}`}
+                    referrerPolicy="no-referrer"
+                  />
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('card')}
