@@ -223,7 +223,7 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
                       <option value="Charge Controller">Charge Controller</option>
                       <option value="Inverter">Inverter</option>
                       <option value="Accessories">Accessories</option>
-                      {Object.keys(pricingRules).filter(key => 
+                      {(pricingRules ? Object.keys(pricingRules) : []).filter(key => 
                         !['Solar Panels', 'Batteries', 'Charge Controller', 'Inverter', 'Accessories', 'Fluoride Removal', 'Filtration', 'Chlorination', 'Exhaust Services'].includes(key)
                       ).map(key => (
                         <option key={key} value={key}>{key}</option>
@@ -308,7 +308,16 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
                   >
                     {imagePreview ? (
                       <>
-                        <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        <img 
+                          src={imagePreview} 
+                          alt="Preview" 
+                          className="w-full h-full object-cover" 
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=800';
+                          }}
+                        />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           <Upload className="text-white" size={24} />
                         </div>

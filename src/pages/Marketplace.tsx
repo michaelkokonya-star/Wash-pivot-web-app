@@ -20,6 +20,7 @@ interface ProductCardProps {
   addToCart: (product: any) => void;
   pricingRules: any;
   ratingOptions: Record<string, string[]>;
+  priority?: boolean;
 }
 
 const ProductCard: React.FC<ProductCardProps & { ratingFilter: string }> = ({ 
@@ -30,7 +31,8 @@ const ProductCard: React.FC<ProductCardProps & { ratingFilter: string }> = ({
   addToCart, 
   pricingRules, 
   ratingOptions,
-  ratingFilter
+  ratingFilter,
+  priority
 }) => {
   const options = (product.ratings && product.ratings.length > 0) 
     ? product.ratings 
@@ -103,6 +105,7 @@ const ProductCard: React.FC<ProductCardProps & { ratingFilter: string }> = ({
               alt={product.name}
               className="w-full h-full group-hover:scale-110 transition-transform duration-700"
               width={600}
+              priority={priority}
             />
             <div className="absolute top-6 left-6 flex flex-col gap-2">
               <span className="px-4 py-1.5 bg-white/90 backdrop-blur-md rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm">
@@ -517,7 +520,7 @@ const Marketplace = () => {
         >
           <AnimatePresence mode="popLayout">
             {allProducts.length > 0 ? (
-              allProducts.map((product) => (
+              allProducts.map((product, index) => (
                 <ProductCard 
                   key={product.id} 
                   product={product} 
@@ -528,6 +531,7 @@ const Marketplace = () => {
                   pricingRules={pricingRules}
                   ratingOptions={ratingOptions}
                   ratingFilter={ratingFilter}
+                  priority={index < 2}
                 />
               ))
             ) : (
@@ -600,11 +604,10 @@ const Marketplace = () => {
                     <div className="group bg-stone-50 rounded-[2.5rem] border border-black/5 overflow-hidden hover:shadow-2xl transition-all h-full flex flex-col p-8">
                       <div className="flex items-start justify-between mb-8">
                         <div className="w-20 h-20 rounded-3xl overflow-hidden bg-white shadow-sm border border-black/5">
-                          <img 
+                          <OptimizedImage 
                             src={service.imageUrl} 
                             alt={service.name}
                             className="w-full h-full object-cover"
-                            referrerPolicy="no-referrer"
                           />
                         </div>
                         <span className="px-4 py-1.5 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-bold uppercase tracking-widest">

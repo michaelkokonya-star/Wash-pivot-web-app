@@ -15,6 +15,7 @@ import AddProductModal from '../components/AddProductModal';
 import EditServiceModal from '../components/EditServiceModal';
 import AddServiceModal from '../components/AddServiceModal';
 import AddProjectModal from '../components/AddProjectModal';
+import OptimizedImage from '../components/OptimizedImage';
 
 const renderActiveShape = (props: any) => {
   const RADIAN = Math.PI / 180;
@@ -1075,11 +1076,10 @@ const AdminDashboard = () => {
                       <tr key={u.id} className="hover:bg-stone-50/50 transition-colors">
                     <td className="px-8 py-6">
                       <div className="flex items-center space-x-4">
-                        <img 
+                        <OptimizedImage 
                           src={u.photoURL || `https://ui-avatars.com/api/?name=${u.displayName}`} 
                           className="w-10 h-10 rounded-xl object-cover"
                           alt=""
-                          referrerPolicy="no-referrer"
                         />
                         <div>
                           <p className="font-bold text-sm">{u.displayName}</p>
@@ -1216,11 +1216,10 @@ const AdminDashboard = () => {
                   <div key={u.id} className="bg-stone-50 rounded-[2rem] border border-black/5 p-8 flex flex-col lg:flex-row gap-8">
                     <div className="flex-1">
                       <div className="flex items-center space-x-4 mb-6">
-                        <img 
+                        <OptimizedImage 
                           src={u.photoURL || `https://ui-avatars.com/api/?name=${u.displayName}`} 
                           className="w-16 h-16 rounded-2xl object-cover"
                           alt=""
-                          referrerPolicy="no-referrer"
                         />
                         <div>
                           <h4 className="text-xl font-bold tracking-tight">{u.displayName}</h4>
@@ -1399,20 +1398,21 @@ const AdminDashboard = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-black/5">
-                    {products
-                      .filter(p => 
-                        (productFilter === 'All' || p.category === productFilter) &&
-                        (p.name.toLowerCase().includes(productSearch.toLowerCase()) || p.description.toLowerCase().includes(productSearch.toLowerCase()))
-                      )
-                      .map((product) => (
+                      {products
+                        .filter(p => {
+                          const nameMatch = (p.name || '').toLowerCase().includes(productSearch.toLowerCase());
+                          const descMatch = (p.description || '').toLowerCase().includes(productSearch.toLowerCase());
+                          const categoryMatch = productFilter === 'All' || p.category === productFilter;
+                          return categoryMatch && (nameMatch || descMatch);
+                        })
+                        .map((product) => (
                         <tr key={product.id} className="hover:bg-stone-50/50 transition-colors">
                           <td className="px-8 py-6">
                             <div className="flex items-center space-x-4">
-                              <img 
+                              <OptimizedImage 
                                 src={product.imageUrl} 
                                 className="w-12 h-12 rounded-xl object-cover bg-stone-100"
                                 alt=""
-                                referrerPolicy="no-referrer"
                               />
                               <div>
                                 <p className="font-bold text-sm">{product.name}</p>
@@ -1461,10 +1461,12 @@ const AdminDashboard = () => {
             ) : (
               <div className="p-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {products
-                  .filter(p => 
-                    (productFilter === 'All' || p.category === productFilter) &&
-                    (p.name.toLowerCase().includes(productSearch.toLowerCase()) || p.description.toLowerCase().includes(productSearch.toLowerCase()))
-                  )
+                  .filter(p => {
+                    const nameMatch = (p.name || '').toLowerCase().includes(productSearch.toLowerCase());
+                    const descMatch = (p.description || '').toLowerCase().includes(productSearch.toLowerCase());
+                    const categoryMatch = productFilter === 'All' || p.category === productFilter;
+                    return categoryMatch && (nameMatch || descMatch);
+                  })
                   .map((product) => (
                     <motion.div
                       key={product.id}
@@ -1472,11 +1474,10 @@ const AdminDashboard = () => {
                       className="group bg-white rounded-3xl border border-black/5 overflow-hidden hover:shadow-xl transition-all flex flex-col"
                     >
                       <div className="aspect-square overflow-hidden bg-stone-100 relative">
-                        <img
+                        <OptimizedImage
                           src={product.imageUrl}
                           alt={product.name}
                           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                          referrerPolicy="no-referrer"
                         />
                         <div className="absolute top-4 left-4">
                           <span className="px-3 py-1 bg-white/90 backdrop-blur-md rounded-full text-[9px] font-bold uppercase tracking-widest shadow-sm">
@@ -1577,11 +1578,10 @@ const AdminDashboard = () => {
                       <tr key={service.id} className="hover:bg-stone-50/50 transition-colors">
                       <td className="px-8 py-6">
                         <div className="flex items-center space-x-4">
-                          <img 
+                          <OptimizedImage 
                             src={service.imageUrl} 
                             className="w-12 h-12 rounded-xl object-cover bg-stone-100"
-                            alt=""
-                            referrerPolicy="no-referrer"
+                            alt={service.name}
                           />
                           <div>
                             <p className="font-bold text-sm">{service.name}</p>
@@ -1758,11 +1758,10 @@ const AdminDashboard = () => {
                   <tr key={project.id} className="hover:bg-stone-50/50 transition-colors">
                     <td className="px-8 py-6">
                       <div className="flex items-center space-x-4">
-                        <img 
+                        <OptimizedImage 
                           src={project.imageUrl} 
                           className="w-12 h-12 rounded-xl object-cover bg-stone-100"
                           alt=""
-                          referrerPolicy="no-referrer"
                         />
                         <div>
                           <div className="flex items-center gap-2">
@@ -2092,6 +2091,7 @@ const AdminDashboard = () => {
       </div>
 
       <EditProductModal 
+        key={isEditModalOpen ? `edit-${selectedProduct?.id}-${selectedProduct?.updatedAt}` : 'closed'}
         isOpen={isEditModalOpen} 
         onClose={() => setIsEditModalOpen(false)} 
         onSuccess={fetchData} 
@@ -2099,6 +2099,7 @@ const AdminDashboard = () => {
       />
 
       <AddProductModal 
+        key={isAddModalOpen ? (clonedProduct ? `clone-${clonedProduct.id}-${clonedProduct.updatedAt}` : 'new') : 'closed'}
         isOpen={isAddModalOpen} 
         onClose={() => {
           setIsAddModalOpen(false);

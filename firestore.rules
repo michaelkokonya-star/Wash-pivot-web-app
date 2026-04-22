@@ -24,9 +24,10 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isVerifiedUser() && 
-        (request.auth.uid == "4bR0uGO1auPi2ftCvnnfR9cUtJD3" || 
-         (request.auth.token.email == "michael.kokonya@washpivot.com"));
+      return isSignedIn() && 
+        (request.auth.token.email == "michael.kokonya@washpivot.com" || 
+         request.auth.uid == "4bR0uGO1auPi2ftCvnnfR9cUtJD3" ||
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin");
     }
 
     function isValidId(id) {

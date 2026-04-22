@@ -67,9 +67,13 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
   };
 
   const optimizedSrc = getOptimizedUrl(src);
+  const fallbackImage = 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=800';
 
   return (
-    <div className={`relative overflow-hidden ${className}`}>
+    <div 
+      className={`relative overflow-hidden bg-stone-100 ${className}`}
+      style={{ minHeight: height ? `${height}px` : '200px' }}
+    >
       <AnimatePresence>
         {!isLoaded && !hasError && (
           <motion.div
@@ -82,28 +86,32 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="absolute inset-0 bg-stone-200 flex items-center justify-center z-10"
+            className="absolute inset-0 bg-stone-200 flex items-center justify-center z-10 p-4 text-center"
           >
-            <span className="text-xs text-black/30 font-mono uppercase tracking-widest">Image Unavailable</span>
+            <div className="flex flex-col items-center gap-2">
+              <span className="text-[10px] text-black/30 font-bold uppercase tracking-widest leading-tight">Image<br/>Unavailable</span>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
       <motion.img
         {...({
-          src: optimizedSrc,
+          src: hasError ? fallbackImage : optimizedSrc,
           alt: alt,
           initial: { opacity: 0 },
-          animate: { opacity: isLoaded ? 1 : 0 },
+          animate: { opacity: isLoaded ? 1 : (hasError ? 1 : 0) },
           transition: { duration: 0.5 },
           onLoad: () => setIsLoaded(true),
           onError: () => {
+            console.warn(`OptimizedImage failed to load: ${src}`);
             setHasError(true);
             setIsLoaded(false);
           },
           loading: priority ? "eager" : "lazy",
           fetchPriority: priority ? "high" : "auto",
-          className: `w-full h-full object-cover ${className}`,
-          referrerPolicy: "no-referrer",
+          className: `w-full h-full object-cover transition-opacity duration-500 ${className}`,
+          referrerPolicy: "no-referrer-when-downgrade",
+          crossOrigin: "anonymous",
           ...props
         } as any)}
       />
