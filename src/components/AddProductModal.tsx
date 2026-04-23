@@ -4,7 +4,7 @@ import { X, Upload, Plus, Loader2, Image as ImageIcon, Copy } from 'lucide-react
 import { auth, db } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useSettings } from '../context/SettingsContext';
-import { compressImage, sanitizeFilename, fileToDataUrl } from '../lib/image-utils';
+import { compressImage } from '../lib/image-utils';
 import { toast } from 'sonner';
 
 interface AddProductModalProps {
@@ -108,6 +108,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
         setUploadStatus('uploading');
         setUploadProgress(10);
         
+        // Try S3 upload first; fall back to base64 data URL stored directly
         const uploadFormData = new FormData();
         uploadFormData.append('file', compressedFile);
 
@@ -121,8 +122,10 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
           finalImageUrl = uploadData.url;
           setUploadProgress(100);
         } else {
-          const errorData = await uploadRes.json().catch(() => ({}));
-          throw new Error(errorData.error || 'Upload failed');
+          // S3 not configured – store image as a data URL in Firestore directly
+          const { fileToDataUrl } = await import('../lib/image-utils');
+          finalImageUrl = await fileToDataUrl(compressedFile);
+          setUploadProgress(100);
         }
       }
 

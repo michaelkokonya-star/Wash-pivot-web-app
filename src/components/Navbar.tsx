@@ -24,6 +24,10 @@ const Navbar = () => {
 
   const isSuperAdmin = user?.email?.toLowerCase() === 'michael.kokonya@washpivot.com';
 
+  if (user) {
+    navLinks.push({ name: 'Catalogue', path: '/catalogue' });
+  }
+
   if (isSuperAdmin) {
     navLinks.push({ name: 'Admin', path: '/admin' });
   }
