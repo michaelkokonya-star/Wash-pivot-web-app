@@ -40,6 +40,7 @@ const CheckoutSuccess = lazy(() => import('./pages/CheckoutSuccess'));
 const OrderTracking = lazy(() => import('./pages/OrderTracking'));
 const Auth = lazy(() => import('./pages/Auth'));
 const CreativeStudio = lazy(() => import('./pages/CreativeStudio'));
+const ProductCatalogue = lazy(() => import('./pages/ProductCatalogue'));
 
 const PageLoader = () => (
   <div className="min-h-[60vh] flex flex-col items-center justify-center">
@@ -116,10 +117,16 @@ function AppContent() {
                             <AdminProjectDetails />
                           </ProtectedRoute>
                         } />
+                        <Route path="/catalogue" element={
+                          <ProtectedRoute>
+                            <ProductCatalogue />
+                          </ProtectedRoute>
+                        } />
                       </Routes>
                     </AnimatePresence>
                   </Suspense>
                 </main>
+
                 
                 <footer className="bg-black text-white py-20 mt-20">
                   <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

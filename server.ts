@@ -7,10 +7,10 @@ import Stripe from 'stripe';
 import axios from 'axios';
 import dotenv from 'dotenv';
 import admin from 'firebase-admin';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import uploadRoutes from './routes/upload.ts';
 import settingsRoutes from './routes/settings.ts';
 import dataRoutes from './routes/data.ts';
+import customerRoutes from './routes/customer.ts';
 
 dotenv.config();
 
@@ -114,6 +114,7 @@ async function startServer() {
     app.use('/api', uploadRoutes);
     app.use('/api/settings', settingsRoutes);
     app.use('/api/data', dataRoutes);
+    app.use('/api/customer', customerRoutes);
 
     // API routes
     app.get('/api/health', (req, res) => {
@@ -124,10 +125,11 @@ async function startServer() {
     app.post('/api/ai/image', async (req, res) => {
       const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
       if (!apiKey) {
-        return res.status(500).json({ error: 'Gemini API key is not configured' });
+        return res.status(503).json({ error: 'Gemini API key is not configured. Set GEMINI_API_KEY to enable AI features.' });
       }
 
       try {
+        const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const { prompt, aspectRatio, imageSize, model, quality } = req.body;
         const genAI = new GoogleGenerativeAI(apiKey);
         const aiModel = genAI.getGenerativeModel({ model: model || 'gemini-2.0-flash' });
@@ -165,10 +167,11 @@ async function startServer() {
     app.post('/api/ai/chat', async (req, res) => {
       const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
       if (!apiKey) {
-        return res.status(500).json({ error: 'Gemini API key is not configured' });
+        return res.status(503).json({ error: 'Gemini API key is not configured. Set GEMINI_API_KEY to enable AI features.' });
       }
 
       try {
+        const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const { message, history, systemInstruction } = req.body;
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({ 
