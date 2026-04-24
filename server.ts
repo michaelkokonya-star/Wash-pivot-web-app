@@ -23,40 +23,43 @@ try {
   console.log('Note: firebase-applet-config.json not found or invalid. Using environment variables instead.');
 }
 
-// Initialize Firebase Admin only if explicitly configured
+// Initialize Firebase Admin SDK
+// Priority: FIREBASE_SERVICE_ACCOUNT env var → GOOGLE_APPLICATION_CREDENTIALS → ADC
 let adminDb: any = null;
 try {
   const projectId = process.env.FIREBASE_PROJECT_ID || firebaseConfig.projectId;
   const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
-  
-  const options: any = {
-    projectId: projectId,
-  };
 
-  let initialized = false;
-  if (serviceAccount) {
-    try {
-      const cert = JSON.parse(serviceAccount);
-      options.credential = admin.credential.cert(cert);
-      console.log('Firebase Admin: Using service account from FIREBASE_SERVICE_ACCOUNT env var');
-      initialized = true;
-    } catch (e) {
-      console.error('Firebase Admin: Failed to parse FIREBASE_SERVICE_ACCOUNT environment variable.');
+  // Only attempt initialization if no app has been registered yet
+  if (admin.apps.length === 0) {
+    const options: any = { projectId };
+
+    if (serviceAccount) {
+      try {
+        const cert = JSON.parse(serviceAccount);
+        options.credential = admin.credential.cert(cert);
+        console.log('Firebase Admin: Using service account from FIREBASE_SERVICE_ACCOUNT env var');
+      } catch (e) {
+        console.error('Firebase Admin: Failed to parse FIREBASE_SERVICE_ACCOUNT — falling back to Application Default Credentials (ADC).');
+        // Leave options.credential unset; ADC will be used automatically
+      }
+    } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+      console.log('Firebase Admin: Using credentials from GOOGLE_APPLICATION_CREDENTIALS file');
+      // Leave options.credential unset; the SDK picks up the file path automatically
+    } else {
+      console.log('Firebase Admin: No explicit credentials found — attempting Application Default Credentials (ADC).');
+      // ADC works on GCP/Cloud Run/Firebase Hosting without any extra config
     }
-  } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    console.log('Firebase Admin: Using credentials from GOOGLE_APPLICATION_CREDENTIALS file');
-    initialized = true;
-  }
 
-  if (initialized && admin.apps.length === 0) {
     admin.initializeApp(options);
     adminDb = admin.firestore();
-    console.log(`Firebase Admin Initialized for project: ${projectId}`);
-  } else if (!initialized) {
-    console.warn('Firebase Admin: No service account provided. Falling back to Application Default Credentials (ADC) is disabled for stability.');
+    console.log(`Firebase Admin: Initialized successfully for project: ${projectId || '(unknown)'}`);
+  } else {
+    adminDb = admin.firestore();
+    console.log('Firebase Admin: App already initialized, reusing existing instance.');
   }
 } catch (error) {
-  console.error('Firebase Admin Initialization Error:', error);
+  console.error('Firebase Admin: Initialization failed. Firestore operations will be unavailable.', error);
 }
 
 const stripe = process.env.STRIPE_SECRET_KEY 
@@ -74,6 +77,7 @@ const mpesaConfig = {
 console.log('--- Server Starting ---');
 console.log('NODE_ENV:', process.env.NODE_ENV);
 console.log('PORT:', process.env.PORT);
+console.log('Firebase Admin Initialized:', !!adminDb);
 console.log('Stripe Initialized:', !!stripe);
 console.log('M-Pesa Configured:', !!(mpesaConfig.consumerKey && mpesaConfig.consumerSecret));
 

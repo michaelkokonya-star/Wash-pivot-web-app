@@ -5,6 +5,18 @@ import { getDb } from './db.ts';
 
 const router = express.Router();
 
+// ---------------------------------------------------------------------------
+// Helper – returns a user-facing 503 when Firebase isn't configured
+// ---------------------------------------------------------------------------
+const isFirebaseUnavailableError = (err: any): boolean => {
+  const msg: string = err?.message || '';
+  return (
+    msg.includes('Firebase Admin is not initialized') ||
+    msg.includes('default Firebase app does not exist') ||
+    msg.includes('Could not load the default credentials')
+  );
+};
+
 // Accept multipart uploads (up to 10 MB) or fall back to JSON body
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -59,6 +71,9 @@ router.post('/products', authenticate, async (req: any, res) => {
     res.status(201).json({ id: docRef.id, ...saved.data() });
   } catch (err: any) {
     console.error('Error creating product:', err);
+    if (isFirebaseUnavailableError(err)) {
+      return res.status(503).json({ error: 'Firebase is not configured. Set the FIREBASE_SERVICE_ACCOUNT environment variable.' });
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -86,6 +101,9 @@ router.get('/products', async (req: any, res) => {
     res.json(products);
   } catch (err: any) {
     console.error('Error listing products:', err);
+    if (isFirebaseUnavailableError(err)) {
+      return res.status(503).json({ error: 'Firebase is not configured. Set the FIREBASE_SERVICE_ACCOUNT environment variable.' });
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -98,6 +116,9 @@ router.get('/products/:productId', async (req, res) => {
     res.json({ id: doc.id, ...doc.data() });
   } catch (err: any) {
     console.error('Error fetching product:', err);
+    if (isFirebaseUnavailableError(err)) {
+      return res.status(503).json({ error: 'Firebase is not configured. Set the FIREBASE_SERVICE_ACCOUNT environment variable.' });
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -123,6 +144,9 @@ router.put('/products/:productId', authenticate, async (req: any, res) => {
     res.json({ id: updated.id, ...updated.data() });
   } catch (err: any) {
     console.error('Error updating product:', err);
+    if (isFirebaseUnavailableError(err)) {
+      return res.status(503).json({ error: 'Firebase is not configured. Set the FIREBASE_SERVICE_ACCOUNT environment variable.' });
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -143,6 +167,9 @@ router.delete('/products/:productId', authenticate, async (req: any, res) => {
     res.json({ success: true });
   } catch (err: any) {
     console.error('Error deleting product:', err);
+    if (isFirebaseUnavailableError(err)) {
+      return res.status(503).json({ error: 'Firebase is not configured. Set the FIREBASE_SERVICE_ACCOUNT environment variable.' });
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -226,6 +253,9 @@ router.post(
       res.status(201).json({ id: photoRef.id, url: photoUrl, mimeType });
     } catch (err: any) {
       console.error('Error uploading product photo:', err);
+      if (isFirebaseUnavailableError(err)) {
+        return res.status(503).json({ error: 'Firebase is not configured. Set the FIREBASE_SERVICE_ACCOUNT environment variable.' });
+      }
       res.status(500).json({ error: err.message });
     }
   }
@@ -278,6 +308,9 @@ router.get('/products/:productId/photo/:photoId', async (req, res) => {
     res.send(imageBuffer);
   } catch (err: any) {
     console.error('Error retrieving product photo:', err);
+    if (isFirebaseUnavailableError(err)) {
+      return res.status(503).json({ error: 'Firebase is not configured. Set the FIREBASE_SERVICE_ACCOUNT environment variable.' });
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -312,6 +345,9 @@ router.delete('/products/:productId/photo/:photoId', authenticate, async (req: a
     res.json({ success: true });
   } catch (err: any) {
     console.error('Error deleting product photo:', err);
+    if (isFirebaseUnavailableError(err)) {
+      return res.status(503).json({ error: 'Firebase is not configured. Set the FIREBASE_SERVICE_ACCOUNT environment variable.' });
+    }
     res.status(500).json({ error: err.message });
   }
 });
