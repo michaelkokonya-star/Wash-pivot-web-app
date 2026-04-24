@@ -234,7 +234,19 @@ router.post(
 // ---------------------------------------------------------------------------
 // Photo retrieval
 // GET /api/customer/products/:productId/photo/:photoId
+// OPTIONS /api/customer/products/:productId/photo/:photoId  (CORS preflight)
 // ---------------------------------------------------------------------------
+
+// Handle CORS preflight for photo endpoints
+router.options('/products/:productId/photo/:photoId', (req, res) => {
+  res.set('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+  res.set('Access-Control-Allow-Credentials', 'true');
+  res.set('Access-Control-Max-Age', '86400'); // cache preflight for 24 h
+  res.status(204).end();
+});
+
 router.get('/products/:productId/photo/:photoId', async (req, res) => {
   try {
     const { productId, photoId } = req.params;
@@ -252,8 +264,15 @@ router.get('/products/:productId/photo/:photoId', async (req, res) => {
 
     const photoData = photoDoc.data() as any;
     const imageBuffer = Buffer.from(photoData.data, 'base64');
+    const mimeType = photoData.mimeType || 'image/jpeg';
 
-    res.set('Content-Type', photoData.mimeType || 'image/jpeg');
+    // Explicit CORS headers on the image response so browsers can render it
+    // whether loaded via <img src>, fetch(), or XHR from any origin.
+    res.set('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.set('Access-Control-Allow-Credentials', 'true');
+    res.set('Access-Control-Expose-Headers', 'Content-Type, Content-Length, Cache-Control');
+
+    res.set('Content-Type', mimeType);
     res.set('Cache-Control', 'public, max-age=31536000, immutable');
     res.set('Content-Length', String(imageBuffer.length));
     res.send(imageBuffer);
