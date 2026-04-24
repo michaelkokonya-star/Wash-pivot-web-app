@@ -107,7 +107,18 @@ async function startServer() {
     const app = express();
     const PORT = parseInt(process.env.PORT || '3000', 10);
 
-    app.use(cors());
+    const corsOptions: cors.CorsOptions = {
+      origin: true, // reflect the request origin, allowing all origins
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+      exposedHeaders: ['Content-Type', 'Content-Length', 'Cache-Control'],
+      optionsSuccessStatus: 204,
+    };
+
+    app.use(cors(corsOptions));
+    // Handle preflight OPTIONS requests for all routes
+    app.options('*', cors(corsOptions));
     app.use(express.json());
 
     // Upload API
