@@ -11,6 +11,7 @@ import uploadRoutes from './routes/upload.ts';
 import settingsRoutes from './routes/settings.ts';
 import dataRoutes from './routes/data.ts';
 import customerRoutes from './routes/customer.ts';
+import { initDb } from './routes/postgres-db.ts';
 
 dotenv.config();
 
@@ -417,6 +418,19 @@ async function startServer() {
           }
         });
       });
+    }
+
+    // Initialise PostgreSQL schema (no-op if tables already exist)
+    if (process.env.DATABASE_URL) {
+      try {
+        await initDb();
+        console.log('PostgreSQL: Schema initialised.');
+      } catch (err: any) {
+        console.error('PostgreSQL: Schema initialisation failed —', err.message);
+        // Non-fatal: server still starts; customer routes will surface DB errors per-request
+      }
+    } else {
+      console.log('PostgreSQL: DATABASE_URL not set — skipping schema init.');
     }
 
     app.listen(PORT, '0.0.0.0', () => {

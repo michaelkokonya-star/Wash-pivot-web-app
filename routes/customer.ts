@@ -1,21 +1,9 @@
 import express from 'express';
 import multer from 'multer';
 import admin from 'firebase-admin';
-import { getDb } from './db.ts';
+import { query as pgQuery } from './postgres-db.ts';
 
 const router = express.Router();
-
-// ---------------------------------------------------------------------------
-// Helper – returns a user-facing 503 when Firebase isn't configured
-// ---------------------------------------------------------------------------
-const isFirebaseUnavailableError = (err: any): boolean => {
-  const msg: string = err?.message || '';
-  return (
-    msg.includes('Firebase Admin is not initialized') ||
-    msg.includes('default Firebase app does not exist') ||
-    msg.includes('Could not load the default credentials')
-  );
-};
 
 // Accept multipart uploads (up to 10 MB) or fall back to JSON body
 const upload = multer({
@@ -43,6 +31,25 @@ const authenticate = async (req: any, res: any, next: any) => {
 };
 
 // ---------------------------------------------------------------------------
+// Helper – map a products row to the API shape clients expect
+// ---------------------------------------------------------------------------
+function rowToProduct(row: any): any {
+  return {
+    id:          row.id,
+    name:        row.name,
+    description: row.description,
+    category:    row.category,
+    price:       parseFloat(row.price),
+    companyId:   row.company_id,
+    createdBy:   row.created_by,
+    createdAt:   row.created_at,
+    updatedAt:   row.updated_at,
+    // photos array is populated separately when needed
+    photos:      row.photos ?? [],
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Product CRUD
 // ---------------------------------------------------------------------------
 
@@ -54,26 +61,23 @@ router.post('/products', authenticate, async (req: any, res) => {
       return res.status(400).json({ error: 'Product name is required' });
     }
 
-    const newProduct = {
-      name,
-      description: description || '',
-      category: category || 'General',
-      price: price ? parseFloat(price) : 0,
-      companyId: companyId || req.user.uid,
-      photos: [],
-      createdBy: req.user.uid,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    };
+    const { rows } = await pgQuery(
+      `INSERT INTO products (name, description, category, price, company_id, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [
+        name,
+        description || '',
+        category    || 'General',
+        price ? parseFloat(price) : 0,
+        companyId   || req.user.uid,
+        req.user.uid,
+      ]
+    );
 
-    const docRef = await getDb().collection('customer_products').add(newProduct);
-    const saved = await docRef.get();
-    res.status(201).json({ id: docRef.id, ...saved.data() });
+    res.status(201).json(rowToProduct(rows[0]));
   } catch (err: any) {
     console.error('Error creating product:', err);
-    if (isFirebaseUnavailableError(err)) {
-      return res.status(503).json({ error: 'Firebase is not configured. Set the FIREBASE_SERVICE_ACCOUNT environment variable.' });
-    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -82,28 +86,33 @@ router.post('/products', authenticate, async (req: any, res) => {
 router.get('/products', async (req: any, res) => {
   try {
     const { companyId } = req.query;
-    let query: any = getDb().collection('customer_products');
+
+    let result;
     if (companyId) {
-      // Filter by companyId; sort client-side to avoid requiring a composite index
-      query = query.where('companyId', '==', companyId);
-      const snapshot = await query.get();
-      const products = snapshot.docs
-        .map((doc: any) => ({ id: doc.id, ...doc.data() }))
-        .sort((a: any, b: any) => {
-          const aTime = a.createdAt?.toMillis?.() ?? 0;
-          const bTime = b.createdAt?.toMillis?.() ?? 0;
-          return bTime - aTime;
-        });
-      return res.json(products);
+      result = await pgQuery(
+        `SELECT * FROM products WHERE company_id = $1 ORDER BY created_at DESC`,
+        [companyId]
+      );
+    } else {
+      result = await pgQuery(
+        `SELECT * FROM products ORDER BY created_at DESC`
+      );
     }
-    const snapshot = await query.orderBy('createdAt', 'desc').get();
-    const products = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+
+    // Attach photo IDs for each product
+    const products = await Promise.all(
+      result.rows.map(async (row: any) => {
+        const photoResult = await pgQuery(
+          `SELECT id FROM product_photos WHERE product_id = $1 ORDER BY uploaded_at ASC`,
+          [row.id]
+        );
+        return rowToProduct({ ...row, photos: photoResult.rows.map((p: any) => p.id) });
+      })
+    );
+
     res.json(products);
   } catch (err: any) {
     console.error('Error listing products:', err);
-    if (isFirebaseUnavailableError(err)) {
-      return res.status(503).json({ error: 'Firebase is not configured. Set the FIREBASE_SERVICE_ACCOUNT environment variable.' });
-    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -111,14 +120,20 @@ router.get('/products', async (req: any, res) => {
 // GET /api/customer/products/:productId – get single product
 router.get('/products/:productId', async (req, res) => {
   try {
-    const doc = await getDb().collection('customer_products').doc(req.params.productId).get();
-    if (!doc.exists) return res.status(404).json({ error: 'Product not found' });
-    res.json({ id: doc.id, ...doc.data() });
+    const { rows } = await pgQuery(
+      `SELECT * FROM products WHERE id = $1`,
+      [req.params.productId]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Product not found' });
+
+    const photoResult = await pgQuery(
+      `SELECT id FROM product_photos WHERE product_id = $1 ORDER BY uploaded_at ASC`,
+      [req.params.productId]
+    );
+
+    res.json(rowToProduct({ ...rows[0], photos: photoResult.rows.map((p: any) => p.id) }));
   } catch (err: any) {
     console.error('Error fetching product:', err);
-    if (isFirebaseUnavailableError(err)) {
-      return res.status(503).json({ error: 'Firebase is not configured. Set the FIREBASE_SERVICE_ACCOUNT environment variable.' });
-    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -126,27 +141,46 @@ router.get('/products/:productId', async (req, res) => {
 // PUT /api/customer/products/:productId – update a product
 router.put('/products/:productId', authenticate, async (req: any, res) => {
   try {
-    const ref = getDb().collection('customer_products').doc(req.params.productId);
-    const existing = await ref.get();
-    if (!existing.exists) return res.status(404).json({ error: 'Product not found' });
+    const { rows: existing } = await pgQuery(
+      `SELECT * FROM products WHERE id = $1`,
+      [req.params.productId]
+    );
+    if (existing.length === 0) return res.status(404).json({ error: 'Product not found' });
 
-    const data = existing.data() as any;
-    if (data.createdBy !== req.user.uid && req.user.email !== 'michael.kokonya@washpivot.com') {
+    if (existing[0].created_by !== req.user.uid && req.user.email !== 'michael.kokonya@washpivot.com') {
       return res.status(403).json({ error: 'Forbidden: You can only update your own products' });
     }
 
     const { id: _id, createdAt: _ca, createdBy: _cb, ...updates } = req.body;
-    await ref.set(
-      { ...updates, updatedAt: admin.firestore.FieldValue.serverTimestamp() },
-      { merge: true }
+
+    const { rows } = await pgQuery(
+      `UPDATE products
+       SET name        = COALESCE($1, name),
+           description = COALESCE($2, description),
+           category    = COALESCE($3, category),
+           price       = COALESCE($4, price),
+           company_id  = COALESCE($5, company_id),
+           updated_at  = NOW()
+       WHERE id = $6
+       RETURNING *`,
+      [
+        updates.name        ?? null,
+        updates.description ?? null,
+        updates.category    ?? null,
+        updates.price != null ? parseFloat(updates.price) : null,
+        updates.companyId   ?? null,
+        req.params.productId,
+      ]
     );
-    const updated = await ref.get();
-    res.json({ id: updated.id, ...updated.data() });
+
+    const photoResult = await pgQuery(
+      `SELECT id FROM product_photos WHERE product_id = $1 ORDER BY uploaded_at ASC`,
+      [req.params.productId]
+    );
+
+    res.json(rowToProduct({ ...rows[0], photos: photoResult.rows.map((p: any) => p.id) }));
   } catch (err: any) {
     console.error('Error updating product:', err);
-    if (isFirebaseUnavailableError(err)) {
-      return res.status(503).json({ error: 'Firebase is not configured. Set the FIREBASE_SERVICE_ACCOUNT environment variable.' });
-    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -154,22 +188,21 @@ router.put('/products/:productId', authenticate, async (req: any, res) => {
 // DELETE /api/customer/products/:productId – delete a product
 router.delete('/products/:productId', authenticate, async (req: any, res) => {
   try {
-    const ref = getDb().collection('customer_products').doc(req.params.productId);
-    const existing = await ref.get();
-    if (!existing.exists) return res.status(404).json({ error: 'Product not found' });
+    const { rows: existing } = await pgQuery(
+      `SELECT * FROM products WHERE id = $1`,
+      [req.params.productId]
+    );
+    if (existing.length === 0) return res.status(404).json({ error: 'Product not found' });
 
-    const data = existing.data() as any;
-    if (data.createdBy !== req.user.uid && req.user.email !== 'michael.kokonya@washpivot.com') {
+    if (existing[0].created_by !== req.user.uid && req.user.email !== 'michael.kokonya@washpivot.com') {
       return res.status(403).json({ error: 'Forbidden: You can only delete your own products' });
     }
 
-    await ref.delete();
+    // Cascade deletes photos automatically (ON DELETE CASCADE in schema)
+    await pgQuery(`DELETE FROM products WHERE id = $1`, [req.params.productId]);
     res.json({ success: true });
   } catch (err: any) {
     console.error('Error deleting product:', err);
-    if (isFirebaseUnavailableError(err)) {
-      return res.status(503).json({ error: 'Firebase is not configured. Set the FIREBASE_SERVICE_ACCOUNT environment variable.' });
-    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -182,8 +215,8 @@ router.delete('/products/:productId', authenticate, async (req: any, res) => {
 //   - multipart/form-data with a "photo" field (binary file)
 //   - application/json with { data: "<base64>", mimeType: "image/jpeg" }
 //
-// Stores the image as a base64 string inside a Firestore sub-collection so
-// that no external storage bucket is required.
+// Stores the image as a base64 string in the product_photos table so that
+// no external storage bucket is required.
 // ---------------------------------------------------------------------------
 router.post(
   '/products/:productId/photo',
@@ -194,9 +227,11 @@ router.post(
       const { productId } = req.params;
 
       // Verify product exists
-      const productRef = getDb().collection('customer_products').doc(productId);
-      const productDoc = await productRef.get();
-      if (!productDoc.exists) {
+      const { rows: productRows } = await pgQuery(
+        `SELECT id FROM products WHERE id = $1`,
+        [productId]
+      );
+      if (productRows.length === 0) {
         return res.status(404).json({ error: 'Product not found' });
       }
 
@@ -228,34 +263,18 @@ router.post(
         return res.status(413).json({ error: 'Image too large. Maximum size is 8 MB.' });
       }
 
-      // Store in Firestore sub-collection
-      const photoData = {
-        productId,
-        uploadedBy: req.user.uid,
-        uploadedAt: admin.firestore.FieldValue.serverTimestamp(),
-        mimeType,
-        data: base64Data,
-      };
+      const { rows } = await pgQuery(
+        `INSERT INTO product_photos (product_id, data, mime_type, uploaded_by)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id, mime_type`,
+        [productId, base64Data, mimeType, req.user.uid]
+      );
 
-      const photoRef = await getDb()
-        .collection('customer_products')
-        .doc(productId)
-        .collection('photos')
-        .add(photoData);
-
-      // Also push the photo ID into the product's photos[] array
-      await productRef.update({
-        photos: admin.firestore.FieldValue.arrayUnion(photoRef.id),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-
-      const photoUrl = `/api/customer/products/${productId}/photo/${photoRef.id}`;
-      res.status(201).json({ id: photoRef.id, url: photoUrl, mimeType });
+      const photoId  = rows[0].id;
+      const photoUrl = `/api/customer/products/${productId}/photo/${photoId}`;
+      res.status(201).json({ id: photoId, url: photoUrl, mimeType: rows[0].mime_type });
     } catch (err: any) {
       console.error('Error uploading product photo:', err);
-      if (isFirebaseUnavailableError(err)) {
-        return res.status(503).json({ error: 'Firebase is not configured. Set the FIREBASE_SERVICE_ACCOUNT environment variable.' });
-      }
       res.status(500).json({ error: err.message });
     }
   }
@@ -281,23 +300,19 @@ router.get('/products/:productId/photo/:photoId', async (req, res) => {
   try {
     const { productId, photoId } = req.params;
 
-    const photoDoc = await getDb()
-      .collection('customer_products')
-      .doc(productId)
-      .collection('photos')
-      .doc(photoId)
-      .get();
+    const { rows } = await pgQuery(
+      `SELECT data, mime_type FROM product_photos WHERE id = $1 AND product_id = $2`,
+      [photoId, productId]
+    );
 
-    if (!photoDoc.exists) {
+    if (rows.length === 0) {
       return res.status(404).json({ error: 'Photo not found' });
     }
 
-    const photoData = photoDoc.data() as any;
-    const imageBuffer = Buffer.from(photoData.data, 'base64');
-    const mimeType = photoData.mimeType || 'image/jpeg';
+    const imageBuffer = Buffer.from(rows[0].data, 'base64');
+    const mimeType    = rows[0].mime_type || 'image/jpeg';
 
-    // Explicit CORS headers on the image response so browsers can render it
-    // whether loaded via <img src>, fetch(), or XHR from any origin.
+    // Explicit CORS headers so browsers can render the image from any origin
     res.set('Access-Control-Allow-Origin', req.headers.origin || '*');
     res.set('Access-Control-Allow-Credentials', 'true');
     res.set('Access-Control-Expose-Headers', 'Content-Type, Content-Length, Cache-Control');
@@ -308,9 +323,6 @@ router.get('/products/:productId/photo/:photoId', async (req, res) => {
     res.send(imageBuffer);
   } catch (err: any) {
     console.error('Error retrieving product photo:', err);
-    if (isFirebaseUnavailableError(err)) {
-      return res.status(503).json({ error: 'Firebase is not configured. Set the FIREBASE_SERVICE_ACCOUNT environment variable.' });
-    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -323,31 +335,23 @@ router.delete('/products/:productId/photo/:photoId', authenticate, async (req: a
   try {
     const { productId, photoId } = req.params;
 
-    const productRef = getDb().collection('customer_products').doc(productId);
-    const photoRef = productRef.collection('photos').doc(photoId);
+    const { rows } = await pgQuery(
+      `SELECT uploaded_by FROM product_photos WHERE id = $1 AND product_id = $2`,
+      [photoId, productId]
+    );
 
-    const photoDoc = await photoRef.get();
-    if (!photoDoc.exists) {
+    if (rows.length === 0) {
       return res.status(404).json({ error: 'Photo not found' });
     }
 
-    const photoData = photoDoc.data() as any;
-    if (photoData.uploadedBy !== req.user.uid && req.user.email !== 'michael.kokonya@washpivot.com') {
+    if (rows[0].uploaded_by !== req.user.uid && req.user.email !== 'michael.kokonya@washpivot.com') {
       return res.status(403).json({ error: 'Forbidden: You can only delete your own photos' });
     }
 
-    await photoRef.delete();
-    await productRef.update({
-      photos: admin.firestore.FieldValue.arrayRemove(photoId),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
+    await pgQuery(`DELETE FROM product_photos WHERE id = $1`, [photoId]);
     res.json({ success: true });
   } catch (err: any) {
     console.error('Error deleting product photo:', err);
-    if (isFirebaseUnavailableError(err)) {
-      return res.status(503).json({ error: 'Firebase is not configured. Set the FIREBASE_SERVICE_ACCOUNT environment variable.' });
-    }
     res.status(500).json({ error: err.message });
   }
 });
