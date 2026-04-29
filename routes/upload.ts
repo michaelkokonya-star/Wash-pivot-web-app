@@ -40,21 +40,38 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     }
     
     const bucket = process.env.BUCKET || '';
+    const region = process.env.REGION || 'auto';
     let url = '';
     
     // Ensure no double slashes in endpoint
     const baseUrl = endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint;
+    const cleanKey = key.startsWith('/') ? key.slice(1) : key;
     
     if (baseUrl.includes('digitaloceanspaces.com')) {
-      // For DigitalOcean, path-style is safer for buckets with dots: https://region.digitaloceanspaces.com/bucket/key
-      url = `${baseUrl}/${bucket}/${key}`;
-    } else if (baseUrl.includes('amazonaws.com') && !baseUrl.includes(bucket)) {
-      // For AWS, virtual-host style is often preferred but depends on configuration
-      const parts = baseUrl.split('://');
-      url = `${parts[0]}://${bucket}.${parts[1]}/${key}`;
+      // DigitalOcean Spaces: Defaulting to virtual-host style if bucket has no dots, else path-style
+      if (bucket.includes('.')) {
+        url = `${baseUrl}/${bucket}/${cleanKey}`;
+      } else {
+        // Construct standard DO virtual host: https://bucket.region.digitaloceanspaces.com/key
+        // Extract region from baseUrl if possible
+        const urlObj = new URL(baseUrl);
+        url = `https://${bucket}.${urlObj.hostname}/${cleanKey}`;
+      }
+    } else if (baseUrl.includes('amazonaws.com')) {
+      // AWS S3: Often bucket.s3.region.amazonaws.com or s3.region.amazonaws.com/bucket
+      if (baseUrl.includes(bucket)) {
+        url = `${baseUrl}/${cleanKey}`;
+      } else {
+        const urlObj = new URL(baseUrl);
+        if (urlObj.hostname.startsWith('s3.')) {
+           url = `https://${bucket}.${urlObj.hostname}/${cleanKey}`;
+        } else {
+           url = `${baseUrl}/${bucket}/${cleanKey}`;
+        }
+      }
     } else {
-      // Fallback to path-style: https://endpoint/bucket/key
-      url = `${baseUrl}/${bucket}/${key}`;
+      // Generic S3 / MinIO / Cloudflare R2
+      url = `${baseUrl}/${bucket}/${cleanKey}`;
     }
     
     console.log('Successfully uploaded to S3:', url);

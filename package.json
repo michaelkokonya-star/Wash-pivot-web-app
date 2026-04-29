@@ -58,7 +58,5 @@
     "tailwindcss": "^4.2.2",
     "vite": "^8.0.3"
   },
-  "overrides": {
-    "node-domexception": "file:./shims/node-domexception"
-  }
+  "overrides": {}
 }
