@@ -95,23 +95,20 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         )}
       </AnimatePresence>
       <motion.img
-        {...({
-          src: hasError ? fallbackImage : optimizedSrc,
-          alt: alt,
-          initial: { opacity: 0 },
-          animate: { opacity: isLoaded ? 1 : (hasError ? 1 : 0) },
-          transition: { duration: 0.5 },
-          onLoad: () => setIsLoaded(true),
-          onError: () => {
-            console.warn(`OptimizedImage failed to load: ${src}`);
-            setHasError(true);
-            setIsLoaded(false);
-          },
-          loading: priority ? "eager" : "lazy",
-          fetchPriority: priority ? "high" : "auto",
-          className: `w-full h-full object-cover transition-opacity duration-500 ${className}`,
-          ...props
-        } as any)}
+        src={hasError ? fallbackImage : optimizedSrc}
+        alt={alt}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: isLoaded || hasError ? 1 : 0 }}
+        transition={{ duration: 0.5 }}
+        onLoad={() => setIsLoaded(true)}
+        onError={() => {
+          console.warn(`OptimizedImage failed to load: ${src}`);
+          setHasError(true);
+        }}
+        loading={priority ? "eager" : "lazy"}
+        className={`w-full h-full object-cover ${className}`}
+        referrerPolicy="no-referrer"
+        {...(props as any)}
       />
     </div>
   );

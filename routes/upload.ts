@@ -15,6 +15,7 @@ const s3 = new S3Client({
     secretAccessKey: process.env.SECRET_ACCESS_KEY as string,
   },
   endpoint: process.env.ENDPOINT as string,
+  forcePathStyle: true, // Use path-style for better compatibility
 });
 
 router.post('/upload', upload.single('file'), async (req, res) => {
@@ -44,13 +45,11 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     // Ensure no double slashes in endpoint
     const baseUrl = endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint;
     
-    if (baseUrl.includes('amazonaws.com') && !baseUrl.includes(bucket)) {
-      // For AWS, virtual-host style is preferred: https://bucket.s3.region.amazonaws.com/key
-      // Standard endpoints are often s3.amazonaws.com or s3.region.amazonaws.com
-      const parts = baseUrl.split('://');
-      url = `${parts[0]}://${bucket}.${parts[1]}/${key}`;
-    } else if (baseUrl.includes('digitaloceanspaces.com') && !baseUrl.includes(bucket)) {
-      // DigitalOcean Spaces: https://bucket.region.digitaloceanspaces.com/key
+    if (baseUrl.includes('digitaloceanspaces.com')) {
+      // For DigitalOcean, path-style is safer for buckets with dots: https://region.digitaloceanspaces.com/bucket/key
+      url = `${baseUrl}/${bucket}/${key}`;
+    } else if (baseUrl.includes('amazonaws.com') && !baseUrl.includes(bucket)) {
+      // For AWS, virtual-host style is often preferred but depends on configuration
       const parts = baseUrl.split('://');
       url = `${parts[0]}://${bucket}.${parts[1]}/${key}`;
     } else {

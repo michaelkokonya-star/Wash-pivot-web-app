@@ -176,6 +176,7 @@ const AdminProjectDetails = () => {
                 <img 
                   src={project.imageUrl} 
                   alt={project.title} 
+                  referrerPolicy="no-referrer"
                   className="w-full h-full object-cover"
                 />
               </div>
