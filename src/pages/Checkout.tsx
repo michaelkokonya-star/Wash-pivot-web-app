@@ -28,7 +28,6 @@ const MpesaLogo = ({ className = "h-8", light = false }) => (
     src="https://upload.wikimedia.org/wikipedia/commons/1/15/M-PESA_LOGO-01.svg" 
     alt="M-Pesa" 
     className={`object-contain ${className} ${light ? 'brightness-0 invert' : ''}`}
-    referrerPolicy="no-referrer"
   />
 );
 
@@ -320,7 +319,6 @@ const Checkout = () => {
                     src="https://paystack.com/assets/img/login/paystack-logo.png" 
                     alt="Paystack" 
                     className={`h-4 transition-all ${paymentMethod === 'paystack' ? 'opacity-100' : 'opacity-40 grayscale group-hover:grayscale-0 group-hover:opacity-100'}`}
-                    referrerPolicy="no-referrer"
                   />
                 </button>
 
@@ -473,7 +471,7 @@ const Checkout = () => {
               {cart.map((item) => (
                 <div key={item.id} className="flex items-center gap-4">
                   <div className="w-16 h-16 rounded-xl overflow-hidden bg-white border border-black/5 flex-shrink-0">
-                    <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
                   </div>
                   <div className="flex-grow">
                     <h4 className="font-bold text-sm line-clamp-1">{item.name}</h4>

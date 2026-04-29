@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Sun, Droplets, ShieldCheck, ArrowRight, Zap, Globe, Users, Sparkles, Loader2, Search, Layers } from 'lucide-react';
+import { GoogleGenAI } from "@google/genai";
 import OptimizedImage from '../components/OptimizedImage';
 import { toast } from 'sonner';
 
@@ -13,27 +14,43 @@ const Home = () => {
   const generateImpactImage = async () => {
     setIsGenerating(true);
     try {
-      const response = await fetch('/api/ai/image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: 'A high-quality, realistic image of a solar-powered water purification system being installed in a vibrant rural village. The scene should show local community members and technicians working together, with solar panels clearly visible and clean water flowing. The atmosphere should be hopeful and sustainable.',
-          aspectRatio: "16:9",
-          model: 'gemini-2.0-flash'
-        })
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to generate image');
+      const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+      if (!apiKey || apiKey === "undefined") {
+        throw new Error("Gemini API key is not configured.");
       }
 
-      const data = await response.json();
-      if (data.image) {
-        setGeneratedImage(data.image);
-        toast.success("Impact visualization generated!");
+      const ai = new GoogleGenAI({ apiKey });
+      const prompt = 'A high-quality, realistic image of a solar-powered water purification system being installed in a vibrant rural village. The scene should show local community members and technicians working together, with solar panels clearly visible and clean water flowing. The atmosphere should be hopeful and sustainable.';
+      
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-image',
+        contents: {
+          parts: [{ text: prompt }],
+        },
+        config: {
+          imageConfig: {
+            aspectRatio: "16:9",
+          },
+        },
+      });
+
+      if (response.candidates && response.candidates[0]?.content?.parts) {
+        let foundImage = false;
+        for (const part of response.candidates[0].content.parts) {
+          if (part.inlineData) {
+            const base64Data = part.inlineData.data;
+            setGeneratedImage(`data:image/png;base64,${base64Data}`);
+            foundImage = true;
+            break;
+          }
+        }
+        if (foundImage) {
+          toast.success("Impact visualization generated!");
+        } else {
+          throw new Error("AI generated a response but no image data was found.");
+        }
       } else {
-        throw new Error("No image returned from server");
+        throw new Error("Failed to generate image candidates.");
       }
     } catch (error: any) {
       console.error("Error generating image:", error);

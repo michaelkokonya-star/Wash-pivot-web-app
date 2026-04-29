@@ -152,7 +152,7 @@ const AICreativeStudio = () => {
       const mimeType = videoSourceImage.split(';')[0].split(':')[1];
 
       let operation = await ai.models.generateVideos({
-        model: 'veo-3.1-fast-generate-preview',
+        model: 'veo-3.1-generate-preview',
         prompt: prompt || 'Animate this scene with cinematic motion',
         image: {
           imageBytes: base64Data,

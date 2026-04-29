@@ -280,7 +280,7 @@ const EditServiceModal: React.FC<EditServiceModalProps> = ({ isOpen, onClose, on
                   >
                     {imagePreview ? (
                       <>
-                        <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           <Upload className="text-white" size={24} />
                         </div>

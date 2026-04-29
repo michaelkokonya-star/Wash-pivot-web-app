@@ -277,7 +277,7 @@ const OrderTracking = () => {
               {order.items.map((item, idx) => (
                 <div key={idx} className="flex items-center gap-4">
                   <div className="w-16 h-16 rounded-2xl overflow-hidden bg-stone-50 border border-black/5 shrink-0">
-                    <img src={item.imageUrl || item.image} alt={item.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    <img src={item.imageUrl || item.image} alt={item.name} className="w-full h-full object-cover" />
                   </div>
                   <div className="min-w-0">
                     <h4 className="font-bold text-sm truncate">{item.name}</h4>

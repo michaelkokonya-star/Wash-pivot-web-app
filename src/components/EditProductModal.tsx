@@ -4,7 +4,7 @@ import { X, Upload, Save, Loader2, Image as ImageIcon } from 'lucide-react';
 import { auth, db } from '../firebase';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useSettings } from '../context/SettingsContext';
-import { compressImage } from '../lib/image-utils';
+import { compressImage, sanitizeFilename, fileToDataUrl } from '../lib/image-utils';
 import { toast } from 'sonner';
 
 interface EditProductModalProps {
@@ -96,7 +96,6 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
         setUploadStatus('uploading');
         setUploadProgress(10);
         
-        // Try S3 upload first; fall back to base64 data URL stored directly
         const uploadFormData = new FormData();
         uploadFormData.append('file', compressedFile);
 
@@ -110,10 +109,8 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
           finalImageUrl = uploadData.url;
           setUploadProgress(100);
         } else {
-          // S3 not configured – store image as a data URL in Firestore directly
-          const { fileToDataUrl } = await import('../lib/image-utils');
-          finalImageUrl = await fileToDataUrl(compressedFile);
-          setUploadProgress(100);
+          const errorData = await uploadRes.json().catch(() => ({}));
+          throw new Error(errorData.error || 'Upload failed');
         }
       }
 
@@ -315,7 +312,6 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
                           src={imagePreview} 
                           alt="Preview" 
                           className="w-full h-full object-cover" 
-                          referrerPolicy="no-referrer"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
                             target.src = 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=800';

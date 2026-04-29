@@ -110,8 +110,6 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
           loading: priority ? "eager" : "lazy",
           fetchPriority: priority ? "high" : "auto",
           className: `w-full h-full object-cover transition-opacity duration-500 ${className}`,
-          referrerPolicy: "no-referrer-when-downgrade",
-          crossOrigin: "anonymous",
           ...props
         } as any)}
       />

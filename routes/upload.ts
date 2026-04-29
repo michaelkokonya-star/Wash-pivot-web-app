@@ -38,14 +38,25 @@ router.post('/upload', upload.single('file'), async (req, res) => {
       endpoint = `https://${endpoint}`;
     }
     
-    // Ensure no double slashes when joining
-    const baseUrl = endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint;
     const bucket = process.env.BUCKET || '';
+    let url = '';
     
-    // Most S3 compatible providers support: https://{bucket}.{endpoint}/{key}
-    // and https://{endpoint}/{bucket}/{key}
-    // We'll stick to a robust path-style but ensure it's a full URL
-    const url = `${baseUrl}/${bucket}/${key}`;
+    // Ensure no double slashes in endpoint
+    const baseUrl = endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint;
+    
+    if (baseUrl.includes('amazonaws.com') && !baseUrl.includes(bucket)) {
+      // For AWS, virtual-host style is preferred: https://bucket.s3.region.amazonaws.com/key
+      // Standard endpoints are often s3.amazonaws.com or s3.region.amazonaws.com
+      const parts = baseUrl.split('://');
+      url = `${parts[0]}://${bucket}.${parts[1]}/${key}`;
+    } else if (baseUrl.includes('digitaloceanspaces.com') && !baseUrl.includes(bucket)) {
+      // DigitalOcean Spaces: https://bucket.region.digitaloceanspaces.com/key
+      const parts = baseUrl.split('://');
+      url = `${parts[0]}://${bucket}.${parts[1]}/${key}`;
+    } else {
+      // Fallback to path-style: https://endpoint/bucket/key
+      url = `${baseUrl}/${bucket}/${key}`;
+    }
     
     console.log('Successfully uploaded to S3:', url);
     res.json({ url });

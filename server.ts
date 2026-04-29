@@ -10,8 +10,6 @@ import admin from 'firebase-admin';
 import uploadRoutes from './routes/upload.ts';
 import settingsRoutes from './routes/settings.ts';
 import dataRoutes from './routes/data.ts';
-import customerRoutes from './routes/customer.ts';
-import { initDb } from './routes/postgres-db.ts';
 
 dotenv.config();
 
@@ -24,43 +22,47 @@ try {
   console.log('Note: firebase-applet-config.json not found or invalid. Using environment variables instead.');
 }
 
-// Initialize Firebase Admin SDK
-// Priority: FIREBASE_SERVICE_ACCOUNT env var → GOOGLE_APPLICATION_CREDENTIALS → ADC
+// Initialize Firebase Admin only if explicitly configured
 let adminDb: any = null;
 try {
   const projectId = process.env.FIREBASE_PROJECT_ID || firebaseConfig.projectId;
   const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
+  
+  const options: any = {
+    projectId: projectId,
+  };
 
-  // Only attempt initialization if no app has been registered yet
-  if (admin.apps.length === 0) {
-    const options: any = { projectId };
-
-    if (serviceAccount) {
-      try {
-        const cert = JSON.parse(serviceAccount);
-        options.credential = admin.credential.cert(cert);
-        console.log('Firebase Admin: Using service account from FIREBASE_SERVICE_ACCOUNT env var');
-      } catch (e) {
-        console.error('Firebase Admin: Failed to parse FIREBASE_SERVICE_ACCOUNT — falling back to Application Default Credentials (ADC).');
-        // Leave options.credential unset; ADC will be used automatically
-      }
-    } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-      console.log('Firebase Admin: Using credentials from GOOGLE_APPLICATION_CREDENTIALS file');
-      // Leave options.credential unset; the SDK picks up the file path automatically
-    } else {
-      console.log('Firebase Admin: No explicit credentials found — attempting Application Default Credentials (ADC).');
-      // ADC works on GCP/Cloud Run/Firebase Hosting without any extra config
+  let initialized = false;
+  if (serviceAccount) {
+    try {
+      const cert = JSON.parse(serviceAccount);
+      options.credential = admin.credential.cert(cert);
+      console.log('Firebase Admin: Using service account from FIREBASE_SERVICE_ACCOUNT env var');
+      initialized = true;
+    } catch (e) {
+      console.error('Firebase Admin: Failed to parse FIREBASE_SERVICE_ACCOUNT environment variable.');
     }
+  } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    console.log('Firebase Admin: Using credentials from GOOGLE_APPLICATION_CREDENTIALS file');
+    initialized = true;
+  }
 
-    admin.initializeApp(options);
-    adminDb = admin.firestore();
-    console.log(`Firebase Admin: Initialized successfully for project: ${projectId || '(unknown)'}`);
-  } else {
-    adminDb = admin.firestore();
-    console.log('Firebase Admin: App already initialized, reusing existing instance.');
+  if (admin.apps.length === 0) {
+    if (initialized) {
+      admin.initializeApp(options);
+      adminDb = admin.firestore();
+      console.log(`Firebase Admin Initialized for project: ${projectId} with provided credentials`);
+    } else if (projectId) {
+      // Fallback for AI Studio environmental ADC or basic setup
+      admin.initializeApp({ projectId });
+      adminDb = admin.firestore();
+      console.log(`Firebase Admin Initialized for project: ${projectId} (ADC fallback)`);
+    } else {
+      console.warn('Firebase Admin: No project ID or credentials found. Admin features may fail.');
+    }
   }
 } catch (error) {
-  console.error('Firebase Admin: Initialization failed. Firestore operations will be unavailable.', error);
+  console.error('Firebase Admin Initialization Error:', error);
 }
 
 const stripe = process.env.STRIPE_SECRET_KEY 
@@ -78,7 +80,6 @@ const mpesaConfig = {
 console.log('--- Server Starting ---');
 console.log('NODE_ENV:', process.env.NODE_ENV);
 console.log('PORT:', process.env.PORT);
-console.log('Firebase Admin Initialized:', !!adminDb);
 console.log('Stripe Initialized:', !!stripe);
 console.log('M-Pesa Configured:', !!(mpesaConfig.consumerKey && mpesaConfig.consumerSecret));
 
@@ -112,98 +113,17 @@ async function startServer() {
     const app = express();
     const PORT = parseInt(process.env.PORT || '3000', 10);
 
-    const corsOptions: cors.CorsOptions = {
-      origin: true, // reflect the request origin, allowing all origins
-      credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
-      exposedHeaders: ['Content-Type', 'Content-Length', 'Cache-Control'],
-      optionsSuccessStatus: 204,
-    };
-
-    app.use(cors(corsOptions));
+    app.use(cors());
     app.use(express.json());
 
     // Upload API
     app.use('/api', uploadRoutes);
     app.use('/api/settings', settingsRoutes);
     app.use('/api/data', dataRoutes);
-    app.use('/api/customer', customerRoutes);
 
     // API routes
     app.get('/api/health', (req, res) => {
       res.json({ status: 'ok' });
-    });
-
-    // AI Endpoints
-    app.post('/api/ai/image', async (req, res) => {
-      const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-      if (!apiKey) {
-        return res.status(503).json({ error: 'Gemini API key is not configured. Set GEMINI_API_KEY to enable AI features.' });
-      }
-
-      try {
-        const { GoogleGenerativeAI } = await import('@google/generative-ai');
-        const { prompt, aspectRatio, imageSize, model, quality } = req.body;
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const aiModel = genAI.getGenerativeModel({ model: model || 'gemini-2.0-flash' });
-
-        const result = await aiModel.generateContent({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.7,
-            topP: 0.95,
-            topK: 40,
-            maxOutputTokens: 2048,
-          }
-        });
-
-        const response = await result.response;
-        const candidates = (response as any).candidates;
-
-        if (candidates && candidates[0]?.content?.parts) {
-          for (const part of candidates[0].content.parts) {
-            if (part.inlineData) {
-              return res.json({ image: `data:image/png;base64,${part.inlineData.data}` });
-            }
-          }
-        }
-        
-        // If we get here, the model might have returned text instead of an image
-        // Or it's a model that doesn't support image generation via generateContent
-        res.status(400).json({ error: 'AI did not return an image. Make sure to use an image-capable model.' });
-      } catch (error: any) {
-        console.error('AI Image Error:', error);
-        res.status(500).json({ error: error.message });
-      }
-    });
-
-    app.post('/api/ai/chat', async (req, res) => {
-      const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-      if (!apiKey) {
-        return res.status(503).json({ error: 'Gemini API key is not configured. Set GEMINI_API_KEY to enable AI features.' });
-      }
-
-      try {
-        const { GoogleGenerativeAI } = await import('@google/generative-ai');
-        const { message, history, systemInstruction } = req.body;
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ 
-          model: 'gemini-2.0-flash',
-          systemInstruction: systemInstruction
-        });
-
-        const chat = model.startChat({
-          history: history || [],
-        });
-
-        const result = await chat.sendMessage(message);
-        const response = await result.response;
-        res.json({ text: response.text() });
-      } catch (error: any) {
-        console.error('AI Chat Error:', error);
-        res.status(500).json({ error: error.message });
-      }
     });
 
     // Provision System Owner
@@ -418,19 +338,6 @@ async function startServer() {
           }
         });
       });
-    }
-
-    // Initialise PostgreSQL schema (no-op if tables already exist)
-    if (process.env.DATABASE_URL) {
-      try {
-        await initDb();
-        console.log('PostgreSQL: Schema initialised.');
-      } catch (err: any) {
-        console.error('PostgreSQL: Schema initialisation failed —', err.message);
-        // Non-fatal: server still starts; customer routes will surface DB errors per-request
-      }
-    } else {
-      console.log('PostgreSQL: DATABASE_URL not set — skipping schema init.');
     }
 
     app.listen(PORT, '0.0.0.0', () => {
