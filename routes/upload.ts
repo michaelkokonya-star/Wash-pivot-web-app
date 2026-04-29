@@ -25,12 +25,19 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     }
 
     const key = `uploads/${Date.now()}-${req.file.originalname.replace(/\s+/g, '-')}`;
+    console.log('Upload params:', {
+      bucket: process.env.BUCKET,
+      region: process.env.REGION,
+      endpoint: process.env.ENDPOINT,
+      publicUrl: process.env.PUBLIC_URL
+    });
+
     await s3.send(new PutObjectCommand({
       Bucket: process.env.BUCKET,
       Key: key,
       Body: req.file.buffer,
       ContentType: req.file.mimetype,
-      ACL: 'public-read', // Try to make it public if allowed
+      ACL: 'public-read', 
     }));
     
     // Construct URL based on endpoint and bucket
@@ -48,39 +55,46 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     const baseUrl = endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint;
     const cleanKey = key.startsWith('/') ? key.slice(1) : key;
     
-    if (baseUrl.includes('digitaloceanspaces.com')) {
+    // Use PUBLIC_URL if provided, else fallback to standard patterns
+    if (process.env.PUBLIC_URL) {
+      const publicUrl = process.env.PUBLIC_URL;
+      const cleanPublicUrl = publicUrl.endsWith('/') ? publicUrl.slice(0, -1) : publicUrl;
+      console.log('Using PUBLIC_URL override:', cleanPublicUrl);
+      url = `${cleanPublicUrl}/${cleanKey}`;
+    } else if (baseUrl.includes('digitaloceanspaces.com')) {
       // DigitalOcean Spaces: https://bucket.region.digitaloceanspaces.com/key
       const urlObj = new URL(baseUrl);
       if (urlObj.hostname.includes(bucket)) {
+        console.log('DO: Horizontal style already in baseUrl');
         url = `${baseUrl}/${cleanKey}`;
       } else {
+        console.log('DO: Constructing virtual-host URL');
         url = `https://${bucket}.${urlObj.hostname}/${cleanKey}`;
       }
     } else if (baseUrl.includes('amazonaws.com')) {
       // AWS S3: https://bucket.s3.region.amazonaws.com/key or https://s3.region.amazonaws.com/bucket/key
-      // Note: For newer regions, the regional endpoint is preferred.
       if (baseUrl.includes(bucket)) {
+        console.log('AWS: Bucket already in baseUrl');
         url = `${baseUrl}/${cleanKey}`;
       } else {
         const urlObj = new URL(baseUrl);
         if (urlObj.hostname.startsWith('s3.')) {
+          console.log('AWS: Constructing virtual-host URL');
           url = `https://${bucket}.${urlObj.hostname}/${cleanKey}`;
         } else {
+          console.log('AWS: Falling back to path-style');
           url = `${baseUrl}/${bucket}/${cleanKey}`;
         }
       }
     } else if (baseUrl.includes('r2.cloudflarestorage.com')) {
-       // Cloudflare R2: Public access usually requires a custom domain or pub-<hash>.r2.dev
-       // If no PUBLIC_URL is provided, we fallback to the endpoint path (which might not work publicly)
-       const publicUrl = process.env.PUBLIC_URL || baseUrl;
-       const cleanPublicUrl = publicUrl.endsWith('/') ? publicUrl.slice(0, -1) : publicUrl;
-       url = `${cleanPublicUrl}/${bucket}/${cleanKey}`;
+       console.log('Cloudflare R2 detected');
+       url = `${baseUrl}/${bucket}/${cleanKey}`;
     } else {
-      // Generic S3 / MinIO / Custom
+      console.log('Generic/Custom S3 provider');
       url = `${baseUrl}/${bucket}/${cleanKey}`;
     }
     
-    console.log('Successfully uploaded to S3:', url);
+    console.log('Successfully uploaded to S3. Final URL:', url);
     res.json({ url });
   } catch (err: any) {
     console.error('Upload error:', err);
