@@ -34,13 +34,14 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     }));
     
     // Construct URL based on endpoint and bucket
-    let endpoint = process.env.ENDPOINT || '';
+    const region = process.env.REGION || 'us-east-1';
+    const bucket = process.env.BUCKET || '';
+    let endpoint = process.env.ENDPOINT || `https://s3.${region}.amazonaws.com`;
+    
     if (endpoint && !endpoint.startsWith('http')) {
       endpoint = `https://${endpoint}`;
     }
     
-    const bucket = process.env.BUCKET || '';
-    const region = process.env.REGION || 'auto';
     let url = '';
     
     // Ensure no double slashes in endpoint
@@ -48,29 +49,34 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     const cleanKey = key.startsWith('/') ? key.slice(1) : key;
     
     if (baseUrl.includes('digitaloceanspaces.com')) {
-      // DigitalOcean Spaces: Defaulting to virtual-host style if bucket has no dots, else path-style
-      if (bucket.includes('.')) {
-        url = `${baseUrl}/${bucket}/${cleanKey}`;
+      // DigitalOcean Spaces: https://bucket.region.digitaloceanspaces.com/key
+      const urlObj = new URL(baseUrl);
+      if (urlObj.hostname.includes(bucket)) {
+        url = `${baseUrl}/${cleanKey}`;
       } else {
-        // Construct standard DO virtual host: https://bucket.region.digitaloceanspaces.com/key
-        // Extract region from baseUrl if possible
-        const urlObj = new URL(baseUrl);
         url = `https://${bucket}.${urlObj.hostname}/${cleanKey}`;
       }
     } else if (baseUrl.includes('amazonaws.com')) {
-      // AWS S3: Often bucket.s3.region.amazonaws.com or s3.region.amazonaws.com/bucket
+      // AWS S3: https://bucket.s3.region.amazonaws.com/key or https://s3.region.amazonaws.com/bucket/key
+      // Note: For newer regions, the regional endpoint is preferred.
       if (baseUrl.includes(bucket)) {
         url = `${baseUrl}/${cleanKey}`;
       } else {
         const urlObj = new URL(baseUrl);
         if (urlObj.hostname.startsWith('s3.')) {
-           url = `https://${bucket}.${urlObj.hostname}/${cleanKey}`;
+          url = `https://${bucket}.${urlObj.hostname}/${cleanKey}`;
         } else {
-           url = `${baseUrl}/${bucket}/${cleanKey}`;
+          url = `${baseUrl}/${bucket}/${cleanKey}`;
         }
       }
+    } else if (baseUrl.includes('r2.cloudflarestorage.com')) {
+       // Cloudflare R2: Public access usually requires a custom domain or pub-<hash>.r2.dev
+       // If no PUBLIC_URL is provided, we fallback to the endpoint path (which might not work publicly)
+       const publicUrl = process.env.PUBLIC_URL || baseUrl;
+       const cleanPublicUrl = publicUrl.endsWith('/') ? publicUrl.slice(0, -1) : publicUrl;
+       url = `${cleanPublicUrl}/${bucket}/${cleanKey}`;
     } else {
-      // Generic S3 / MinIO / Cloudflare R2
+      // Generic S3 / MinIO / Custom
       url = `${baseUrl}/${bucket}/${cleanKey}`;
     }
     

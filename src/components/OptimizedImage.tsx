@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { Image as ImageIcon } from 'lucide-react';
 
 interface OptimizedImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   src: string;
@@ -86,9 +87,12 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="absolute inset-0 bg-stone-200 flex items-center justify-center z-10 p-4 text-center"
+            className="absolute inset-0 bg-stone-100 flex items-center justify-center z-10 p-4 text-center border-2 border-stone-200 rounded-3xl"
           >
-            <div className="flex flex-col items-center gap-2">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-black/5">
+                <ImageIcon className="text-black/10" size={24} />
+              </div>
               <span className="text-[10px] text-black/30 font-bold uppercase tracking-widest leading-tight">Image<br/>Unavailable</span>
             </div>
           </motion.div>
@@ -108,7 +112,6 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         loading={priority ? "eager" : "lazy"}
         className={`w-full h-full object-cover ${className}`}
         referrerPolicy="no-referrer"
-        crossOrigin="anonymous"
         {...(props as any)}
       />
     </div>
