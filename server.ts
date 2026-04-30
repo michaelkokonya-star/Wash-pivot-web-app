@@ -10,6 +10,7 @@ import admin from 'firebase-admin';
 import uploadRoutes from './routes/upload.ts';
 import settingsRoutes from './routes/settings.ts';
 import dataRoutes from './routes/data.ts';
+import paystackRoutes from './routes/paystack.ts';
 
 dotenv.config();
 
@@ -82,6 +83,7 @@ console.log('NODE_ENV:', process.env.NODE_ENV);
 console.log('PORT:', process.env.PORT);
 console.log('Stripe Initialized:', !!stripe);
 console.log('M-Pesa Configured:', !!(mpesaConfig.consumerKey && mpesaConfig.consumerSecret));
+console.log('Paystack Initialized:', !!process.env.PAYSTACK_SECRET_KEY);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -120,6 +122,7 @@ async function startServer() {
     app.use('/api', uploadRoutes);
     app.use('/api/settings', settingsRoutes);
     app.use('/api/data', dataRoutes);
+    app.use('/api/paystack', paystackRoutes);
 
     // API routes
     app.get('/api/health', (req, res) => {
@@ -167,47 +170,6 @@ async function startServer() {
       } catch (error: any) {
         console.error('Provisioning Error:', error);
         res.status(500).json({ error: error.message });
-      }
-    });
-
-    // Paystack Checkout
-    app.post('/api/paystack/initialize', async (req, res) => {
-      const paystackSecret = process.env.PAYSTACK_SECRET_KEY;
-      if (!paystackSecret) {
-        return res.status(500).json({ error: 'Paystack is not configured' });
-      }
-
-      try {
-        const { email, amount, metadata } = req.body;
-
-        const response = await axios.post(
-          'https://api.paystack.co/transaction/initialize',
-          {
-            email,
-            amount: Math.round(amount * 100), // Paystack expects minor units (cents/kobo)
-            metadata: {
-              ...metadata,
-              custom_fields: metadata.items?.map((item: any) => ({
-                display_name: item.name,
-                variable_name: item.id,
-                value: item.quantity
-              }))
-            },
-            callback_url: `${process.env.APP_URL}/checkout/success?orderId=${metadata.orderId}&method=paystack`,
-            cancel_url: `${process.env.APP_URL}/cart`
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${paystackSecret}`,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-
-        res.json(response.data);
-      } catch (error: any) {
-        console.error('Paystack Initialize Error:', error.response?.data || error.message);
-        res.status(500).json({ error: error.response?.data?.message || 'Failed to initialize Paystack transaction' });
       }
     });
 
