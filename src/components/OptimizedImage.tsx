@@ -25,7 +25,30 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
 
-  // Function to optimize Unsplash/Picsum URLs
+  // Domains that serve images with correct CORS headers — no proxy needed
+  const TRUSTED_DOMAINS = [
+    'unsplash.com',
+    'picsum.photos',
+    'images.unsplash.com',
+    'ui-avatars.com',
+    'cdn-icons-png.flaticon.com',
+    'upload.wikimedia.org',
+    'lh3.googleusercontent.com', // Google profile photos
+  ];
+
+  // Returns true when the URL should be routed through the server-side image proxy
+  // to guarantee CORS headers and correct Content-Type regardless of the origin.
+  const needsProxy = (url: string): boolean => {
+    if (!url || url.startsWith('data:') || url.startsWith('/')) return false;
+    try {
+      const { hostname } = new URL(url);
+      return !TRUSTED_DOMAINS.some((d) => hostname.includes(d));
+    } catch {
+      return false;
+    }
+  };
+
+  // Function to optimize Unsplash/Picsum URLs and proxy S3/CDN images
   const getOptimizedUrl = (url: string) => {
     if (!url) return `https://picsum.photos/seed/${encodeURIComponent(alt)}/800/600`;
     if (url.startsWith('data:')) return url; // Base64 images (like GenAI output)
@@ -59,6 +82,12 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
           urlObj.pathname = parts.join('/');
         }
         return urlObj.toString();
+      }
+
+      // Route S3 / CDN-hosted images through the server-side proxy so they
+      // always arrive with proper CORS + Content-Type headers.
+      if (needsProxy(url)) {
+        return `/api/images/proxy?url=${encodeURIComponent(url)}`;
       }
     } catch (e) {
       return url;
@@ -112,7 +141,6 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         loading={priority ? "eager" : "lazy"}
         className={`w-full h-full object-cover ${className}`}
         referrerPolicy="no-referrer"
-        crossOrigin="anonymous"
         {...(props as any)}
       />
     </div>
