@@ -11,6 +11,7 @@ import uploadRoutes from './routes/upload.ts';
 import settingsRoutes from './routes/settings.ts';
 import dataRoutes from './routes/data.ts';
 import paystackRoutes from './routes/paystack.ts';
+import imageRoutes from './routes/images.ts';
 
 dotenv.config();
 
@@ -115,11 +116,26 @@ async function startServer() {
     const app = express();
     const PORT = parseInt(process.env.PORT || '3000', 10);
 
-    app.use(cors());
+    const corsOptions = {
+      origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+        // Allow requests with no origin (server-to-server, curl, etc.) and all browser origins
+        callback(null, true);
+      },
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+      credentials: true,
+      optionsSuccessStatus: 204,
+    };
+
+    app.use(cors(corsOptions));
+    // Ensure pre-flight OPTIONS requests are handled for all routes
+    app.options('*', cors(corsOptions));
     app.use(express.json());
 
     // Upload API
     app.use('/api', uploadRoutes);
+    // Image proxy / serving routes (must come before the generic /api/data catch-all)
+    app.use('/api/images', imageRoutes);
     app.use('/api/settings', settingsRoutes);
     app.use('/api/data', dataRoutes);
     app.use('/api/paystack', paystackRoutes);
