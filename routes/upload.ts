@@ -25,15 +25,24 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     }
 
     const key = `uploads/${Date.now()}-${req.file.originalname.replace(/\s+/g, '-')}`;
+    const bucket = process.env.BUCKET || '';
+    const region = process.env.REGION || 'us-east-1';
+    let endpoint = process.env.ENDPOINT || `https://s3.${region}.amazonaws.com`;
+
+    if (!bucket) {
+      console.error('BUCKET environment variable is missing');
+      return res.status(500).json({ error: 'S3 bucket configuration missing' });
+    }
+
     console.log('Upload params:', {
-      bucket: process.env.BUCKET,
-      region: process.env.REGION,
-      endpoint: process.env.ENDPOINT,
+      bucket,
+      region,
+      endpoint,
       publicUrl: process.env.PUBLIC_URL
     });
 
     await s3.send(new PutObjectCommand({
-      Bucket: process.env.BUCKET,
+      Bucket: bucket,
       Key: key,
       Body: req.file.buffer,
       ContentType: req.file.mimetype,
@@ -41,10 +50,6 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     }));
     
     // Construct URL based on endpoint and bucket
-    const region = process.env.REGION || 'us-east-1';
-    const bucket = process.env.BUCKET || '';
-    let endpoint = process.env.ENDPOINT || `https://s3.${region}.amazonaws.com`;
-    
     if (endpoint && !endpoint.startsWith('http')) {
       endpoint = `https://${endpoint}`;
     }

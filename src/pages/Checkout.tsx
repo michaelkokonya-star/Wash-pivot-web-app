@@ -31,36 +31,6 @@ const MpesaLogo = ({ className = "h-8", light = false }) => (
   />
 );
 
-// Inline SVG so the Paystack logo renders without relying on an external URL
-const PaystackLogo = ({ className = "h-4" }: { className?: string }) => (
-  <svg
-    viewBox="0 0 120 28"
-    xmlns="http://www.w3.org/2000/svg"
-    className={className}
-    aria-label="Paystack"
-    role="img"
-  >
-    {/* Green "P" mark */}
-    <rect x="0" y="0" width="28" height="28" rx="6" fill="#00C3F7" />
-    <rect x="0" y="0" width="28" height="28" rx="6" fill="#011B33" />
-    <path
-      d="M7 7h8a5 5 0 0 1 0 10H7V7zm0 14h5v-4h3a9 9 0 0 0 0-18H3v22h4z"
-      fill="#00C3F7"
-    />
-    {/* Wordmark */}
-    <text
-      x="34"
-      y="20"
-      fontFamily="Arial, Helvetica, sans-serif"
-      fontWeight="700"
-      fontSize="14"
-      fill="#011B33"
-    >
-      Paystack
-    </text>
-  </svg>
-);
-
 const Checkout = () => {
   const { cart, cartTotal, cartCount, clearCart } = useCart();
   const { user, profile, authFetch } = useAuth();
@@ -345,8 +315,10 @@ const Checkout = () => {
                       <p className="text-xs text-black/40">Pay with Card, Bank or Transfer</p>
                     </div>
                   </div>
-                  <PaystackLogo
-                    className={`h-5 w-auto transition-all ${paymentMethod === 'paystack' ? 'opacity-100' : 'opacity-40 grayscale group-hover:grayscale-0 group-hover:opacity-100'}`}
+                  <img 
+                    src="https://paystack.com/assets/img/login/paystack-logo.png" 
+                    alt="Paystack" 
+                    className={`h-4 transition-all ${paymentMethod === 'paystack' ? 'opacity-100' : 'opacity-40 grayscale group-hover:grayscale-0 group-hover:opacity-100'}`}
                   />
                 </button>
 
