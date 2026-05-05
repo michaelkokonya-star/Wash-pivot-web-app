@@ -25,15 +25,36 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
 
-  // Function to optimize Unsplash/Picsum URLs
+  // Domains that are publicly accessible and should be served directly without proxying.
+  // S3 bucket with public read policy and CDN-friendly origins belong here.
+  const TRUSTED_DOMAINS = [
+    'unsplash.com',
+    'images.unsplash.com',
+    'picsum.photos',
+    'washpivot-photos-zrwie7u.s3.amazonaws.com', // WashPivot S3 bucket (public read policy)
+    's3.amazonaws.com',
+  ];
+
+  const isTrustedDomain = (url: string): boolean => {
+    try {
+      const { hostname } = new URL(url);
+      return TRUSTED_DOMAINS.some((domain) => hostname === domain || hostname.endsWith(`.${domain}`));
+    } catch {
+      return false;
+    }
+  };
+
+  // Function to optimize image URLs.
+  // Trusted domains (S3, Unsplash, Picsum) are served directly.
+  // All other external URLs are routed through the server proxy to avoid CORS issues.
   const getOptimizedUrl = (url: string) => {
     if (!url) return `https://picsum.photos/seed/${encodeURIComponent(alt)}/800/600`;
     if (url.startsWith('data:')) return url; // Base64 images (like GenAI output)
 
     try {
       const urlObj = new URL(url);
-      
-      // Unsplash optimization
+
+      // Unsplash optimization — apply CDN params before returning directly
       if (urlObj.hostname.includes('unsplash.com')) {
         urlObj.searchParams.set('auto', 'format');
         urlObj.searchParams.set('fit', 'crop');
@@ -43,7 +64,7 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         return urlObj.toString();
       }
 
-      // Picsum optimization
+      // Picsum optimization — adjust dimensions in the path before returning directly
       if (urlObj.hostname.includes('picsum.photos')) {
         // Picsum format is usually /seed/id/width/height
         // If it's a seed URL, we can try to adjust the dimensions if they are at the end
@@ -60,6 +81,14 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         }
         return urlObj.toString();
       }
+
+      // S3 and other trusted domains — serve directly, no proxy needed
+      if (isTrustedDomain(url)) {
+        return url;
+      }
+
+      // Untrusted external URLs — proxy through server to avoid CORS issues
+      return `/api/image-proxy?url=${encodeURIComponent(url)}`;
     } catch (e) {
       return url;
     }
