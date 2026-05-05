@@ -337,7 +337,6 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
                         <img 
                           src={imagePreview} 
                           alt="Preview" 
-                          referrerPolicy="no-referrer"
                           className="w-full h-full object-cover" 
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;

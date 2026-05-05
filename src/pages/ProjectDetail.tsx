@@ -164,7 +164,6 @@ const ProjectDetail = () => {
                 src={project.imageUrl} 
                 alt={project.title} 
                 className="w-full h-full object-cover"
-                referrerPolicy="no-referrer"
               />
               <div className="absolute top-6 left-6">
                 <span className="px-4 py-1.5 bg-white/90 backdrop-blur-md rounded-full text-xs font-bold uppercase tracking-widest shadow-sm">
@@ -211,7 +210,6 @@ const ProjectDetail = () => {
                           src={item.url} 
                           alt={`Gallery ${index}`} 
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          referrerPolicy="no-referrer"
                         />
                       ) : (
                         <div className="w-full h-full">

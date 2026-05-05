@@ -60,42 +60,49 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     const baseUrl = endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint;
     const cleanKey = key.startsWith('/') ? key.slice(1) : key;
     
+    // Check if hostname already includes the bucket (e.g. custom domain or pre-configured endpoint)
+    const urlObj = new URL(baseUrl);
+    const hostname = urlObj.hostname;
+    
     // Use PUBLIC_URL if provided, else fallback to standard patterns
     if (process.env.PUBLIC_URL) {
       const publicUrl = process.env.PUBLIC_URL;
       const cleanPublicUrl = publicUrl.endsWith('/') ? publicUrl.slice(0, -1) : publicUrl;
       console.log('Using PUBLIC_URL override:', cleanPublicUrl);
       url = `${cleanPublicUrl}/${cleanKey}`;
-    } else if (baseUrl.includes('digitaloceanspaces.com')) {
-      // DigitalOcean Spaces: https://bucket.region.digitaloceanspaces.com/key
-      const urlObj = new URL(baseUrl);
-      if (urlObj.hostname.includes(bucket)) {
-        console.log('DO: Horizontal style already in baseUrl');
+    } else if (hostname.includes('digitaloceanspaces.com')) {
+      // DigitalOcean Spaces: Preferred style is https://bucket.region.digitaloceanspaces.com/key
+      if (hostname.startsWith(`${bucket}.`)) {
         url = `${baseUrl}/${cleanKey}`;
       } else {
-        console.log('DO: Constructing virtual-host URL');
-        url = `https://${bucket}.${urlObj.hostname}/${cleanKey}`;
+        url = `https://${bucket}.${hostname}/${cleanKey}`;
       }
-    } else if (baseUrl.includes('amazonaws.com')) {
-      // AWS S3: https://bucket.s3.region.amazonaws.com/key or https://s3.region.amazonaws.com/bucket/key
-      if (baseUrl.includes(bucket)) {
-        console.log('AWS: Bucket already in baseUrl');
+    } else if (hostname.includes('amazonaws.com')) {
+      // AWS S3: Preferred virtual-host style: https://bucket.s3.region.amazonaws.com/key
+      // Note: Older buckets or specific regions might behave differently, but virtual-host is modern standard.
+      if (hostname.startsWith(`${bucket}.`)) {
         url = `${baseUrl}/${cleanKey}`;
       } else {
-        const urlObj = new URL(baseUrl);
-        if (urlObj.hostname.startsWith('s3.')) {
-          console.log('AWS: Constructing virtual-host URL');
-          url = `https://${bucket}.${urlObj.hostname}/${cleanKey}`;
+        // Handle cases like s3.amazonaws.com or s3.us-east-1.amazonaws.com
+        let newHostname = hostname;
+        if (hostname === 's3.amazonaws.com') {
+          url = `https://${bucket}.s3.amazonaws.com/${cleanKey}`;
         } else {
-          console.log('AWS: Falling back to path-style');
-          url = `${baseUrl}/${bucket}/${cleanKey}`;
+          url = `https://${bucket}.${hostname}/${cleanKey}`;
         }
       }
-    } else if (baseUrl.includes('r2.cloudflarestorage.com')) {
-       console.log('Cloudflare R2 detected');
+    } else if (hostname.includes('r2.cloudflarestorage.com')) {
+       // Cloudflare R2: Usually requires path-style for the API endpoint, 
+       // but public access is usually via a custom domain. 
+       // If no PUBLIC_URL, we default to path-style on the R2 endpoint.
        url = `${baseUrl}/${bucket}/${cleanKey}`;
     } else {
-      console.log('Generic/Custom S3 provider');
+      // Generic S3: Default to path-style for widest compatibility
+      url = `${baseUrl}/${bucket}/${cleanKey}`;
+    }
+    
+    // Fallback: if we still don't have a URL or it looks invalid
+    if (!url) {
       url = `${baseUrl}/${bucket}/${cleanKey}`;
     }
     
