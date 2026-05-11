@@ -12,6 +12,30 @@ interface OptimizedImageProps extends React.ImgHTMLAttributes<HTMLImageElement> 
   quality?: number;
 }
 
+/**
+ * Domains that can be loaded directly without proxying.
+ * - S3 bucket has public-read ACL, so no proxy needed.
+ * - Well-known CDNs are safe to load directly.
+ */
+const TRUSTED_DOMAINS = [
+  'washpivot-photos-zrwie7u.s3.amazonaws.com', // WashPivot S3 bucket (public-read)
+  'unsplash.com',
+  'images.unsplash.com',
+  'picsum.photos',
+  'drive.google.com',
+  'ui-avatars.com',
+];
+
+/** Returns true when the hostname matches a trusted domain (exact or subdomain). */
+const isTrustedDomain = (hostname: string): boolean =>
+  TRUSTED_DOMAINS.some(
+    (domain) => hostname === domain || hostname.endsWith(`.${domain}`)
+  );
+
+/** Returns true when the hostname belongs to the WashPivot S3 bucket. */
+const isS3Url = (hostname: string): boolean =>
+  hostname === 'washpivot-photos-zrwie7u.s3.amazonaws.com';
+
 const OptimizedImage: React.FC<OptimizedImageProps> = ({
   src,
   alt,
@@ -25,16 +49,37 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
 
-  // Function to optimize Unsplash/Picsum URLs
-  const getOptimizedUrl = (url: string) => {
+  /**
+   * Resolves the best URL to use for a given image source:
+   *
+   * 1. Empty / falsy  → Picsum placeholder
+   * 2. data: URI      → returned as-is (GenAI / base64 output)
+   * 3. Relative URL   → returned as-is (served from same origin)
+   * 4. S3 bucket URL  → returned as-is (bucket has public-read ACL)
+   * 5. Other trusted  → apply CDN-specific optimisations (Unsplash, Picsum, Drive)
+   * 6. External, untrusted → routed through /api/images/proxy to avoid CORS issues
+   */
+  const getOptimizedUrl = (url: string): string => {
     if (!url) return `https://picsum.photos/seed/${encodeURIComponent(alt)}/800/600`;
-    if (url.startsWith('data:')) return url; // Base64 images (like GenAI output)
+
+    // Base64 / data URIs (e.g. GenAI output) — use directly
+    if (url.startsWith('data:')) return url;
+
+    // Relative URLs — served from the same origin, no transformation needed
+    if (url.startsWith('/') || url.startsWith('./') || url.startsWith('../')) return url;
 
     try {
       const urlObj = new URL(url);
-      
-      // Unsplash optimization
-      if (urlObj.hostname.includes('unsplash.com')) {
+      const { hostname } = urlObj;
+
+      // ── S3 bucket (public-read) ──────────────────────────────────────────
+      // Load directly; no proxy or transformation required.
+      if (isS3Url(hostname)) {
+        return urlObj.toString();
+      }
+
+      // ── Unsplash ─────────────────────────────────────────────────────────
+      if (hostname.includes('unsplash.com')) {
         urlObj.searchParams.set('auto', 'format');
         urlObj.searchParams.set('fit', 'crop');
         urlObj.searchParams.set('q', quality.toString());
@@ -43,10 +88,8 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         return urlObj.toString();
       }
 
-      // Picsum optimization
-      if (urlObj.hostname.includes('picsum.photos')) {
-        // Picsum format is usually /seed/id/width/height
-        // If it's a seed URL, we can try to adjust the dimensions if they are at the end
+      // ── Picsum ───────────────────────────────────────────────────────────
+      if (hostname.includes('picsum.photos')) {
         const parts = urlObj.pathname.split('/');
         if (parts.length >= 4 && !isNaN(Number(parts[parts.length - 1]))) {
           if (width && height) {
@@ -61,25 +104,67 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         return urlObj.toString();
       }
 
-      // Google Drive optimization
-      if (urlObj.hostname.includes('drive.google.com')) {
-        // Convert share link to direct view link
-        // View URL: https://drive.google.com/file/d/[ID]/view?usp=sharing
-        // Direct URL: https://drive.google.com/uc?export=view&id=[ID]
+      // ── Google Drive ─────────────────────────────────────────────────────
+      // Convert share links to direct-view links.
+      if (hostname.includes('drive.google.com')) {
         if (urlObj.pathname.includes('/file/d/')) {
           const fileId = urlObj.pathname.split('/file/d/')[1].split('/')[0];
           return `https://drive.google.com/uc?export=view&id=${fileId}`;
         }
+        return urlObj.toString();
       }
-    } catch (e) {
+
+      // ── ui-avatars.com ───────────────────────────────────────────────────
+      if (hostname === 'ui-avatars.com') {
+        return urlObj.toString();
+      }
+
+      // ── External, untrusted domain ───────────────────────────────────────
+      // Route through the server-side proxy to avoid CORS / mixed-content errors.
+      if (!isTrustedDomain(hostname)) {
+        console.info(`OptimizedImage: routing untrusted domain "${hostname}" through image proxy`);
+        return `/api/images/proxy?url=${encodeURIComponent(url)}`;
+      }
+
+      return urlObj.toString();
+    } catch {
+      // Malformed URL — return as-is and let the browser handle it
       return url;
     }
-    
-    return url;
   };
 
   const optimizedSrc = getOptimizedUrl(src);
-  const fallbackImage = 'https://drive.google.com/uc?export=view&id=1P8CXvuVVGpLjQpS2wB7HPu3CHZiZEK2Q';
+
+  const handleError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const target = e.target as HTMLImageElement;
+
+    // Distinguish error type for better diagnostics
+    if (src && src.includes('s3.amazonaws.com')) {
+      console.error(
+        `OptimizedImage: S3 image failed to load — check bucket ACL / CORS policy.\n` +
+        `  Original URL : ${src}\n` +
+        `  Resolved URL : ${optimizedSrc}`
+      );
+    } else if (optimizedSrc.startsWith('/api/images/proxy')) {
+      console.error(
+        `OptimizedImage: proxy request failed.\n` +
+        `  Proxy URL    : ${optimizedSrc}\n` +
+        `  Original URL : ${src}`
+      );
+    } else {
+      console.warn(
+        `OptimizedImage: failed to load image.\n` +
+        `  Resolved URL : ${optimizedSrc}\n` +
+        `  Original URL : ${src}`
+      );
+    }
+
+    // Prevent infinite error loop if the placeholder itself fails
+    if (!target.src.includes('picsum.photos/seed/error')) {
+      target.src = `https://picsum.photos/seed/error-${encodeURIComponent(alt)}/800/600`;
+    }
+    setHasError(true);
+  };
 
   return (
     <div 
@@ -110,18 +195,13 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         )}
       </AnimatePresence>
       <motion.img
-        src={hasError ? fallbackImage : optimizedSrc}
+        src={optimizedSrc}
         alt={alt}
         initial={{ opacity: 0 }}
         animate={{ opacity: isLoaded || hasError ? 1 : 0 }}
         transition={{ duration: 0.5 }}
         onLoad={() => setIsLoaded(true)}
-        onError={(e) => {
-          console.warn(`OptimizedImage failed to load: ${optimizedSrc}. Status: Access Denied or Network Error.`);
-          const target = e.target as HTMLImageElement;
-          target.src = 'https://via.placeholder.com/800x600?text=Access+Denied';
-          setHasError(true);
-        }}
+        onError={handleError}
         loading={priority ? "eager" : "lazy"}
         className={`w-full h-full object-cover ${className}`}
         {...(props as any)}
