@@ -105,8 +105,10 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         animate={{ opacity: isLoaded || hasError ? 1 : 0 }}
         transition={{ duration: 0.5 }}
         onLoad={() => setIsLoaded(true)}
-        onError={() => {
+        onError={(e) => {
           console.warn(`OptimizedImage failed to load: ${src}`);
+          const target = e.target as HTMLImageElement;
+          target.src = 'https://via.placeholder.com/800x600?text=Image+Not+Found';
           setHasError(true);
         }}
         loading={priority ? "eager" : "lazy"}
