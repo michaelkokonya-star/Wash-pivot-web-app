@@ -18,7 +18,11 @@ interface OptimizedImageProps extends React.ImgHTMLAttributes<HTMLImageElement> 
  * - Well-known CDNs are safe to load directly.
  */
 const TRUSTED_DOMAINS = [
-  'washpivot-photos-zrwie7u.s3.amazonaws.com', // WashPivot S3 bucket (public-read)
+  // WashPivot S3 bucket – virtual-host style (preferred, public-read ACL)
+  'washpivot-photos-zrwie7u.s3.amazonaws.com',
+  // Catch any region-specific virtual-host variant, e.g. .s3.us-east-1.amazonaws.com
+  's3.amazonaws.com',
+  'amazonaws.com',
   'unsplash.com',
   'images.unsplash.com',
   'picsum.photos',
@@ -32,9 +36,13 @@ const isTrustedDomain = (hostname: string): boolean =>
     (domain) => hostname === domain || hostname.endsWith(`.${domain}`)
   );
 
-/** Returns true when the hostname belongs to the WashPivot S3 bucket. */
+/**
+ * Returns true for any AWS S3 URL – both virtual-host style
+ * (bucket.s3.region.amazonaws.com) and legacy path-style
+ * (s3.region.amazonaws.com/bucket/...).
+ */
 const isS3Url = (hostname: string): boolean =>
-  hostname === 'washpivot-photos-zrwie7u.s3.amazonaws.com';
+  hostname.endsWith('.amazonaws.com') && hostname.includes('s3');
 
 const OptimizedImage: React.FC<OptimizedImageProps> = ({
   src,
@@ -55,7 +63,7 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
    * 1. Empty / falsy  → Picsum placeholder
    * 2. data: URI      → returned as-is (GenAI / base64 output)
    * 3. Relative URL   → returned as-is (served from same origin)
-   * 4. S3 bucket URL  → returned as-is (bucket has public-read ACL)
+   * 4. S3 bucket URL  → normalised to virtual-host style (bucket has public-read ACL)
    * 5. Other trusted  → apply CDN-specific optimisations (Unsplash, Picsum, Drive)
    * 6. External, untrusted → routed through /api/images/proxy to avoid CORS issues
    */
@@ -68,13 +76,44 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
     // Relative URLs — served from the same origin, no transformation needed
     if (url.startsWith('/') || url.startsWith('./') || url.startsWith('../')) return url;
 
+    console.debug(`OptimizedImage: resolving URL for "${alt}"`, { src: url });
+
     try {
       const urlObj = new URL(url);
       const { hostname } = urlObj;
 
       // ── S3 bucket (public-read) ──────────────────────────────────────────
-      // Load directly; no proxy or transformation required.
+      // Normalise to virtual-host style so the public-read ACL is honoured.
+      // Path-style URLs (s3.region.amazonaws.com/bucket/key) are deprecated
+      // for new AWS buckets and may return "Access Denied" even with a
+      // public-read ACL.  Virtual-host style (bucket.s3.region.amazonaws.com/key)
+      // is the AWS-recommended format.
       if (isS3Url(hostname)) {
+        // Detect legacy path-style: hostname is exactly s3.amazonaws.com or
+        // s3.<region>.amazonaws.com (no bucket prefix in the hostname).
+        const isPathStyle =
+          hostname === 's3.amazonaws.com' ||
+          /^s3\.[a-z0-9-]+\.amazonaws\.com$/.test(hostname);
+
+        if (isPathStyle) {
+          // Path-style: /<bucket>/<key...>  →  virtual-host: <bucket>.s3.<region>.amazonaws.com/<key>
+          const pathParts = urlObj.pathname.replace(/^\//, '').split('/');
+          const bucket = pathParts[0];
+          const objectKey = pathParts.slice(1).join('/');
+          // Preserve the region from the hostname when present, else default to us-east-1
+          const regionMatch = hostname.match(/^s3\.([a-z0-9-]+)\.amazonaws\.com$/);
+          const region = regionMatch ? regionMatch[1] : 'us-east-1';
+          const virtualHostUrl = `https://${bucket}.s3.${region}.amazonaws.com/${objectKey}`;
+          console.info(
+            `OptimizedImage: rewrote path-style S3 URL to virtual-host style.\n` +
+            `  Path-style    : ${url}\n` +
+            `  Virtual-host  : ${virtualHostUrl}`
+          );
+          return virtualHostUrl;
+        }
+
+        // Already virtual-host style — use directly
+        console.debug(`OptimizedImage: S3 virtual-host URL accepted as-is: ${url}`);
         return urlObj.toString();
       }
 
@@ -139,11 +178,17 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
     const target = e.target as HTMLImageElement;
 
     // Distinguish error type for better diagnostics
-    if (src && src.includes('s3.amazonaws.com')) {
+    if (src && src.includes('amazonaws.com')) {
       console.error(
-        `OptimizedImage: S3 image failed to load — check bucket ACL / CORS policy.\n` +
+        `OptimizedImage: S3 image failed to load.\n` +
         `  Original URL : ${src}\n` +
-        `  Resolved URL : ${optimizedSrc}`
+        `  Resolved URL : ${optimizedSrc}\n` +
+        `  Checklist:\n` +
+        `    1. Bucket ACL  – object must have public-read ACL (set on upload via PutObjectCommand ACL: 'public-read')\n` +
+        `    2. Block Public Access – all four "Block Public Access" settings must be OFF in the S3 console\n` +
+        `    3. Bucket policy – add a policy granting s3:GetObject to Principal "*" for arn:aws:s3:::${src.split('.s3.')[0].replace('https://', '')}/*\n` +
+        `    4. CORS – bucket needs a CORS rule: AllowedOrigins ["*"], AllowedMethods ["GET","HEAD"]\n` +
+        `    5. URL style – virtual-host (bucket.s3.region.amazonaws.com) is required; path-style is deprecated`
       );
     } else if (optimizedSrc.startsWith('/api/images/proxy')) {
       console.error(
