@@ -10,6 +10,7 @@ import admin from 'firebase-admin';
 import uploadRoutes from './routes/upload.ts';
 import settingsRoutes from './routes/settings.ts';
 import dataRoutes from './routes/data.ts';
+import imageRoutes from './routes/images.ts';
 
 dotenv.config();
 
@@ -120,6 +121,7 @@ async function startServer() {
     app.use('/api', uploadRoutes);
     app.use('/api/settings', settingsRoutes);
     app.use('/api/data', dataRoutes);
+    app.use('/api', imageRoutes);
 
     // API routes
     app.get('/api/health', (req, res) => {
