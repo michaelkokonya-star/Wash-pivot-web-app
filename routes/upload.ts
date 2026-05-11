@@ -78,17 +78,18 @@ router.post('/upload', upload.single('file'), async (req, res) => {
         url = `https://${bucket}.${hostname}/${cleanKey}`;
       }
     } else if (hostname.includes('amazonaws.com')) {
-      // AWS S3: Always use virtual-host style for direct public access.
-      // The bucket has a public read policy, so direct S3 URLs are served without proxying.
-      // Virtual-host format: https://<bucket>.s3.<region>.amazonaws.com/<key>
+      // AWS S3: Preferred virtual-host style: https://bucket.s3.region.amazonaws.com/key
+      // Note: Older buckets or specific regions might behave differently, but virtual-host is modern standard.
       if (hostname.startsWith(`${bucket}.`)) {
-        // Endpoint already includes the bucket name (e.g. bucket.s3.region.amazonaws.com)
         url = `${baseUrl}/${cleanKey}`;
-      } else if (hostname === 's3.amazonaws.com') {
-        url = `https://${bucket}.s3.amazonaws.com/${cleanKey}`;
       } else {
-        // e.g. s3.us-east-1.amazonaws.com → bucket.s3.us-east-1.amazonaws.com
-        url = `https://${bucket}.${hostname}/${cleanKey}`;
+        // Handle cases like s3.amazonaws.com or s3.us-east-1.amazonaws.com
+        let newHostname = hostname;
+        if (hostname === 's3.amazonaws.com') {
+          url = `https://${bucket}.s3.amazonaws.com/${cleanKey}`;
+        } else {
+          url = `https://${bucket}.${hostname}/${cleanKey}`;
+        }
       }
     } else if (hostname.includes('r2.cloudflarestorage.com')) {
        // Cloudflare R2: Usually requires path-style for the API endpoint, 
@@ -105,7 +106,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
       url = `${baseUrl}/${bucket}/${cleanKey}`;
     }
     
-    console.log('Successfully uploaded to S3. Direct S3 URL:', url);
+    console.log('Successfully uploaded to S3. Final URL:', url);
     res.json({ url });
   } catch (err: any) {
     console.error('Upload error:', err);

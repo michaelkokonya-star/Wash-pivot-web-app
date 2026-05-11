@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Phone, Mail, MapPin, MessageSquare, Clock, Globe } from 'lucide-react';
+import { Phone, Mail, MapPin, MessageSquare, Clock, Globe, Facebook, Linkedin, Twitter, Instagram } from 'lucide-react';
 
 const Contact = () => {
   const contactDetails = [
@@ -160,6 +160,38 @@ const Contact = () => {
           </form>
         </motion.div>
       </div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        className="mt-20 pt-20 border-t border-black/5 text-center"
+      >
+        <h2 className="text-2xl font-bold mb-8 uppercase tracking-widest">Connect with us</h2>
+        <div className="flex justify-center items-center gap-6 sm:gap-10">
+          {[
+            { icon: Facebook, name: 'Facebook', url: 'https://web.facebook.com/profile.php?id=61589374054143', color: 'hover:text-[#1877F2]' },
+            { icon: Twitter, name: 'X', url: 'https://x.com/washpivot', color: 'hover:text-[#000000]' },
+            { icon: Linkedin, name: 'LinkedIn', url: 'https://www.linkedin.com/company/121793899/', color: 'hover:text-[#0A66C2]' },
+            { icon: Instagram, name: 'Instagram', url: 'https://instagram.com/washpivot', color: 'hover:text-[#E4405F]' }
+          ].map((social, i) => (
+            <a
+              key={i}
+              href={social.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`flex flex-col items-center gap-3 text-black/30 transition-all duration-300 ${social.color} group`}
+            >
+              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-stone-50 border border-black/5 flex items-center justify-center group-hover:shadow-lg group-hover:scale-110 transition-all">
+                <social.icon size={24} className="sm:w-7 sm:h-7" />
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
+                {social.name}
+              </span>
+            </a>
+          ))}
+        </div>
+      </motion.div>
     </div>
   );
 };

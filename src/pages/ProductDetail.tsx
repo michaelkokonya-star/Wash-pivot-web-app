@@ -491,9 +491,9 @@ const ProductDetail = () => {
                   <Facebook size={18} />
                 </button>
                 <button 
-                  onClick={() => window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(window.location.href)}&text=${encodeURIComponent(`Check out this ${product.name} on WASH Pivot!`)}`, '_blank')}
-                  className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center hover:bg-[#1DA1F2] hover:text-white transition-all"
-                  title="Share on Twitter"
+                  onClick={() => window.open(`https://x.com/intent/tweet?url=${encodeURIComponent(window.location.href)}&text=${encodeURIComponent(`Check out this ${product.name} on WASH Pivot!`)}`, '_blank')}
+                  className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center hover:bg-black hover:text-white transition-all"
+                  title="Share on X"
                 >
                   <Twitter size={18} />
                 </button>

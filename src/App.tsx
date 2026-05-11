@@ -155,8 +155,9 @@ function AppContent() {
                     <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-white/30">
                       <p>© 2026 Wash Pivot. All rights reserved.</p>
                       <div className="flex space-x-6">
-                        <a href="https://twitter.com/washpivot" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Twitter</a>
-                        <a href="https://linkedin.com/company/washpivot" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">LinkedIn</a>
+                        <a href="https://web.facebook.com/profile.php?id=61589374054143" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Facebook</a>
+                        <a href="https://x.com/washpivot" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">X (Twitter)</a>
+                        <a href="https://www.linkedin.com/company/121793899/" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">LinkedIn</a>
                         <a href="https://instagram.com/washpivot" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Instagram</a>
                       </div>
                     </div>

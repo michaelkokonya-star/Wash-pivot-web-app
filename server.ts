@@ -126,47 +126,6 @@ async function startServer() {
       res.json({ status: 'ok' });
     });
 
-    // Image proxy — forwards requests for untrusted external image URLs.
-    // Trusted domains (S3, Unsplash, Picsum) are served directly by the browser;
-    // this endpoint handles everything else to avoid browser CORS restrictions.
-    app.get('/api/image-proxy', async (req, res) => {
-      const { url } = req.query;
-      if (!url || typeof url !== 'string') {
-        return res.status(400).json({ error: 'Missing url query parameter' });
-      }
-
-      let targetUrl: URL;
-      try {
-        targetUrl = new URL(url);
-      } catch {
-        return res.status(400).json({ error: 'Invalid URL' });
-      }
-
-      // Block requests to private/internal network ranges
-      const blockedHosts = ['localhost', '127.0.0.1', '0.0.0.0', '::1'];
-      if (blockedHosts.includes(targetUrl.hostname)) {
-        return res.status(403).json({ error: 'Proxying to internal addresses is not allowed' });
-      }
-
-      try {
-        const response = await axios.get(url, {
-          responseType: 'stream',
-          timeout: 10000,
-          maxContentLength: 10 * 1024 * 1024, // 10 MB limit
-          headers: { 'User-Agent': 'WashPivot-ImageProxy/1.0' },
-        });
-
-        const contentType = response.headers['content-type'] || 'image/jpeg';
-        res.setHeader('Content-Type', contentType);
-        res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
-        res.setHeader('X-Proxied-By', 'washpivot-image-proxy');
-        response.data.pipe(res);
-      } catch (err: any) {
-        console.error('Image proxy error:', err.message);
-        res.status(502).json({ error: 'Failed to fetch image' });
-      }
-    });
-
     // Provision System Owner
     app.post('/api/admin/provision-owner', async (req, res) => {
       const { secret, password } = req.body;
