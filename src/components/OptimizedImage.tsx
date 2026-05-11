@@ -23,6 +23,8 @@ const TRUSTED_DOMAINS = [
   // Catch any region-specific virtual-host variant, e.g. .s3.us-east-1.amazonaws.com
   's3.amazonaws.com',
   'amazonaws.com',
+  // Custom S3-compatible storage endpoint used by WashPivot (t3.storage)
+  't3.storageapi.dev',
   'unsplash.com',
   'images.unsplash.com',
   'picsum.photos',
@@ -43,6 +45,14 @@ const isTrustedDomain = (hostname: string): boolean =>
  */
 const isS3Url = (hostname: string): boolean =>
   hostname.endsWith('.amazonaws.com') && hostname.includes('s3');
+
+/**
+ * Returns true for custom S3-compatible storage endpoints that use path-style
+ * URLs (https://endpoint/bucket/key), such as t3.storageapi.dev.
+ * These endpoints serve objects directly and do not need proxying.
+ */
+const isCustomS3Endpoint = (hostname: string): boolean =>
+  hostname === 't3.storageapi.dev' || hostname.endsWith('.t3.storageapi.dev');
 
 const OptimizedImage: React.FC<OptimizedImageProps> = ({
   src,
@@ -117,6 +127,19 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         return urlObj.toString();
       }
 
+      // ── Custom S3-compatible endpoint (t3.storageapi.dev) ────────────────
+      // These endpoints use path-style URLs: https://endpoint/bucket/key.
+      // The bucket has public-read ACL so objects are served directly —
+      // no proxy or URL rewriting needed.
+      if (isCustomS3Endpoint(hostname)) {
+        console.info(
+          `OptimizedImage: custom S3-compatible endpoint detected.\n` +
+          `  Endpoint : ${hostname}\n` +
+          `  URL      : ${url}`
+        );
+        return urlObj.toString();
+      }
+
       // ── Unsplash ─────────────────────────────────────────────────────────
       if (hostname.includes('unsplash.com')) {
         urlObj.searchParams.set('auto', 'format');
@@ -178,7 +201,18 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
     const target = e.target as HTMLImageElement;
 
     // Distinguish error type for better diagnostics
-    if (src && src.includes('amazonaws.com')) {
+    if (src && src.includes('t3.storageapi.dev')) {
+      console.error(
+        `OptimizedImage: custom S3-compatible endpoint image failed to load.\n` +
+        `  Original URL : ${src}\n` +
+        `  Resolved URL : ${optimizedSrc}\n` +
+        `  Checklist:\n` +
+        `    1. Bucket ACL  – object must have public-read ACL (set on upload via PutObjectCommand ACL: 'public-read')\n` +
+        `    2. CORS        – bucket needs a CORS rule: AllowedOrigins ["*"], AllowedMethods ["GET","HEAD"]\n` +
+        `    3. Endpoint    – verify ENDPOINT env var is set to https://t3.storageapi.dev\n` +
+        `    4. Bucket name – verify BUCKET env var matches the bucket in the URL path`
+      );
+    } else if (src && src.includes('amazonaws.com')) {
       console.error(
         `OptimizedImage: S3 image failed to load.\n` +
         `  Original URL : ${src}\n` +
