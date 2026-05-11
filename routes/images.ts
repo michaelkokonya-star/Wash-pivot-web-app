@@ -75,11 +75,11 @@ router.get('/images/proxy', async (req, res) => {
 });
 
 /**
- * GET /api/images/s3/:key(*)
+ * GET /api/images/s3/:key*
  * Streams an object from the configured S3 bucket.
  * Useful as a fallback when the bucket is not publicly accessible.
  */
-router.get('/images/s3/:key(*)', async (req, res) => {
+router.get('/images/s3/:key*', async (req, res) => {
   const key = req.params.key;
   const bucket = process.env.BUCKET || '';
 
