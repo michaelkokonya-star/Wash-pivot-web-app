@@ -10,6 +10,7 @@ import {
 import { toast } from 'sonner';
 import { db } from '../firebase';
 import { doc, getDoc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
+import OptimizedImage from '../components/OptimizedImage';
 
 const AdminProjectDetails = () => {
   const { id } = useParams();
@@ -173,11 +174,10 @@ const AdminProjectDetails = () => {
             {/* Image & Description */}
             <div className="bg-white rounded-[32px] p-8 border border-black/5 shadow-sm">
               <div className="aspect-video rounded-2xl overflow-hidden mb-8 bg-stone-100 border border-black/5">
-                <img 
+                <OptimizedImage 
                   src={project.imageUrl} 
                   alt={project.title} 
-                  referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover"
+                  className="w-full h-full"
                 />
               </div>
               <h3 className="text-xl font-bold mb-4">Project Description</h3>

@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { motion } from 'motion/react';
 import { User, Briefcase, GraduationCap, Search, Filter, Mail, Award, Sparkles, Trash2 } from 'lucide-react';
 import ExpertOnboardingModal from '../components/ExpertOnboardingModal';
+import OptimizedImage from '../components/OptimizedImage';
 import { db } from '../firebase';
 import { collection, getDocs, query, where, deleteDoc, doc } from 'firebase/firestore';
 
@@ -101,11 +102,10 @@ const Recruitment = () => {
               className="bg-white p-8 rounded-3xl border border-black/5 hover:shadow-xl transition-all"
             >
               <div className="flex items-center space-x-4 mb-6">
-                <img
+                <OptimizedImage
                   src={expert.photoURL || `https://ui-avatars.com/api/?name=${expert.displayName}`}
                   alt={expert.displayName}
-                  className="w-16 h-16 rounded-2xl object-cover"
-                  referrerPolicy="no-referrer"
+                  className="w-16 h-16 rounded-2xl"
                 />
                 <div>
                   <div className="flex justify-between items-start">

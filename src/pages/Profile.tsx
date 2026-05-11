@@ -248,7 +248,6 @@ const Profile = () => {
                 <img
                   src={profile.photoURL || `https://ui-avatars.com/api/?name=${profile.displayName}`}
                   alt={profile.displayName}
-                  referrerPolicy="no-referrer"
                   className={`w-32 h-32 rounded-[2rem] object-cover border-4 border-white shadow-xl transition-opacity ${uploadingPhoto ? 'opacity-50' : 'opacity-100'}`}
                 />
                 {uploadingPhoto && (
@@ -732,7 +731,6 @@ const Profile = () => {
                             key={idx}
                             src={item.image}
                             alt={item.name}
-                            referrerPolicy="no-referrer"
                             className="w-10 h-10 rounded-xl border-2 border-white object-cover"
                           />
                         ))}

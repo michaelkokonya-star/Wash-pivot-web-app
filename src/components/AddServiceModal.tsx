@@ -277,7 +277,7 @@ const AddServiceModal: React.FC<AddServiceModalProps> = ({ isOpen, onClose, onSu
                   >
                     {imagePreview ? (
                       <>
-                        <img src={imagePreview} alt="Preview" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+                        <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           <Upload className="text-white" size={24} />
                         </div>

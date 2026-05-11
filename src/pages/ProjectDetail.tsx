@@ -7,6 +7,8 @@ import { ArrowLeft, CheckCircle2, Circle, Heart, Users, Target, Calendar, Shield
 import { db } from '../firebase';
 import { doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 
+import OptimizedImage from '../components/OptimizedImage';
+
 const ProjectDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -160,10 +162,10 @@ const ProjectDetail = () => {
         <div className="lg:col-span-2 space-y-12">
           <section>
             <div className="relative aspect-video rounded-3xl overflow-hidden mb-8 border border-black/5">
-              <img 
+              <OptimizedImage 
                 src={project.imageUrl} 
                 alt={project.title} 
-                className="w-full h-full object-cover"
+                className="w-full h-full"
               />
               <div className="absolute top-6 left-6">
                 <span className="px-4 py-1.5 bg-white/90 backdrop-blur-md rounded-full text-xs font-bold uppercase tracking-widest shadow-sm">
@@ -206,7 +208,7 @@ const ProjectDetail = () => {
                   {project.media.map((item: any, index: number) => (
                     <div key={index} className="relative aspect-video rounded-3xl overflow-hidden bg-stone-100 border border-black/5 group shadow-sm">
                       {item.type === 'image' ? (
-                        <img 
+                        <OptimizedImage 
                           src={item.url} 
                           alt={`Gallery ${index}`} 
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"

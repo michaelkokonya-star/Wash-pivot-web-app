@@ -79,17 +79,14 @@ router.post('/upload', upload.single('file'), async (req, res) => {
       }
     } else if (hostname.includes('amazonaws.com')) {
       // AWS S3: Preferred virtual-host style: https://bucket.s3.region.amazonaws.com/key
-      // Note: Older buckets or specific regions might behave differently, but virtual-host is modern standard.
+      // Note: If you get Access Denied, ensure your bucket has Public Access enabled and a policy allowing GetObject.
       if (hostname.startsWith(`${bucket}.`)) {
         url = `${baseUrl}/${cleanKey}`;
+      } else if (hostname === 's3.amazonaws.com') {
+        url = `https://${bucket}.s3.amazonaws.com/${cleanKey}`;
       } else {
-        // Handle cases like s3.amazonaws.com or s3.us-east-1.amazonaws.com
-        let newHostname = hostname;
-        if (hostname === 's3.amazonaws.com') {
-          url = `https://${bucket}.s3.amazonaws.com/${cleanKey}`;
-        } else {
-          url = `https://${bucket}.${hostname}/${cleanKey}`;
-        }
+        // Construct standard AWS virtual-host URL: https://bucket.s3.region.amazonaws.com/key
+        url = `https://${bucket}.${hostname}/${cleanKey}`;
       }
     } else if (hostname.includes('r2.cloudflarestorage.com')) {
        // Cloudflare R2: Usually requires path-style for the API endpoint, 

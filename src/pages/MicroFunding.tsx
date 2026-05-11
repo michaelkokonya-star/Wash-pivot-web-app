@@ -5,6 +5,7 @@ import { Helmet } from 'react-helmet-async';
 import { Plus, Target, Users, TrendingUp, Heart, ListTodo, X, Shield, Loader2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import AddProjectModal from '../components/AddProjectModal';
+import OptimizedImage from '../components/OptimizedImage';
 import { db } from '../firebase';
 import { collection, getDocs, query, where, updateDoc, doc } from 'firebase/firestore';
 
@@ -95,11 +96,10 @@ const MicroFunding = () => {
                 className="bg-white rounded-3xl border border-black/5 overflow-hidden flex flex-col md:flex-row h-full group hover:shadow-2xl transition-all"
               >
                 <div className="md:w-2/5 relative overflow-hidden cursor-pointer" onClick={() => navigate(`/funding/${project.id}`)}>
-                  <img
+                  <OptimizedImage
                     src={project.imageUrl}
                     alt={project.title}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                    referrerPolicy="no-referrer"
+                    className="w-full h-full"
                   />
                   <div className="absolute top-4 left-4 flex flex-col gap-2">
                     <span className="px-3 py-1 bg-black text-white rounded-full text-[10px] font-bold uppercase tracking-widest">
