@@ -49,7 +49,8 @@ const isS3Url = (hostname: string): boolean =>
 /**
  * Returns true for custom S3-compatible storage endpoints that use path-style
  * URLs (https://endpoint/bucket/key), such as t3.storageapi.dev.
- * These endpoints serve objects directly and do not need proxying.
+ * These endpoints do not send CORS headers for the washpivot-hub origin, so
+ * images must be routed through the server-side proxy (/api/images/proxy).
  */
 const isCustomS3Endpoint = (hostname: string): boolean =>
   hostname === 't3.storageapi.dev' || hostname.endsWith('.t3.storageapi.dev');
@@ -128,16 +129,18 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
       }
 
       // ── Custom S3-compatible endpoint (t3.storageapi.dev) ────────────────
-      // These endpoints use path-style URLs: https://endpoint/bucket/key.
-      // The bucket has public-read ACL so objects are served directly —
-      // no proxy or URL rewriting needed.
+      // t3.storageapi.dev does not send CORS headers that allow requests from
+      // the washpivot-hub origin, so the browser blocks direct image loads.
+      // Route all requests through the server-side proxy which re-serves the
+      // image with Access-Control-Allow-Origin: * headers.
       if (isCustomS3Endpoint(hostname)) {
+        const proxyUrl = `/api/images/proxy?url=${encodeURIComponent(urlObj.toString())}`;
         console.info(
-          `OptimizedImage: custom S3-compatible endpoint detected.\n` +
-          `  Endpoint : ${hostname}\n` +
-          `  URL      : ${url}`
+          `OptimizedImage: routing t3.storageapi.dev image through proxy to avoid CORS.\n` +
+          `  Original : ${url}\n` +
+          `  Proxy    : ${proxyUrl}`
         );
-        return urlObj.toString();
+        return proxyUrl;
       }
 
       // ── Unsplash ─────────────────────────────────────────────────────────
@@ -202,15 +205,17 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
 
     // Distinguish error type for better diagnostics
     if (src && src.includes('t3.storageapi.dev')) {
+      // Images from t3.storageapi.dev are routed through /api/images/proxy.
+      // A failure here means the proxy itself could not fetch the image.
       console.error(
-        `OptimizedImage: custom S3-compatible endpoint image failed to load.\n` +
+        `OptimizedImage: proxy request for t3.storageapi.dev image failed.\n` +
         `  Original URL : ${src}\n` +
-        `  Resolved URL : ${optimizedSrc}\n` +
+        `  Proxy URL    : ${optimizedSrc}\n` +
         `  Checklist:\n` +
-        `    1. Bucket ACL  – object must have public-read ACL (set on upload via PutObjectCommand ACL: 'public-read')\n` +
-        `    2. CORS        – bucket needs a CORS rule: AllowedOrigins ["*"], AllowedMethods ["GET","HEAD"]\n` +
-        `    3. Endpoint    – verify ENDPOINT env var is set to https://t3.storageapi.dev\n` +
-        `    4. Bucket name – verify BUCKET env var matches the bucket in the URL path`
+        `    1. Proxy route  – ensure GET /api/images/proxy is registered in server.ts\n` +
+        `    2. Bucket ACL   – object must have public-read ACL (PutObjectCommand ACL: 'public-read')\n` +
+        `    3. Endpoint     – verify ENDPOINT env var is set to https://t3.storageapi.dev\n` +
+        `    4. Bucket name  – verify BUCKET env var matches the bucket in the URL path`
       );
     } else if (src && src.includes('amazonaws.com')) {
       console.error(
