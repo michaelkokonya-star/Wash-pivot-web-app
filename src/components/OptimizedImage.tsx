@@ -136,9 +136,11 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
       if (isCustomS3Endpoint(hostname)) {
         const proxyUrl = `/api/images/proxy?url=${encodeURIComponent(urlObj.toString())}`;
         console.info(
-          `OptimizedImage: routing t3.storageapi.dev image through proxy to avoid CORS.\n` +
-          `  Original : ${url}\n` +
-          `  Proxy    : ${proxyUrl}`
+          `[OptimizedImage] t3.storageapi.dev URL detected for "${alt}" — routing through proxy.\n` +
+          `  Original URL : ${url}\n` +
+          `  Proxy URL    : ${proxyUrl}\n` +
+          `  Hostname     : ${hostname}\n` +
+          `  Pathname     : ${urlObj.pathname}`
         );
         return proxyUrl;
       }
@@ -199,6 +201,22 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
   };
 
   const optimizedSrc = getOptimizedUrl(src);
+
+  // Log the final resolved src so it's visible in DevTools without having to
+  // inspect the DOM element.  This fires on every render but is cheap.
+  console.debug(
+    `[OptimizedImage] Resolved src for "${alt}"\n` +
+    `  Input src    : ${src || '(empty)'}\n` +
+    `  Resolved src : ${optimizedSrc}`
+  );
+
+  const handleLoad = () => {
+    console.info(
+      `[OptimizedImage] Image loaded successfully for "${alt}"\n` +
+      `  Resolved src : ${optimizedSrc}`
+    );
+    setIsLoaded(true);
+  };
 
   const handleError = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const target = e.target as HTMLImageElement;
@@ -284,7 +302,7 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         initial={{ opacity: 0 }}
         animate={{ opacity: isLoaded || hasError ? 1 : 0 }}
         transition={{ duration: 0.5 }}
-        onLoad={() => setIsLoaded(true)}
+        onLoad={handleLoad}
         onError={handleError}
         loading={priority ? "eager" : "lazy"}
         className={`w-full h-full object-cover ${className}`}
