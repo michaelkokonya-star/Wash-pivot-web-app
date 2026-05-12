@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Upload, Plus, Loader2, Image as ImageIcon, Copy } from 'lucide-react';
+import { X, Upload, Plus, Loader2, Image as ImageIcon, Copy, ShieldAlert } from 'lucide-react';
 import { auth, db } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useSettings } from '../context/SettingsContext';
+import { useAuth } from '../context/AuthContext';
 import { compressImage, sanitizeFilename, fileToDataUrl } from '../lib/image-utils';
 import { toast } from 'sonner';
 
@@ -16,6 +17,8 @@ interface AddProductModalProps {
 
 const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSuccess, clonedProduct }) => {
   const { pricingRules } = useSettings();
+  const { user, profile } = useAuth();
+  const isAdmin = user?.email?.toLowerCase() === 'michael.kokonya@washpivot.com' || profile?.role === 'admin';
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'compressing' | 'uploading' | 'saving'>('idle');
@@ -93,6 +96,10 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
     e.preventDefault();
     if (!auth.currentUser) {
       toast.error("You must be logged in to perform this action.");
+      return;
+    }
+    if (!isAdmin) {
+      toast.error("Only admins can add products.");
       return;
     }
     setLoading(true);
@@ -192,6 +199,14 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
             </div>
 
             <form onSubmit={handleSubmit} className="flex flex-col h-full overflow-hidden">
+              {!isAdmin && (
+                <div className="mx-8 mt-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                  <ShieldAlert size={18} className="mt-0.5 shrink-0 text-red-500" />
+                  <p className="text-sm font-medium text-red-700">
+                    Only admins can add products. You do not have permission to perform this action.
+                  </p>
+                </div>
+              )}
               <div className="p-8 space-y-6 overflow-y-auto flex-1">
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">Product Name / Model</label>
@@ -394,8 +409,8 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onSu
               <div className="p-8 border-t border-black/5 bg-white shrink-0">
                 <button
                   type="submit"
-                  disabled={loading}
-                  className="w-full py-4 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all flex items-center justify-center space-x-2 shadow-xl shadow-emerald-600/20 disabled:opacity-50"
+                  disabled={loading || !isAdmin}
+                  className="w-full py-4 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all flex items-center justify-center space-x-2 shadow-xl shadow-emerald-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? (
                     <>
