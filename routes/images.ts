@@ -1,5 +1,6 @@
 import express from 'express';
-import axios from 'axios';
+import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
+import { Readable } from 'stream';
 
 const router = express.Router();
 
@@ -8,14 +9,35 @@ const router = express.Router();
 // as an open relay for arbitrary external URLs.
 const ALLOWED_PROXY_HOSTNAME = 't3.storageapi.dev';
 
+// Re-use the same S3 client configuration as the upload route so that
+// authenticated requests are made with the same credentials/endpoint.
+const s3 = new S3Client({
+  region: process.env.REGION as string,
+  credentials: {
+    accessKeyId: process.env.ACCESS_KEY_ID as string,
+    secretAccessKey: process.env.SECRET_ACCESS_KEY as string,
+  },
+  ...(process.env.ENDPOINT ? { endpoint: process.env.ENDPOINT } : {}),
+  forcePathStyle: false,
+});
+
+const BUCKET = process.env.BUCKET || '';
+
 /**
  * GET /api/images/proxy?url=<encoded-url>
  *
- * Fetches an image from t3.storageapi.dev and re-serves it with CORS
- * headers so the browser can display it without a CORS error.
+ * Fetches an image from t3.storageapi.dev via the AWS SDK (with S3
+ * credentials) and re-serves it with CORS headers so the browser can
+ * display it without a CORS error.
+ *
+ * Using GetObjectCommand instead of a plain HTTP request ensures that
+ * proper AWS Signature V4 Authorization headers are sent, which is
+ * required by t3.storageapi.dev even for objects with a public-read ACL.
  *
  * Security:
  *   - Only URLs whose hostname is t3.storageapi.dev are accepted.
+ *   - The S3 key is extracted from the URL path; the bucket is taken
+ *     from the BUCKET environment variable, not from the URL.
  *   - The response Content-Type is validated to be an image/* type.
  *   - A 24-hour Cache-Control header is set so repeated requests are
  *     served from the browser cache rather than hitting this proxy.
@@ -44,17 +66,29 @@ router.get('/proxy', async (req, res) => {
     });
   }
 
-  try {
-    const upstream = await axios.get(targetUrl.toString(), {
-      responseType: 'arraybuffer',
-      timeout: 15_000,
-      headers: {
-        // Forward a neutral User-Agent so the storage endpoint doesn't reject the request
-        'User-Agent': 'WashPivot-ImageProxy/1.0',
-      },
-    });
+  if (!BUCKET) {
+    console.error('ImageProxy: BUCKET environment variable is not set');
+    return res.status(500).json({ error: 'S3 bucket configuration missing' });
+  }
 
-    const contentType: string = upstream.headers['content-type'] || 'application/octet-stream';
+  // Extract the object key from the URL path.
+  // The path may be /<bucket>/<key> (path-style) or just /<key> (virtual-host style).
+  // Strip a leading slash and, if the first path segment matches the bucket name,
+  // remove it so we always end up with just the object key.
+  let key = targetUrl.pathname.replace(/^\//, '');
+  if (key.startsWith(`${BUCKET}/`)) {
+    key = key.slice(BUCKET.length + 1);
+  }
+
+  if (!key) {
+    return res.status(400).json({ error: 'Could not determine S3 object key from URL' });
+  }
+
+  try {
+    const command = new GetObjectCommand({ Bucket: BUCKET, Key: key });
+    const s3Response = await s3.send(command);
+
+    const contentType: string = s3Response.ContentType || 'application/octet-stream';
 
     // Validate that the upstream response is actually an image
     if (!contentType.startsWith('image/')) {
@@ -71,16 +105,26 @@ router.get('/proxy', async (req, res) => {
     res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
 
     res.setHeader('Content-Type', contentType);
-    res.status(200).send(Buffer.from(upstream.data));
+
+    // Stream the S3 body directly to the response for memory efficiency
+    if (s3Response.Body instanceof Readable) {
+      s3Response.Body.pipe(res);
+    } else {
+      // Fallback: collect the body as a buffer (handles non-Node stream types)
+      const chunks: Uint8Array[] = [];
+      for await (const chunk of s3Response.Body as AsyncIterable<Uint8Array>) {
+        chunks.push(chunk);
+      }
+      res.status(200).send(Buffer.concat(chunks));
+    }
   } catch (err: any) {
-    const status: number = err.response?.status;
+    const code: string | undefined = err.name || err.Code;
     console.error(
-      `ImageProxy: failed to fetch "${targetUrl.toString()}" — ` +
-        (status ? `upstream returned HTTP ${status}` : err.message)
+      `ImageProxy: failed to fetch key "${key}" from bucket "${BUCKET}" — ${err.message}`
     );
 
-    if (status === 404) {
-      return res.status(404).json({ error: 'Image not found at the upstream URL' });
+    if (code === 'NoSuchKey' || code === 'NotFound') {
+      return res.status(404).json({ error: 'Image not found in S3 bucket' });
     }
 
     res.status(502).json({
