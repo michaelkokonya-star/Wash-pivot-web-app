@@ -61,15 +61,18 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         return urlObj.toString();
       }
 
-      // Google Drive optimization
+      // Google Drive optimization — share links: drive.google.com/file/d/{id}/view
       if (urlObj.hostname.includes('drive.google.com')) {
-        // Convert share link to direct view link
-        // View URL: https://drive.google.com/file/d/[ID]/view?usp=sharing
-        // Direct URL: https://drive.google.com/uc?export=view&id=[ID]
         if (urlObj.pathname.includes('/file/d/')) {
           const fileId = urlObj.pathname.split('/file/d/')[1].split('/')[0];
           return `https://drive.google.com/uc?export=view&id=${fileId}`;
         }
+      }
+
+      // Google Drive direct CDN links: lh3.googleusercontent.com/d/{id}
+      if (urlObj.hostname === 'lh3.googleusercontent.com' && urlObj.pathname.startsWith('/d/')) {
+        const fileId = urlObj.pathname.split('/d/')[1].split('/')[0];
+        return `https://drive.google.com/uc?export=view&id=${fileId}`;
       }
     } catch (e) {
       return url;
@@ -116,10 +119,8 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         animate={{ opacity: isLoaded || hasError ? 1 : 0 }}
         transition={{ duration: 0.5 }}
         onLoad={() => setIsLoaded(true)}
-        onError={(e) => {
-          console.warn(`OptimizedImage failed to load: ${optimizedSrc}. Status: Access Denied or Network Error.`);
-          const target = e.target as HTMLImageElement;
-          target.src = 'https://via.placeholder.com/800x600?text=Access+Denied';
+        onError={() => {
+          console.warn(`OptimizedImage failed to load: ${optimizedSrc}`);
           setHasError(true);
         }}
         loading={priority ? "eager" : "lazy"}
