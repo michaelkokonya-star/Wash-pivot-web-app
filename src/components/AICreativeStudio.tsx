@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Sparkles, 
@@ -17,16 +17,6 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import OptimizedImage from './OptimizedImage';
-
-// Extend window for AI Studio functions
-declare global {
-  interface Window {
-    aistudio: {
-      hasSelectedApiKey: () => Promise<boolean>;
-      openSelectKey: () => Promise<void>;
-    };
-  }
-}
 
 const AICreativeStudio = () => {
   const [activeMode, setActiveMode] = useState<'image' | 'video'>('image');
@@ -51,20 +41,6 @@ const AICreativeStudio = () => {
   const ASPECT_RATIOS = ['1:1', '2:3', '3:2', '3:4', '4:3', '9:16', '16:9', '21:9'];
   const IMAGE_SIZES = ['1K', '2K', '4K'];
 
-  const checkAndOpenKey = async () => {
-    try {
-      const hasKey = await window.aistudio.hasSelectedApiKey();
-      if (!hasKey) {
-        await window.aistudio.openSelectKey();
-        return true;
-      }
-      return true;
-    } catch (err) {
-      console.error("Error checking API key:", err);
-      return false;
-    }
-  };
-
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -87,28 +63,33 @@ const AICreativeStudio = () => {
     setGeneratedImage(null);
 
     try {
-      await checkAndOpenKey();
-      const { GoogleGenAI } = await import("@google/genai");
-      const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
-      
-      const ai = new GoogleGenAI({ apiKey });
-      
-      const response = await ai.models.generateContent({
-        model: imageModel,
-        contents: {
-          parts: [{ text: prompt }],
+      const response = await fetch('/api/ai/generate-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        config: {
-          imageConfig: {
-            aspectRatio: aspectRatio as any,
-            imageSize: imageSize as any,
+        body: JSON.stringify({
+          model: imageModel,
+          prompt: prompt,
+          config: {
+            imageConfig: {
+              aspectRatio: aspectRatio as any,
+              imageSize: imageSize as any,
+            },
           },
-        },
+        }),
       });
 
-      if (response.candidates && response.candidates[0]?.content?.parts) {
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to generate image.");
+      }
+
+      const data = await response.json();
+
+      if (data.candidates && data.candidates[0]?.content?.parts) {
         let foundImage = false;
-        for (const part of response.candidates[0].content.parts) {
+        for (const part of data.candidates[0].content.parts) {
           if (part.inlineData) {
             const base64Data = part.inlineData.data;
             setGeneratedImage(`data:image/png;base64,${base64Data}`);
@@ -142,34 +123,53 @@ const AICreativeStudio = () => {
     setVideoStatus('Initializing video generation...');
 
     try {
-      await checkAndOpenKey();
-      const { GoogleGenAI } = await import("@google/genai");
-      const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
-      
-      const ai = new GoogleGenAI({ apiKey });
-      
       const base64Data = videoSourceImage.split(',')[1];
       const mimeType = videoSourceImage.split(';')[0].split(':')[1];
 
-      let operation = await ai.models.generateVideos({
-        model: 'veo-3.1-generate-preview',
-        prompt: prompt || 'Animate this scene with cinematic motion',
-        image: {
-          imageBytes: base64Data,
-          mimeType: mimeType,
+      const response = await fetch('/api/ai/generate-video', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        config: {
-          numberOfVideos: 1,
-          resolution: '720p',
-          aspectRatio: videoAspectRatio,
-        }
+        body: JSON.stringify({
+          model: 'veo-3.1-generate-preview',
+          prompt: prompt || 'Animate this scene with cinematic motion',
+          image: {
+            imageBytes: base64Data,
+            mimeType: mimeType,
+          },
+          config: {
+            numberOfVideos: 1,
+            resolution: '720p',
+            aspectRatio: videoAspectRatio,
+          }
+        })
       });
 
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to initialize video generation.");
+      }
+
+      let operation = await response.json();
       setVideoStatus('Video is being processed. This may take a few minutes...');
 
       while (!operation.done) {
         await new Promise(resolve => setTimeout(resolve, 10000));
-        operation = await ai.operations.getVideosOperation({ operation: operation });
+        
+        const statusResponse = await fetch('/api/ai/video-status', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ operation })
+        });
+        
+        if (!statusResponse.ok) {
+          throw new Error("Failed to check video status.");
+        }
+        
+        operation = await statusResponse.json();
         setVideoStatus('Still processing... hang tight!');
       }
 
@@ -177,16 +177,15 @@ const AICreativeStudio = () => {
       if (!downloadLink) throw new Error("Video generation completed but no download link was found.");
 
       setVideoStatus('Fetching generated video...');
-      const videoResponse = await fetch(downloadLink, {
-        method: 'GET',
-        headers: {
-          'x-goog-api-key': apiKey!,
-        },
-      });
-
-      if (!videoResponse.ok) throw new Error("Failed to fetch video data.");
+      // We still need the API key to fetch the final video file from the Google URI
+      // But we can try to proxy this fetch too if needed, or just hope the link works with the key in headers
+      // Wait, we can't easily proxy the binary fetch without knowing the key.
+      // Let's assume the server should do it. I'll add a proxy for the direct download too.
       
-      const blob = await videoResponse.blob();
+      const fetchResponse = await fetch('/api/ai/video-download?uri=' + encodeURIComponent(downloadLink));
+      if (!fetchResponse.ok) throw new Error("Failed to download video file.");
+      
+      const blob = await fetchResponse.blob();
       const videoUrl = URL.createObjectURL(blob);
       setGeneratedVideo(videoUrl);
       toast.success("Video generated successfully!");

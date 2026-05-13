@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { GoogleGenAI, GenerateContentResponse, ThinkingLevel } from "@google/genai";
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, Zap, Battery, Sun, MapPin, Home, Tv, Loader2, Info, ExternalLink, MessageSquare, Copy, Check, Plus, X, Save, Send, User, Bot } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -136,25 +135,6 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
     setResult(null);
     
     try {
-      // Check for API key selection if using a potentially paid model
-      if (window.aistudio && !(await window.aistudio.hasSelectedApiKey())) {
-        if (auth.currentUser?.email === SUPER_ADMIN_EMAIL) {
-          await window.aistudio.openSelectKey();
-          setIsLoading(false);
-          toast.info("Please select an API key in the dialog and then click Calculate again.");
-          return;
-        } else {
-          throw new Error("Solar Advisor is currently being configured by the administrator. Please try again later.");
-        }
-      }
-
-      const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-      if (!apiKey || apiKey === "undefined") {
-        throw new Error("API Key is not defined. Please ensure you have selected an API key from the 'Secrets' or 'Key Selection' menu and that it is correctly configured.");
-      }
-      
-      const ai = new GoogleGenAI({ apiKey });
-      
       const appliancesList = selectedAppliances
         .map(a => `${a.quantity}x ${a.name}`)
         .join(', ');
@@ -172,31 +152,52 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
         
         Format the report using Markdown with clear headings and bullet points.`;
 
-      const response: GenerateContentResponse = await ai.models.generateContent({
-        model: "gemini-3.1-pro-preview",
-        contents: prompt,
-        config: {
-          thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
-          tools: [{ googleMaps: {} }],
-          toolConfig: { includeServerSideToolInvocations: true }
-        }
+      const response = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: "gemini-3.1-pro-preview",
+          prompt: prompt,
+          config: {
+            thinkingConfig: { thinkingLevel: "HIGH" },
+            tools: [{ googleMaps: {} }],
+            toolConfig: { includeServerSideToolInvocations: true }
+          }
+        })
       });
 
-      if (!response.text) {
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to compute requirements.");
+      }
+
+      const data = await response.json();
+
+      if (!data.text) {
         // Fallback if the tool call failed or returned empty
-        const fallbackResponse = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
-          contents: prompt + "\n\n(Note: Google Maps tools were unavailable, providing general technical advice based on location string.)",
+        const fallbackResponse = await fetch('/api/ai/generate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: "gemini-3-flash-preview",
+            prompt: prompt + "\n\n(Note: Google Maps tools were unavailable, providing general technical advice based on location string.)",
+          })
         });
+
+        const fallbackData = await fallbackResponse.json();
         
-        if (!fallbackResponse.text) {
+        if (!fallbackData.text) {
           throw new Error("AI failed to generate a response. Please try again.");
         }
-        setResult(fallbackResponse.text);
+        setResult(fallbackData.text);
       } else {
-        setResult(response.text);
+        setResult(data.text);
         // Extract grounding chunks
-        const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+        const chunks = data.candidates?.[0]?.groundingMetadata?.groundingChunks;
         if (chunks) {
           setGroundingChunks(chunks);
         }
@@ -275,28 +276,30 @@ const SolarAIAdvisor: React.FC<SolarAIAdvisorProps> = ({ onApply }) => {
     setIsChatLoading(true);
 
     try {
-      const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-      if (!apiKey || apiKey === "undefined") {
-        toast.error("API Key missing. Please select a key first.");
-        setIsChatLoading(false);
-        return;
-      }
-
-      const ai = new GoogleGenAI({ apiKey });
-      const chat = ai.chats.create({
-        model: "gemini-3-flash-preview",
-        config: {
-          systemInstruction: "You are a Solar Energy Expert Assistant. You help users understand their solar requirements, explain technical terms, and provide advice on energy efficiency. Be concise, professional, and helpful. Use the context of their current project (Premises: " + inputs.premisesSize + ", Location: " + inputs.location + ") if relevant.",
+      const response = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        history: chatMessages.map(msg => ({
-          role: msg.role === 'user' ? 'user' : 'model',
-          parts: [{ text: msg.text }]
-        }))
+        body: JSON.stringify({
+          model: "gemini-3-flash-preview",
+          prompt: userMessage,
+          systemInstruction: "You are a Solar Energy Expert Assistant. You help users understand their solar requirements, explain technical terms, and provide advice on energy efficiency. Be concise, professional, and helpful. Use the context of their current project (Premises: " + inputs.premisesSize + ", Location: " + inputs.location + ") if relevant.",
+          history: chatMessages.map(msg => ({
+            role: msg.role === 'user' ? 'user' : 'model',
+            parts: [{ text: msg.text }]
+          }))
+        })
       });
 
-      const response = await chat.sendMessage({ message: userMessage });
-      if (response.text) {
-        setChatMessages(prev => [...prev, { role: 'model', text: response.text as string }]);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to get a response.");
+      }
+
+      const data = await response.json();
+      if (data.text) {
+        setChatMessages(prev => [...prev, { role: 'model', text: data.text as string }]);
       }
     } catch (error) {
       console.error("Chat Error:", error);

@@ -8,6 +8,7 @@ import { db } from '../firebase';
 import { doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 
 import OptimizedImage from '../components/OptimizedImage';
+import AIImpactVisualizer from '../components/AIImpactVisualizer';
 
 const ProjectDetail = () => {
   const { id } = useParams();
@@ -340,6 +341,15 @@ const ProjectDetail = () => {
                 </div>
               )}
             </div>
+          </section>
+
+          {/* AI Impact Visualization Section */}
+          <section className="mt-16">
+            <AIImpactVisualizer 
+              title={project.title} 
+              description={project.description} 
+              category={project.category} 
+            />
           </section>
         </div>
 

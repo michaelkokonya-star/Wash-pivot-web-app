@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { db } from '../firebase';
 import { doc, getDoc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import OptimizedImage from '../components/OptimizedImage';
+import AIImpactVisualizer from '../components/AIImpactVisualizer';
 
 const AdminProjectDetails = () => {
   const { id } = useParams();
@@ -211,6 +212,13 @@ const AdminProjectDetails = () => {
                 )}
               </div>
             </div>
+
+            {/* AI Impact Visualization */}
+            <AIImpactVisualizer 
+              title={project.title} 
+              description={project.description} 
+              category={project.category} 
+            />
           </div>
 
           {/* Sidebar Info */}

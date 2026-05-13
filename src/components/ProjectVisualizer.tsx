@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { GoogleGenAI } from "@google/genai";
 import { motion } from 'motion/react';
 import { Sparkles, Loader2, Image as ImageIcon, Download, RefreshCw, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -25,36 +24,39 @@ const ProjectVisualizer: React.FC<ProjectVisualizerProps> = ({ selectedProducts,
     setError(null);
     
     try {
-      const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-      if (!apiKey || apiKey === "undefined") {
-        throw new Error("API Key is not defined. Please ensure your Gemini API key is configured in the Secrets panel.");
-      }
-
-      const ai = new GoogleGenAI({ apiKey });
-      
       const productNames = selectedProducts.map(p => p.name).join(', ');
-      const prompt = `A professional, high-quality architectural visualization of a sustainable energy and water project. 
-        The scene features: ${productNames}. 
-        ${location ? `The setting is in ${location}.` : 'The setting is a modern, sustainable community.'}
-        The image should be realistic, bright, and show the technology integrated into the environment. 
-        Include solar panels, water tanks, and clean infrastructure. 
-        Cinematic lighting, 8k resolution, photorealistic style.`;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
-        contents: {
-          parts: [{ text: prompt }],
+      
+      const response = await fetch('/api/ai/generate-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        config: {
-          imageConfig: {
-            aspectRatio: "16:9",
+        body: JSON.stringify({
+          model: 'gemini-2.5-flash-image',
+          prompt: `A professional, high-quality architectural visualization of a sustainable energy and water project. 
+            The scene features: ${productNames}. 
+            ${location ? `The setting is in ${location}.` : 'The setting is a modern, sustainable community.'}
+            The image should be realistic, bright, and show the technology integrated into the environment. 
+            Include solar panels, water tanks, and clean infrastructure. 
+            Cinematic lighting, 8k resolution, photorealistic style.`,
+          config: {
+            imageConfig: {
+              aspectRatio: "16:9",
+            },
           },
-        },
+        }),
       });
 
-      if (response.candidates && response.candidates[0]?.content?.parts) {
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to generate visualization.");
+      }
+
+      const data = await response.json();
+
+      if (data.candidates && data.candidates[0]?.content?.parts) {
         let foundImage = false;
-        for (const part of response.candidates[0].content.parts) {
+        for (const part of data.candidates[0].content.parts) {
           if (part.inlineData) {
             const base64EncodeString = part.inlineData.data;
             setGeneratedImage(`data:image/png;base64,${base64EncodeString}`);

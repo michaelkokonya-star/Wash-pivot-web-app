@@ -3,7 +3,6 @@ import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Sun, Droplets, ShieldCheck, ArrowRight, Zap, Globe, Users, Sparkles, Loader2, Search, Layers } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
 import OptimizedImage from '../components/OptimizedImage';
 import { toast } from 'sonner';
 
@@ -14,29 +13,34 @@ const Home = () => {
   const generateImpactImage = async () => {
     setIsGenerating(true);
     try {
-      const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-      if (!apiKey || apiKey === "undefined") {
-        throw new Error("Gemini API key is not configured.");
-      }
-
-      const ai = new GoogleGenAI({ apiKey });
       const prompt = 'A high-quality, realistic image of a solar-powered water purification system being installed in a vibrant rural village. The scene should show local community members and technicians working together, with solar panels clearly visible and clean water flowing. The atmosphere should be hopeful and sustainable.';
       
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
-        contents: {
-          parts: [{ text: prompt }],
+      const response = await fetch('/api/ai/generate-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        config: {
-          imageConfig: {
-            aspectRatio: "16:9",
+        body: JSON.stringify({
+          model: 'gemini-2.5-flash-image',
+          prompt: prompt,
+          config: {
+            imageConfig: {
+              aspectRatio: "16:9",
+            },
           },
-        },
+        }),
       });
 
-      if (response.candidates && response.candidates[0]?.content?.parts) {
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to generate visualization.");
+      }
+
+      const data = await response.json();
+
+      if (data.candidates && data.candidates[0]?.content?.parts) {
         let foundImage = false;
-        for (const part of response.candidates[0].content.parts) {
+        for (const part of data.candidates[0].content.parts) {
           if (part.inlineData) {
             const base64Data = part.inlineData.data;
             setGeneratedImage(`data:image/png;base64,${base64Data}`);

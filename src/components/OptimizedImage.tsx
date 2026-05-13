@@ -12,49 +12,6 @@ interface OptimizedImageProps extends React.ImgHTMLAttributes<HTMLImageElement> 
   quality?: number;
 }
 
-/**
- * Domains that can be loaded directly without proxying.
- * - S3 bucket has public-read ACL, so no proxy needed.
- * - Well-known CDNs are safe to load directly.
- */
-const TRUSTED_DOMAINS = [
-  // WashPivot S3 bucket – virtual-host style (preferred, public-read ACL)
-  'washpivot-photos-zrwie7u.s3.amazonaws.com',
-  // Catch any region-specific virtual-host variant, e.g. .s3.us-east-1.amazonaws.com
-  's3.amazonaws.com',
-  'amazonaws.com',
-  // Custom S3-compatible storage endpoint used by WashPivot (t3.storage)
-  't3.storageapi.dev',
-  'unsplash.com',
-  'images.unsplash.com',
-  'picsum.photos',
-  'drive.google.com',
-  'ui-avatars.com',
-];
-
-/** Returns true when the hostname matches a trusted domain (exact or subdomain). */
-const isTrustedDomain = (hostname: string): boolean =>
-  TRUSTED_DOMAINS.some(
-    (domain) => hostname === domain || hostname.endsWith(`.${domain}`)
-  );
-
-/**
- * Returns true for any AWS S3 URL – both virtual-host style
- * (bucket.s3.region.amazonaws.com) and legacy path-style
- * (s3.region.amazonaws.com/bucket/...).
- */
-const isS3Url = (hostname: string): boolean =>
-  hostname.endsWith('.amazonaws.com') && hostname.includes('s3');
-
-/**
- * Returns true for custom S3-compatible storage endpoints that use path-style
- * URLs (https://endpoint/bucket/key), such as t3.storageapi.dev.
- * These endpoints do not send CORS headers for the washpivot-hub origin, so
- * images must be routed through the server-side proxy (/api/images/proxy).
- */
-const isCustomS3Endpoint = (hostname: string): boolean =>
-  hostname === 't3.storageapi.dev' || hostname.endsWith('.t3.storageapi.dev');
-
 const OptimizedImage: React.FC<OptimizedImageProps> = ({
   src,
   alt,
@@ -68,83 +25,16 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
 
-  /**
-   * Resolves the best URL to use for a given image source:
-   *
-   * 1. Empty / falsy  → Picsum placeholder
-   * 2. data: URI      → returned as-is (GenAI / base64 output)
-   * 3. Relative URL   → returned as-is (served from same origin)
-   * 4. S3 bucket URL  → normalised to virtual-host style (bucket has public-read ACL)
-   * 5. Other trusted  → apply CDN-specific optimisations (Unsplash, Picsum, Drive)
-   * 6. External, untrusted → routed through /api/images/proxy to avoid CORS issues
-   */
-  const getOptimizedUrl = (url: string): string => {
+  // Function to optimize Unsplash/Picsum URLs
+  const getOptimizedUrl = (url: string) => {
     if (!url) return `https://picsum.photos/seed/${encodeURIComponent(alt)}/800/600`;
-
-    // Base64 / data URIs (e.g. GenAI output) — use directly
-    if (url.startsWith('data:')) return url;
-
-    // Relative URLs — served from the same origin, no transformation needed
-    if (url.startsWith('/') || url.startsWith('./') || url.startsWith('../')) return url;
-
-    console.debug(`OptimizedImage: resolving URL for "${alt}"`, { src: url });
+    if (url.startsWith('data:')) return url; // Base64 images (like GenAI output)
 
     try {
       const urlObj = new URL(url);
-      const { hostname } = urlObj;
-
-      // ── S3 bucket (public-read) ──────────────────────────────────────────
-      // Normalise to virtual-host style so the public-read ACL is honoured.
-      // Path-style URLs (s3.region.amazonaws.com/bucket/key) are deprecated
-      // for new AWS buckets and may return "Access Denied" even with a
-      // public-read ACL.  Virtual-host style (bucket.s3.region.amazonaws.com/key)
-      // is the AWS-recommended format.
-      if (isS3Url(hostname)) {
-        // Detect legacy path-style: hostname is exactly s3.amazonaws.com or
-        // s3.<region>.amazonaws.com (no bucket prefix in the hostname).
-        const isPathStyle =
-          hostname === 's3.amazonaws.com' ||
-          /^s3\.[a-z0-9-]+\.amazonaws\.com$/.test(hostname);
-
-        if (isPathStyle) {
-          // Path-style: /<bucket>/<key...>  →  virtual-host: <bucket>.s3.<region>.amazonaws.com/<key>
-          const pathParts = urlObj.pathname.replace(/^\//, '').split('/');
-          const bucket = pathParts[0];
-          const objectKey = pathParts.slice(1).join('/');
-          // Preserve the region from the hostname when present, else default to us-east-1
-          const regionMatch = hostname.match(/^s3\.([a-z0-9-]+)\.amazonaws\.com$/);
-          const region = regionMatch ? regionMatch[1] : 'us-east-1';
-          const virtualHostUrl = `https://${bucket}.s3.${region}.amazonaws.com/${objectKey}`;
-          console.info(
-            `OptimizedImage: rewrote path-style S3 URL to virtual-host style.\n` +
-            `  Path-style    : ${url}\n` +
-            `  Virtual-host  : ${virtualHostUrl}`
-          );
-          return virtualHostUrl;
-        }
-
-        // Already virtual-host style — use directly
-        console.debug(`OptimizedImage: S3 virtual-host URL accepted as-is: ${url}`);
-        return urlObj.toString();
-      }
-
-      // ── Custom S3-compatible endpoint (t3.storageapi.dev) ────────────────
-      // t3.storageapi.dev does not send CORS headers that allow requests from
-      // the washpivot-hub origin, so the browser blocks direct image loads.
-      // Route all requests through the server-side proxy which re-serves the
-      // image with Access-Control-Allow-Origin: * headers.
-      if (isCustomS3Endpoint(hostname)) {
-        const proxyUrl = `/api/images/proxy?url=${encodeURIComponent(urlObj.toString())}`;
-        console.info(
-          `OptimizedImage: routing t3.storageapi.dev image through proxy to avoid CORS.\n` +
-          `  Original : ${url}\n` +
-          `  Proxy    : ${proxyUrl}`
-        );
-        return proxyUrl;
-      }
-
-      // ── Unsplash ─────────────────────────────────────────────────────────
-      if (hostname.includes('unsplash.com')) {
+      
+      // Unsplash optimization
+      if (urlObj.hostname.includes('unsplash.com')) {
         urlObj.searchParams.set('auto', 'format');
         urlObj.searchParams.set('fit', 'crop');
         urlObj.searchParams.set('q', quality.toString());
@@ -153,8 +43,10 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         return urlObj.toString();
       }
 
-      // ── Picsum ───────────────────────────────────────────────────────────
-      if (hostname.includes('picsum.photos')) {
+      // Picsum optimization
+      if (urlObj.hostname.includes('picsum.photos')) {
+        // Picsum format is usually /seed/id/width/height
+        // If it's a seed URL, we can try to adjust the dimensions if they are at the end
         const parts = urlObj.pathname.split('/');
         if (parts.length >= 4 && !isNaN(Number(parts[parts.length - 1]))) {
           if (width && height) {
@@ -169,86 +61,25 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         return urlObj.toString();
       }
 
-      // ── Google Drive ─────────────────────────────────────────────────────
-      // Convert share links to direct-view links.
-      if (hostname.includes('drive.google.com')) {
+      // Google Drive optimization
+      if (urlObj.hostname.includes('drive.google.com')) {
+        // Convert share link to direct view link
+        // View URL: https://drive.google.com/file/d/[ID]/view?usp=sharing
+        // Direct URL: https://drive.google.com/uc?export=view&id=[ID]
         if (urlObj.pathname.includes('/file/d/')) {
           const fileId = urlObj.pathname.split('/file/d/')[1].split('/')[0];
           return `https://drive.google.com/uc?export=view&id=${fileId}`;
         }
-        return urlObj.toString();
       }
-
-      // ── ui-avatars.com ───────────────────────────────────────────────────
-      if (hostname === 'ui-avatars.com') {
-        return urlObj.toString();
-      }
-
-      // ── External, untrusted domain ───────────────────────────────────────
-      // Route through the server-side proxy to avoid CORS / mixed-content errors.
-      if (!isTrustedDomain(hostname)) {
-        console.info(`OptimizedImage: routing untrusted domain "${hostname}" through image proxy`);
-        return `/api/images/proxy?url=${encodeURIComponent(url)}`;
-      }
-
-      return urlObj.toString();
-    } catch {
-      // Malformed URL — return as-is and let the browser handle it
+    } catch (e) {
       return url;
     }
+    
+    return url;
   };
 
   const optimizedSrc = getOptimizedUrl(src);
-
-  const handleError = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    const target = e.target as HTMLImageElement;
-
-    // Distinguish error type for better diagnostics
-    if (src && src.includes('t3.storageapi.dev')) {
-      // Images from t3.storageapi.dev are routed through /api/images/proxy.
-      // A failure here means the proxy itself could not fetch the image.
-      console.error(
-        `OptimizedImage: proxy request for t3.storageapi.dev image failed.\n` +
-        `  Original URL : ${src}\n` +
-        `  Proxy URL    : ${optimizedSrc}\n` +
-        `  Checklist:\n` +
-        `    1. Proxy route  – ensure GET /api/images/proxy is registered in server.ts\n` +
-        `    2. Bucket ACL   – object must have public-read ACL (PutObjectCommand ACL: 'public-read')\n` +
-        `    3. Endpoint     – verify ENDPOINT env var is set to https://t3.storageapi.dev\n` +
-        `    4. Bucket name  – verify BUCKET env var matches the bucket in the URL path`
-      );
-    } else if (src && src.includes('amazonaws.com')) {
-      console.error(
-        `OptimizedImage: S3 image failed to load.\n` +
-        `  Original URL : ${src}\n` +
-        `  Resolved URL : ${optimizedSrc}\n` +
-        `  Checklist:\n` +
-        `    1. Bucket ACL  – object must have public-read ACL (set on upload via PutObjectCommand ACL: 'public-read')\n` +
-        `    2. Block Public Access – all four "Block Public Access" settings must be OFF in the S3 console\n` +
-        `    3. Bucket policy – add a policy granting s3:GetObject to Principal "*" for arn:aws:s3:::${src.split('.s3.')[0].replace('https://', '')}/*\n` +
-        `    4. CORS – bucket needs a CORS rule: AllowedOrigins ["*"], AllowedMethods ["GET","HEAD"]\n` +
-        `    5. URL style – virtual-host (bucket.s3.region.amazonaws.com) is required; path-style is deprecated`
-      );
-    } else if (optimizedSrc.startsWith('/api/images/proxy')) {
-      console.error(
-        `OptimizedImage: proxy request failed.\n` +
-        `  Proxy URL    : ${optimizedSrc}\n` +
-        `  Original URL : ${src}`
-      );
-    } else {
-      console.warn(
-        `OptimizedImage: failed to load image.\n` +
-        `  Resolved URL : ${optimizedSrc}\n` +
-        `  Original URL : ${src}`
-      );
-    }
-
-    // Prevent infinite error loop if the placeholder itself fails
-    if (!target.src.includes('picsum.photos/seed/error')) {
-      target.src = `https://picsum.photos/seed/error-${encodeURIComponent(alt)}/800/600`;
-    }
-    setHasError(true);
-  };
+  const fallbackImage = 'https://drive.google.com/uc?export=view&id=1P8CXvuVVGpLjQpS2wB7HPu3CHZiZEK2Q';
 
   return (
     <div 
@@ -279,13 +110,18 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         )}
       </AnimatePresence>
       <motion.img
-        src={optimizedSrc}
+        src={hasError ? fallbackImage : optimizedSrc}
         alt={alt}
         initial={{ opacity: 0 }}
         animate={{ opacity: isLoaded || hasError ? 1 : 0 }}
         transition={{ duration: 0.5 }}
         onLoad={() => setIsLoaded(true)}
-        onError={handleError}
+        onError={(e) => {
+          console.warn(`OptimizedImage failed to load: ${optimizedSrc}. Status: Access Denied or Network Error.`);
+          const target = e.target as HTMLImageElement;
+          target.src = 'https://via.placeholder.com/800x600?text=Access+Denied';
+          setHasError(true);
+        }}
         loading={priority ? "eager" : "lazy"}
         className={`w-full h-full object-cover ${className}`}
         {...(props as any)}
