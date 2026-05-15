@@ -8,7 +8,7 @@ const teamMembers = [
     name: "Michael Kokonya",
     role: "Founder & CEO",
     bio: "Visionary leader with a passion for sustainable development and social impact. Dedicated to empowering communities through accessible technology and expertise.",
-    image: "https://drive.google.com/file/d/10eosV20Sm4XeckDxGkO68zMAnmvBn8ZV/view",
+    image: "https://drive.google.com/file/d/10eosV20Sm4XeckDxGkO68zMAnmvBn8ZV/view?usp=sharing",
     socials: { twitter: "#", linkedin: "#", mail: "michael.kokonya@washpivot.com" }
   }
 ];
