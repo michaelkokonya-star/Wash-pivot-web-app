@@ -6,22 +6,12 @@ import Stripe from 'stripe';
 import axios from 'axios';
 import dotenv from 'dotenv';
 import admin from 'firebase-admin';
-import { GoogleGenAI } from "@google/genai";
 import uploadRoutes from './routes/upload.ts';
 import settingsRoutes from './routes/settings.ts';
 import dataRoutes from './routes/data.ts';
 import imageRoutes from './routes/images.ts';
 
 dotenv.config();
-
-// Initialize AI
-const getAiClient = () => {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-  if (!apiKey) {
-    throw new Error('GEMINI_API_KEY is not set in the server environment');
-  }
-  return new GoogleGenAI({ apiKey });
-};
 
 // Load Firebase Config safely
 const firebaseConfigPath = path.join(process.cwd(), 'firebase-applet-config.json');
@@ -132,115 +122,6 @@ async function startServer() {
     // API routes
     app.get('/api/health', (req, res) => {
       res.json({ status: 'ok' });
-    });
-
-    // AI Proxy Routes
-    app.post('/api/ai/generate', async (req, res) => {
-      try {
-        const { model, prompt, systemInstruction, history, config } = req.body;
-        const ai = getAiClient();
-        
-        let response;
-        if (history) {
-          const chat = ai.chats.create({
-            model: model || "gemini-3-flash-preview",
-            config: {
-              systemInstruction,
-            },
-            history,
-          });
-          response = await chat.sendMessage({ message: prompt });
-        } else {
-          response = await ai.models.generateContent({
-            model: model || "gemini-3-flash-preview",
-            contents: prompt,
-            config,
-          });
-        }
-        
-        res.json({ 
-          text: response.text, 
-          candidates: response.candidates,
-          usageMetadata: response.usageMetadata 
-        });
-      } catch (error: any) {
-        console.error('AI Proxy Error:', error);
-        res.status(500).json({ error: error.message });
-      }
-    });
-
-    app.post('/api/ai/generate-image', async (req, res) => {
-      try {
-        const { model, prompt, config } = req.body;
-        const ai = getAiClient();
-        
-        const response = await ai.models.generateContent({
-          model: model || "gemini-2.5-flash-image",
-          contents: {
-            parts: [{ text: prompt }],
-          },
-          config,
-        });
-
-        res.json(response);
-      } catch (error: any) {
-        console.error('AI Image Proxy Error:', error);
-        res.status(500).json({ error: error.message });
-      }
-    });
-
-    app.post('/api/ai/generate-video', async (req, res) => {
-      try {
-        const { model, prompt, image, config } = req.body;
-        const ai = getAiClient();
-        
-        const operation = await ai.models.generateVideos({
-          model: model || 'veo-3.1-generate-preview',
-          prompt: prompt || 'Animate this scene with cinematic motion',
-          image: image,
-          config,
-        });
-
-        res.json(operation);
-      } catch (error: any) {
-        console.error('AI Video Proxy Error:', error);
-        res.status(500).json({ error: error.message });
-      }
-    });
-
-    app.post('/api/ai/video-status', async (req, res) => {
-      try {
-        const { operation } = req.body;
-        const ai = getAiClient();
-        
-        const status = await ai.operations.getVideosOperation({ operation });
-        res.json(status);
-      } catch (error: any) {
-        console.error('AI Video Status Proxy Error:', error);
-        res.status(500).json({ error: error.message });
-      }
-    });
-
-    app.get('/api/ai/video-download', async (req, res) => {
-      try {
-        const uri = req.query.uri as string;
-        if (!uri) return res.status(400).json({ error: 'URI is required' });
-        
-        const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-        
-        const response = await axios.get(uri, {
-          headers: {
-            'x-goog-api-key': apiKey,
-          },
-          responseType: 'stream'
-        });
-
-        res.setHeader('Content-Type', response.headers['content-type']);
-        response.data.pipe(res);
-      } catch (error: any) {
-        console.error('AI Video Download Proxy Error:', error);
-        res.status(500).json({ error: error.message });
-      }
     });
 
     // Provision System Owner
