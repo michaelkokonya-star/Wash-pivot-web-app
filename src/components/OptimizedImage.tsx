@@ -27,7 +27,10 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
 
   // Function to optimize Unsplash/Picsum URLs
   const getOptimizedUrl = (url: string) => {
-    if (!url) return `https://picsum.photos/seed/${encodeURIComponent(alt)}/800/600`;
+    if (!url) {
+      console.warn(`[OptimizedImage] src is empty/missing for alt="${alt}". Using placeholder.`);
+      return `https://picsum.photos/seed/${encodeURIComponent(alt)}/800/600`;
+    }
     if (url.startsWith('data:')) return url; // Base64 images (like GenAI output)
 
     try {
@@ -117,9 +120,14 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         transition={{ duration: 0.5 }}
         onLoad={() => setIsLoaded(true)}
         onError={(e) => {
-          console.warn(`OptimizedImage failed to load: ${optimizedSrc}. Status: Access Denied or Network Error.`);
+          console.warn(
+            `[OptimizedImage] ❌ Failed to load image for "${alt}".`,
+            `\n  Original src : ${src || '(empty)'}`,
+            `\n  Optimized src: ${optimizedSrc}`,
+            '\n  Possible causes: invalid URL, CORS/access-denied, network error, or missing Firestore imageUrl field.'
+          );
           const target = e.target as HTMLImageElement;
-          target.src = 'https://via.placeholder.com/800x600?text=Access+Denied';
+          target.src = 'https://via.placeholder.com/800x600?text=Image+Unavailable';
           setHasError(true);
         }}
         loading={priority ? "eager" : "lazy"}
