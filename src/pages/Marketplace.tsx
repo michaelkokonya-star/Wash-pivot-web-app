@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, useAnimation, AnimatePresence } from 'motion/react';
-import { ShoppingCart, Filter, Search, Sun, Droplets, ShieldCheck, ChevronLeft, ChevronRight, Check, Plus, Edit, Trash2, LogIn, Mail, Phone, MapPin, ExternalLink } from 'lucide-react';
+import { ShoppingCart, Filter, Search, Sun, Droplets, ShieldCheck, ChevronLeft, ChevronRight, Check, Plus, Edit, Trash2, LogIn, Mail, Phone, MapPin, ExternalLink, RefreshCw, AlertTriangle, PackageSearch } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import OptimizedImage from '../components/OptimizedImage';
@@ -11,6 +11,7 @@ import AddProductModal from '../components/AddProductModal';
 import EditProductModal from '../components/EditProductModal';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, orderBy, deleteDoc, doc } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 
 interface ProductCardProps {
   product: any;
@@ -224,19 +225,42 @@ const Marketplace = () => {
 
   const isAdmin = user?.email?.toLowerCase() === 'michael.kokonya@washpivot.com';
 
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
   const fetchProducts = async () => {
     setLoading(true);
+    setFetchError(null);
+    console.log('[Marketplace] fetchProducts — starting. filters:', { filter, subFilter, ratingFilter });
     try {
       const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'));
       const snapshot = await getDocs(q);
-      let productsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      
+
+      console.log(`[Marketplace] Firestore returned ${snapshot.docs.length} raw product document(s).`);
+
+      let productsData = snapshot.docs.map(d => {
+        const data = d.data();
+        console.log(`[Marketplace] Product doc id=${d.id}`, {
+          name: data.name,
+          category: data.category,
+          subCategory: data.subCategory,
+          imageUrl: data.imageUrl || '⚠️ MISSING',
+          price: data.price,
+          createdAt: data.createdAt,
+        });
+        if (!data.imageUrl) {
+          console.warn(`[Marketplace] ⚠️ Product "${data.name}" (id=${d.id}) has no imageUrl — a placeholder will be shown.`);
+        }
+        return { id: d.id, ...data };
+      });
+
       // Apply category/subcategory filters BEFORE grouping
       if (filter !== 'All') {
         productsData = productsData.filter((p: any) => p.category === filter);
+        console.log(`[Marketplace] After category filter "${filter}": ${productsData.length} product(s).`);
       }
       if (subFilter !== 'All') {
         productsData = productsData.filter((p: any) => p.subCategory === subFilter);
+        console.log(`[Marketplace] After subCategory filter "${subFilter}": ${productsData.length} product(s).`);
       }
 
       // Group by name
@@ -246,9 +270,10 @@ const Marketplace = () => {
           groupedMap.set(p.name, p);
         }
       });
-      
+
       let filteredProducts = Array.from(groupedMap.values());
-      
+      console.log(`[Marketplace] After grouping by name: ${filteredProducts.length} unique product(s).`);
+
       // Apply rating filter on groups
       if (ratingFilter !== 'All') {
         filteredProducts = filteredProducts.filter((p: any) => {
@@ -258,11 +283,25 @@ const Marketplace = () => {
           const options = ratingOptions[p.subCategory] || [];
           return options.includes(ratingFilter);
         });
+        console.log(`[Marketplace] After rating filter "${ratingFilter}": ${filteredProducts.length} product(s).`);
       }
-      
+
+      if (filteredProducts.length === 0) {
+        console.warn('[Marketplace] ⚠️ No products to display after all filters. Check Firestore data or active filters.');
+      } else {
+        console.log(`[Marketplace] ✅ Rendering ${filteredProducts.length} product(s).`);
+      }
+
       setProducts(filteredProducts);
     } catch (error) {
-      console.error("Error fetching products:", error);
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[Marketplace] ❌ Error fetching products:', error);
+      setFetchError(message);
+      try {
+        handleFirestoreError(error, OperationType.LIST, 'products');
+      } catch {
+        // handleFirestoreError re-throws; we already captured the message above
+      }
     } finally {
       setLoading(false);
     }
@@ -270,11 +309,13 @@ const Marketplace = () => {
 
   const fetchServices = async () => {
     setServicesLoading(true);
+    console.log('[Marketplace] fetchServices — starting.');
     try {
       const q = query(collection(db, 'service_providers'), where('isApproved', '==', true), orderBy('createdAt', 'desc'));
       const snapshot = await getDocs(q);
-      let servicesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      
+      console.log(`[Marketplace] Firestore returned ${snapshot.docs.length} approved service provider(s).`);
+      let servicesData = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+
       // Apply client-side filtering
       if (filter !== 'All') {
         servicesData = servicesData.filter((s: any) => s.category === filter);
@@ -282,10 +323,11 @@ const Marketplace = () => {
       if (subFilter !== 'All') {
         servicesData = servicesData.filter((s: any) => s.subCategory === subFilter);
       }
-      
+
+      console.log(`[Marketplace] Service providers after filters: ${servicesData.length}.`);
       setServices(servicesData);
     } catch (error) {
-      console.error("Error fetching services:", error);
+      console.error('[Marketplace] ❌ Error fetching services:', error);
     } finally {
       setServicesLoading(false);
     }
@@ -497,6 +539,50 @@ const Marketplace = () => {
         product={selectedProduct}
       />
 
+      {/* Product fetch error banner */}
+      <AnimatePresence>
+        {fetchError && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="mb-6 flex items-start gap-4 p-5 bg-red-50 border border-red-200 rounded-2xl text-sm"
+          >
+            <AlertTriangle size={18} className="text-red-500 mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <p className="font-bold text-red-700 mb-1">Failed to load products</p>
+              <p className="text-red-600/80 font-mono text-xs break-all">{fetchError}</p>
+              {isAdmin && (
+                <p className="mt-1 text-red-500/70 text-xs">Check the browser console for the full Firestore error details.</p>
+              )}
+            </div>
+            <button
+              onClick={fetchProducts}
+              className="flex items-center gap-1.5 px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-bold hover:bg-red-700 transition-all shrink-0"
+            >
+              <RefreshCw size={13} />
+              Retry
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Product count badge */}
+      {!loading && !fetchError && (
+        <div className="mb-4 flex items-center gap-2">
+          <span className="px-3 py-1 bg-stone-100 rounded-full text-xs font-bold text-black/40 uppercase tracking-widest">
+            {allProducts.length === 0
+              ? 'No products'
+              : `${allProducts.length} product${allProducts.length !== 1 ? 's' : ''}`}
+          </span>
+          {isAdmin && allProducts.length === 0 && (
+            <span className="text-xs text-amber-600 font-medium">
+              — Add products via the "Add Product" button above, or check Firestore for data issues.
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="relative group/carousel">
         {/* Navigation Arrows - Hidden on mobile, visible on hover on desktop */}
         <button 
@@ -519,7 +605,28 @@ const Marketplace = () => {
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
           <AnimatePresence mode="popLayout">
-            {allProducts.length > 0 ? (
+            {loading ? (
+              /* Loading skeleton cards */
+              Array.from({ length: 3 }).map((_, i) => (
+                <div
+                  key={`skeleton-${i}`}
+                  className="min-w-[280px] sm:min-w-[320px] lg:min-w-[350px] snap-start"
+                >
+                  <div className="bg-white rounded-3xl border border-black/5 overflow-hidden h-full flex flex-col animate-pulse">
+                    <div className="aspect-[4/5] bg-stone-200" />
+                    <div className="p-8 flex flex-col gap-4 flex-grow">
+                      <div className="h-6 bg-stone-200 rounded-full w-3/4" />
+                      <div className="h-4 bg-stone-100 rounded-full w-full" />
+                      <div className="h-4 bg-stone-100 rounded-full w-2/3" />
+                      <div className="mt-auto flex justify-between items-center">
+                        <div className="h-7 bg-stone-200 rounded-full w-1/3" />
+                        <div className="w-14 h-14 bg-stone-200 rounded-2xl" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : allProducts.length > 0 ? (
               allProducts.map((product, index) => (
                 <ProductCard 
                   key={product.id} 
@@ -535,8 +642,31 @@ const Marketplace = () => {
                 />
               ))
             ) : (
-              <div className="w-full py-20 text-center bg-stone-50 rounded-3xl border border-dashed border-black/10">
-                <p className="text-black/40 font-medium">No products found in this category.</p>
+              <div className="w-full py-20 text-center bg-stone-50 rounded-3xl border border-dashed border-black/10 flex flex-col items-center gap-4">
+                <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-black/5">
+                  <PackageSearch size={26} className="text-black/20" />
+                </div>
+                <div>
+                  <p className="text-black/50 font-semibold mb-1">No products found</p>
+                  <p className="text-black/30 text-sm">
+                    {filter !== 'All' || subFilter !== 'All' || ratingFilter !== 'All'
+                      ? 'Try clearing the active filters above.'
+                      : 'No products have been added to the marketplace yet.'}
+                  </p>
+                  {isAdmin && filter === 'All' && subFilter === 'All' && ratingFilter === 'All' && (
+                    <p className="mt-2 text-amber-600/80 text-xs font-medium">
+                      Admin: check the browser console for Firestore query details.
+                    </p>
+                  )}
+                </div>
+                {(filter !== 'All' || subFilter !== 'All' || ratingFilter !== 'All') && (
+                  <button
+                    onClick={() => { setFilter('All'); setSubFilter('All'); setRatingFilter('All'); }}
+                    className="mt-2 px-5 py-2 bg-black text-white rounded-full text-xs font-bold hover:bg-stone-800 transition-all"
+                  >
+                    Clear filters
+                  </button>
+                )}
               </div>
             )}
           </AnimatePresence>
@@ -553,7 +683,6 @@ const Marketplace = () => {
         </div>
         <span className="text-[10px] font-bold uppercase tracking-widest text-black/30">Swipe to browse</span>
       </div>
-
       {/* Service Providers Section */}
       <div className="mt-32">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
