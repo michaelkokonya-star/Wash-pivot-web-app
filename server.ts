@@ -1,7 +1,6 @@
 import express from 'express';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import cors from 'cors';
 import Stripe from 'stripe';
 import axios from 'axios';
@@ -92,9 +91,6 @@ console.log('NODE_ENV:', process.env.NODE_ENV);
 console.log('PORT:', process.env.PORT);
 console.log('Stripe Initialized:', !!stripe);
 console.log('M-Pesa Configured:', !!(mpesaConfig.consumerKey && mpesaConfig.consumerSecret));
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
@@ -431,7 +427,16 @@ async function startServer() {
       app.use(vite.middlewares);
     } else {
       console.log('Starting in production mode...');
+      console.log('process.cwd():', process.cwd());
       const distPath = path.join(process.cwd(), 'dist');
+      console.log('distPath:', distPath);
+
+      if (!distPath) {
+        throw new Error('distPath resolved to an empty value — cannot serve static files');
+      }
+      if (!existsSync(distPath)) {
+        throw new Error(`dist directory not found at: ${distPath} — ensure the build step ran before starting the server`);
+      }
       console.log(`Serving static files from: ${distPath}`);
       
       // Serve static files with caching for hashed assets
