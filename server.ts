@@ -1,6 +1,5 @@
 import express from 'express';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { readFileSync } from 'fs';
 import cors from 'cors';
 import Stripe from 'stripe';
@@ -92,9 +91,6 @@ console.log('NODE_ENV:', process.env.NODE_ENV);
 console.log('PORT:', process.env.PORT);
 console.log('Stripe Initialized:', !!stripe);
 console.log('M-Pesa Configured:', !!(mpesaConfig.consumerKey && mpesaConfig.consumerSecret));
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
