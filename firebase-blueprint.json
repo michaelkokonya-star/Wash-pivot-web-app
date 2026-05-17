@@ -202,6 +202,28 @@
         "value": { "type": "object", "description": "JSON object containing setting configuration" },
         "updatedAt": { "type": "string", "format": "date-time" }
       }
+    },
+    "TeamMember": {
+      "title": "Team Member",
+      "description": "Information about a team member for the Meet the Team section.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "bio": { "type": "string" },
+        "image": { "type": "string" },
+        "socials": {
+          "type": "object",
+          "properties": {
+            "twitter": { "type": "string" },
+            "linkedin": { "type": "string" },
+            "mail": { "type": "string" }
+          }
+        },
+        "order": { "type": "number", "description": "Display order" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "role", "image"]
     }
   },
   "firestore": {
@@ -236,6 +258,10 @@
     "/settings/{settingId}": {
       "schema": "Setting",
       "description": "System-wide settings (pricing, delivery, etc.)."
+    },
+    "/team_members/{memberId}": {
+      "schema": "TeamMember",
+      "description": "Team members shown on the team page."
     }
   }
 }

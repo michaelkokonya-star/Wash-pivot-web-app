@@ -1,7 +1,7 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync } from 'fs';
 import cors from 'cors';
 import Stripe from 'stripe';
 import axios from 'axios';
@@ -11,7 +11,6 @@ import { GoogleGenAI } from "@google/genai";
 import uploadRoutes from './routes/upload.ts';
 import settingsRoutes from './routes/settings.ts';
 import dataRoutes from './routes/data.ts';
-import imageRoutes from './routes/images.ts';
 
 dotenv.config();
 
@@ -94,23 +93,8 @@ console.log('PORT:', process.env.PORT);
 console.log('Stripe Initialized:', !!stripe);
 console.log('M-Pesa Configured:', !!(mpesaConfig.consumerKey && mpesaConfig.consumerSecret));
 
-// Resolve __dirname safely for both runtimes:
-//   - Production (esbuild --format=cjs): import.meta.url is undefined; esbuild injects
-//     __dirname as a native CJS global, so we must NOT shadow it with a bad declaration.
-//   - Development (tsx / native ESM): __dirname is not defined, so we derive it from
-//     import.meta.url.
-// We use a helper variable name to avoid redeclaring the CJS global.
-const _serverDir: string = (() => {
-  try {
-    // Works in ESM / tsx dev mode
-    if (typeof import.meta?.url === 'string') {
-      return path.dirname(fileURLToPath(import.meta.url));
-    }
-  } catch (_) { /* ignore */ }
-  // Falls back to the CJS __dirname injected by esbuild, or process.cwd()
-  // eslint-disable-next-line no-undef
-  return (typeof __dirname === 'string' ? __dirname : process.cwd());
-})();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
@@ -146,7 +130,6 @@ async function startServer() {
     app.use('/api', uploadRoutes);
     app.use('/api/settings', settingsRoutes);
     app.use('/api/data', dataRoutes);
-    app.use('/api/images', imageRoutes);
 
     // API routes
     app.get('/api/health', (req, res) => {
@@ -448,56 +431,29 @@ async function startServer() {
       app.use(vite.middlewares);
     } else {
       console.log('Starting in production mode...');
-
-      // _serverDir resolves to the directory containing the compiled server file.
-      // In the esbuild CJS bundle (dist/server.cjs) that is the dist/ folder itself,
-      // so _serverDir and the static assets share the same parent directory.
-      // We also accept an explicit DIST_PATH env var as an escape hatch.
-      const distPath: string = process.env.DIST_PATH
-        || path.join(_serverDir, '.')   // dist/server.cjs lives inside dist/
-        || path.join(process.cwd(), 'dist'); // last-resort fallback
-
-      // Validate that distPath is a non-empty string before using it
-      if (!distPath || typeof distPath !== 'string') {
-        console.error('FATAL: distPath is undefined or not a string. Cannot serve static files.');
-        process.exit(1);
-      }
-
+      const distPath = path.join(process.cwd(), 'dist');
       console.log(`Serving static files from: ${distPath}`);
-
-      // Verify the dist directory actually exists before wiring up static middleware
-      if (!existsSync(distPath)) {
-        console.error(`FATAL: dist directory not found at "${distPath}". Run "npm run build" first.`);
-        process.exit(1);
-      }
-
-      const indexPath = path.join(distPath, 'index.html');
-      if (!existsSync(indexPath)) {
-        console.error(`FATAL: index.html not found at "${indexPath}". The build may be incomplete.`);
-        process.exit(1);
-      }
-
+      
       // Serve static files with caching for hashed assets
       app.use(express.static(distPath, {
         maxAge: '1y',
         immutable: true,
         index: false, // Don't serve index.html from here, we handle it below
       }));
-
+      
       // Handle SPA routing - serve index.html for all non-API routes
-      // Express 5 requires an explicit wildcard parameter; bare '*' is invalid.
-      app.all('/{*path}', (req, res) => {
+      app.get('*all', (req, res) => {
+        const indexPath = path.join(distPath, 'index.html');
+        
         // Prevent caching of index.html to ensure users always get the latest version
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.setHeader('Pragma', 'no-cache');
         res.setHeader('Expires', '0');
-
+        
         res.sendFile(indexPath, (err) => {
           if (err) {
             console.error('Error sending index.html:', err);
-            if (!res.headersSent) {
-              res.status(500).send('Internal Server Error');
-            }
+            res.status(500).send('Internal Server Error');
           }
         });
       });

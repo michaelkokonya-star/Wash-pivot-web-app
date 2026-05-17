@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { Users, ShoppingBag, Droplets, Shield, CheckCircle2, XCircle, Search, Filter, Edit, Trash2, Plus, Eye, EyeOff, Key, Package, TrendingUp, DollarSign, PieChart, Check, X, BarChart as BarChartIcon, Activity, Briefcase, Award, Mail, Loader2, Sun, Truck, Copy } from 'lucide-react';
+import { toast } from 'sonner';
+import { Users, ShoppingBag, Droplets, Shield, CheckCircle2, XCircle, Search, Filter, Edit, Trash2, Plus, Eye, EyeOff, Key, Package, TrendingUp, DollarSign, PieChart, Check, X, BarChart as BarChartIcon, Activity, Briefcase, Award, Mail, Loader2, Sun, Truck, Copy, Image as ImageIcon } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
 import { db } from '../firebase';
-import { collection, query, getDocs, doc, updateDoc, deleteDoc, setDoc, orderBy, where, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { collection, query, getDocs, doc, updateDoc, deleteDoc, setDoc, orderBy, where, onSnapshot, serverTimestamp, addDoc } from 'firebase/firestore';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   BarChart, Bar, Legend, AreaChart, Area, PieChart as RePieChart, Pie, Cell, LabelList, Sector 
@@ -476,6 +477,316 @@ const SecuritySettings = ({ onSuccess, onError }: { onSuccess: () => void, onErr
   );
 };
 
+const TeamManagement = ({ teamMembers, onRefresh }: { teamMembers: any[], onRefresh: () => void, isAdmin: boolean }) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    role: '',
+    bio: '',
+    image: '',
+    socials: { twitter: '', linkedin: '', mail: '' },
+    order: 0
+  });
+
+  const handleOpenModal = (member?: any) => {
+    if (member) {
+      setEditingMember(member);
+      setFormData({
+        name: member.name || '',
+        role: member.role || '',
+        bio: member.bio || '',
+        image: member.image || '',
+        socials: {
+          twitter: member.socials?.twitter || '',
+          linkedin: member.socials?.linkedin || '',
+          mail: member.socials?.mail || ''
+        },
+        order: member.order || 0
+      });
+    } else {
+      setEditingMember(null);
+      setFormData({
+        name: '',
+        role: '',
+        bio: '',
+        image: '',
+        socials: { twitter: '', linkedin: '', mail: '' },
+        order: teamMembers.length
+      });
+    }
+    setIsModalOpen(true);
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLoading(true);
+    const uploadData = new FormData();
+    uploadData.append('file', file);
+
+    try {
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: uploadData,
+      });
+
+      if (!response.ok) throw new Error('Upload failed');
+      const data = await response.json();
+      setFormData(prev => ({ ...prev, image: data.url }));
+      toast.success('Image uploaded successfully');
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast.error('Failed to upload image');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const memberData = {
+        ...formData,
+        updatedAt: serverTimestamp(),
+        createdAt: editingMember ? editingMember.createdAt : serverTimestamp()
+      };
+
+      if (editingMember) {
+        await updateDoc(doc(db, 'team_members', editingMember.id), memberData);
+        toast.success('Team member updated');
+      } else {
+        await addDoc(collection(db, 'team_members'), memberData);
+        toast.success('Team member added');
+      }
+      setIsModalOpen(false);
+      onRefresh();
+    } catch (error) {
+      console.error('Error saving team member:', error);
+      toast.error('Failed to save team member');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this team member?')) return;
+    try {
+      await deleteDoc(doc(db, 'team_members', id));
+      toast.success('Team member deleted');
+      onRefresh();
+    } catch (error) {
+      console.error('Error deleting team member:', error);
+      toast.error('Failed to delete team member');
+    }
+  };
+
+  return (
+    <div className="p-8 space-y-8">
+      <div className="flex justify-between items-center">
+        <div>
+          <h3 className="font-bold text-xl mb-2">Team Management</h3>
+          <p className="text-xs text-black/40">Manage people appearing on the "Meet the Team" section.</p>
+        </div>
+        <button 
+          onClick={() => handleOpenModal()}
+          className="px-6 py-3 bg-black text-white rounded-2xl font-bold hover:bg-stone-800 transition-all flex items-center gap-2"
+        >
+          <Plus size={18} />
+          <span>Add Member</span>
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {teamMembers.sort((a,b) => (a.order || 0) - (b.order || 0)).map(member => (
+          <div key={member.id} className="bg-stone-50 rounded-[2rem] border border-black/5 p-6 space-y-4">
+            <div className="aspect-[3/4] rounded-2xl overflow-hidden bg-stone-100 relative group">
+              <OptimizedImage 
+                src={member.image} 
+                className="w-full h-full object-cover"
+                alt={member.name}
+              />
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                <button 
+                  onClick={() => handleOpenModal(member)}
+                  className="p-3 bg-white rounded-full text-black hover:bg-emerald-500 hover:text-white transition-all shadow-xl"
+                >
+                  <Edit size={20} />
+                </button>
+                <button 
+                  onClick={() => handleDelete(member.id)}
+                  className="p-3 bg-white rounded-full text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-xl"
+                >
+                  <Trash2 size={20} />
+                </button>
+              </div>
+            </div>
+            <div>
+              <h4 className="font-bold text-lg uppercase tracking-tight">{member.name}</h4>
+              <p className="text-emerald-600 text-[10px] font-bold uppercase tracking-widest">{member.role}</p>
+            </div>
+          </div>
+        ))}
+        {teamMembers.length === 0 && (
+          <div className="col-span-full py-20 text-center bg-stone-50/50 rounded-[2rem] border border-dashed border-black/10">
+            <Users size={48} className="mx-auto mb-4 text-black/10" />
+            <p className="text-sm text-black/30">No team members added yet.</p>
+          </div>
+        )}
+      </div>
+
+      <AnimatePresence>
+        {isModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }}
+              onClick={() => setIsModalOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-2xl bg-white rounded-[3rem] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+            >
+              <div className="p-8 border-b border-black/5 flex justify-between items-center shrink-0">
+                <h3 className="text-2xl font-bold uppercase tracking-tight">
+                  {editingMember ? 'Edit Team Member' : 'Add Team Member'}
+                </h3>
+                <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-stone-100 rounded-full transition-colors flash">
+                  <X />
+                </button>
+              </div>
+
+              <form onSubmit={handleSubmit} className="p-8 space-y-6 overflow-y-auto">
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-black/40 ml-4">Full Name</label>
+                    <input 
+                      required
+                      value={formData.name}
+                      onChange={e => setFormData({ ...formData, name: e.target.value })}
+                      className="w-full px-6 py-4 bg-stone-50 border border-black/5 rounded-2xl focus:outline-none focus:border-emerald-600 transition-colors font-medium"
+                      placeholder="e.g. John Doe"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-black/40 ml-4">Role</label>
+                    <input 
+                      required
+                      value={formData.role}
+                      onChange={e => setFormData({ ...formData, role: e.target.value })}
+                      className="w-full px-6 py-4 bg-stone-50 border border-black/5 rounded-2xl focus:outline-none focus:border-emerald-600 transition-colors font-medium"
+                      placeholder="e.g. CEO & Founder"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-black/40 ml-4">Bio</label>
+                  <textarea 
+                    value={formData.bio}
+                    onChange={e => setFormData({ ...formData, bio: e.target.value })}
+                    className="w-full px-6 py-4 bg-stone-50 border border-black/5 rounded-2xl focus:outline-none focus:border-emerald-600 transition-colors font-medium min-h-[100px]"
+                    placeholder="Short professional biography..."
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-black/40 ml-4 block border-b pb-2">Social Links</label>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <input 
+                      placeholder="Twitter URL"
+                      value={formData.socials.twitter}
+                      onChange={e => setFormData({ ...formData, socials: { ...formData.socials, twitter: e.target.value }})}
+                      className="px-4 py-3 bg-stone-50 border border-black/5 rounded-xl text-xs focus:outline-none focus:border-emerald-600"
+                    />
+                    <input 
+                      placeholder="LinkedIn URL"
+                      value={formData.socials.linkedin}
+                      onChange={e => setFormData({ ...formData, socials: { ...formData.socials, linkedin: e.target.value }})}
+                      className="px-4 py-3 bg-stone-50 border border-black/5 rounded-xl text-xs focus:outline-none focus:border-emerald-600"
+                    />
+                    <input 
+                      placeholder="Email Address"
+                      value={formData.socials.mail}
+                      onChange={e => setFormData({ ...formData, socials: { ...formData.socials, mail: e.target.value }})}
+                      className="px-4 py-3 bg-stone-50 border border-black/5 rounded-xl text-xs focus:outline-none focus:border-emerald-600"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-black/40 ml-4">Profile Photo</label>
+                  <div className="flex items-center gap-6 p-6 bg-stone-50 border border-black/5 rounded-[2.5rem]">
+                    <div className="w-24 h-24 rounded-2xl bg-white border border-black/5 overflow-hidden shrink-0 flex items-center justify-center">
+                      {formData.image ? (
+                        <OptimizedImage src={formData.image} className="w-full h-full object-cover" alt="Preview" />
+                      ) : (
+                        <ImageIcon className="text-black/10" size={32} />
+                      )}
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <p className="text-[10px] font-bold text-black/40 uppercase tracking-widest">Recommended size: 800x1000px</p>
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleImageUpload}
+                        className="hidden" 
+                        id="team-photo-upload"
+                      />
+                      <label 
+                        htmlFor="team-photo-upload"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-black/10 rounded-xl text-xs font-bold hover:bg-stone-50 transition-colors cursor-pointer"
+                      >
+                        {loading ? <Loader2 className="animate-spin" size={14} /> : <ImageIcon size={14} />}
+                        {formData.image ? 'Change Photo' : 'Upload Photo'}
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-black/40 ml-4">Display Order</label>
+                  <input 
+                    type="number"
+                    value={formData.order}
+                    onChange={e => setFormData({ ...formData, order: parseInt(e.target.value) })}
+                    className="w-full px-6 py-4 bg-stone-50 border border-black/5 rounded-2xl focus:outline-none focus:border-emerald-600 transition-colors font-medium"
+                  />
+                </div>
+
+                <div className="pt-4 flex justify-end gap-4 shrink-0 mt-auto">
+                  <button 
+                    type="button"
+                    onClick={() => setIsModalOpen(false)}
+                    className="px-8 py-4 font-bold text-sm text-black/40 hover:text-black transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit"
+                    disabled={loading || !formData.name || !formData.role || !formData.image}
+                    className="px-10 py-4 bg-black text-white rounded-2xl font-bold hover:bg-stone-800 transition-all shadow-xl shadow-black/10 disabled:opacity-50"
+                  >
+                    {loading ? <Loader2 className="animate-spin" /> : editingMember ? 'Update Member' : 'Add Team Member'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { user, profile, resetPassword, loading: authLoading, authFetch } = useAuth();
@@ -483,8 +794,9 @@ const AdminDashboard = () => {
   const [products, setProducts] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'users' | 'products' | 'projects' | 'orders' | 'analytics' | 'services' | 'experts' | 'pricing' | 'delivery' | 'security'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'products' | 'projects' | 'orders' | 'analytics' | 'services' | 'experts' | 'pricing' | 'delivery' | 'security' | 'team'>('users');
   const [userFilter, setUserFilter] = useState<'all' | 'pending' | 'approved'>('all');
   const [serviceFilter, setServiceFilter] = useState<'all' | 'pending' | 'approved'>('all');
   const [projectFilter, setProjectFilter] = useState<'all' | 'pending' | 'active' | 'completed' | 'rejected'>('all');
@@ -580,6 +892,11 @@ const AdminDashboard = () => {
         const fetchedProjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setProjects(fetchedProjects);
         setStats(prev => ({ ...prev, projectCount: fetchedProjects.length }));
+      } else if (activeTab === 'team') {
+        const q = query(collection(db, 'team_members'), orderBy('order', 'asc'));
+        const snapshot = await getDocs(q);
+        const fetchedTeam = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setTeamMembers(fetchedTeam);
       } else if (activeTab === 'analytics') {
         const [ordersSnap, usersSnap] = await Promise.all([
           getDocs(query(collection(db, 'orders'), orderBy('createdAt', 'desc'))),
@@ -729,6 +1046,34 @@ const AdminDashboard = () => {
     } catch (error) {
       console.error("Error toggling contacts:", error);
       setMessage({ type: 'error', text: 'Failed to update contact visibility' });
+    }
+  };
+
+  const handleUserPhotoUpload = async (userId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    toast.loading('Uploading photo...');
+    const uploadData = new FormData();
+    uploadData.append('file', file);
+
+    try {
+      const response = await fetch('/api/upload', { method: 'POST', body: uploadData });
+      if (!response.ok) throw new Error('Upload failed');
+      const data = await response.json();
+      
+      await updateDoc(doc(db, 'users', userId), { 
+        photoURL: data.url,
+        updatedAt: serverTimestamp()
+      });
+      
+      setUsers(users.map(u => u.id === userId ? { ...u, photoURL: data.url } : u));
+      toast.dismiss();
+      toast.success('User photo updated');
+    } catch (error) {
+      console.error('Error uploading user photo:', error);
+      toast.dismiss();
+      toast.error('Failed to upload photo');
     }
   };
 
@@ -898,6 +1243,7 @@ const AdminDashboard = () => {
             { id: 'services', label: 'Services', icon: Briefcase, count: services.filter(s => !s.isApproved).length },
             { id: 'orders', label: 'Orders', icon: Package },
             { id: 'projects', label: 'Projects', icon: Droplets, count: projects.filter(p => !p.isApproved).length },
+            { id: 'team', label: 'Team', icon: Users },
             { id: 'pricing', label: 'Pricing', icon: DollarSign },
             { id: 'delivery', label: 'Delivery', icon: Truck },
             { id: 'security', label: 'Security', icon: Shield },
@@ -1024,6 +1370,14 @@ const AdminDashboard = () => {
           />
         )}
 
+        {activeTab === 'team' && (
+          <TeamManagement 
+            teamMembers={teamMembers} 
+            onRefresh={fetchData}
+            isAdmin={isAdmin}
+          />
+        )}
+
         {activeTab === 'users' && (
           <div className="space-y-6">
             <div className="p-8 border-b border-black/5 flex flex-col md:flex-row justify-between items-start md:items-center bg-stone-50/30 gap-4">
@@ -1146,6 +1500,20 @@ const AdminDashboard = () => {
                     </td>
                     <td className="px-8 py-6">
                       <div className="flex items-center space-x-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          id={`photo-upload-${u.id}`}
+                          className="hidden"
+                          onChange={(e) => handleUserPhotoUpload(u.id, e)}
+                        />
+                        <label
+                          htmlFor={`photo-upload-${u.id}`}
+                          className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                          title="Upload Photo"
+                        >
+                          <ImageIcon size={16} />
+                        </label>
                         <button
                           onClick={() => handleResetPassword(u.email)}
                           className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"

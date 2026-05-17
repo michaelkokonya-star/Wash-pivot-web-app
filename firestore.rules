@@ -139,6 +139,17 @@ service cloud.firestore {
              (!('createdAt' in data) || data.createdAt == request.time);
     }
 
+    function isValidTeamMember(data) {
+      return hasOnlyAllowedFields(['name', 'role', 'bio', 'image', 'socials', 'order', 'createdAt']) &&
+             data.name is string && data.name.size() > 0 &&
+             data.role is string && data.role.size() > 0 &&
+             data.image is string &&
+             (!('bio' in data) || data.bio is string) &&
+             (!('socials' in data) || data.socials is map) &&
+             (!('order' in data) || data.order is number) &&
+             (!('createdAt' in data) || data.createdAt == request.time);
+    }
+
     // ===============================================================
     // Collection Rules
     // ===============================================================
@@ -222,6 +233,13 @@ service cloud.firestore {
       allow create: if isVerifiedUser() && isValidSolarKit(incoming());
       allow update: if isVerifiedUser() && isOwner(existing().userId) && isValidSolarKit(incoming());
       allow delete: if isVerifiedUser() && isOwner(existing().userId);
+    }
+
+    match /team_members/{memberId} {
+      allow get: if isValidId(memberId);
+      allow list: if true;
+      allow create, update: if isAdmin() && isValidTeamMember(incoming());
+      allow delete: if isAdmin();
     }
   }
 }
