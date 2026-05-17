@@ -35,6 +35,13 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
 
     try {
       const urlObj = new URL(url);
+
+      // S3 / t3.storageapi.dev — route through server-side proxy to handle auth & CORS
+      if (urlObj.hostname.includes('t3.storageapi.dev') || urlObj.hostname.includes('storageapi.dev')) {
+        const proxyUrl = `/api/images/proxy?url=${encodeURIComponent(url)}`;
+        console.log(`[OptimizedImage] Routing S3 URL through proxy: ${proxyUrl}`);
+        return proxyUrl;
+      }
       
       // Unsplash optimization
       if (urlObj.hostname.includes('unsplash.com')) {
