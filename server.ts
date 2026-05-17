@@ -11,6 +11,7 @@ import { GoogleGenAI } from "@google/genai";
 import uploadRoutes from './routes/upload.ts';
 import settingsRoutes from './routes/settings.ts';
 import dataRoutes from './routes/data.ts';
+import imageRoutes from './routes/images.ts';
 
 dotenv.config();
 
@@ -145,6 +146,7 @@ async function startServer() {
     app.use('/api', uploadRoutes);
     app.use('/api/settings', settingsRoutes);
     app.use('/api/data', dataRoutes);
+    app.use('/api/images', imageRoutes);
 
     // API routes
     app.get('/api/health', (req, res) => {
@@ -483,7 +485,8 @@ async function startServer() {
       }));
 
       // Handle SPA routing - serve index.html for all non-API routes
-      app.get('*', (req, res) => {
+      // Express 5 requires an explicit wildcard parameter; bare '*' is invalid.
+      app.all('/{*path}', (req, res) => {
         // Prevent caching of index.html to ensure users always get the latest version
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.setHeader('Pragma', 'no-cache');
