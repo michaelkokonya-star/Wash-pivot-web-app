@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { 
   Plus, 
   Trash2, 
@@ -344,9 +345,18 @@ const SolarKitBuilder: React.FC = () => {
       doc.text(`Total Peak Power Requirement: ${totalPeakLoadW.toLocaleString()} W`, 14, hardwareTableEndY + 38);
       
       if (selectedHardware.length > 0) {
+        const hardwareCost = totalPriceEstimate;
+        const expertFee = Math.round(hardwareCost * 0.15);
+        const totalProjectCost = hardwareCost + expertFee;
+
+        doc.setFontSize(11);
+        doc.setTextColor(100);
+        doc.text(`Hardware Component Costs: KSh ${hardwareCost.toLocaleString()}`, 14, hardwareTableEndY + 45);
+        doc.text(`Expert Installation & Commissioning (15%): KSh ${expertFee.toLocaleString()}`, 14, hardwareTableEndY + 53);
+        
         doc.setFontSize(14);
         doc.setTextColor(16, 185, 129);
-        doc.text(`TOTAL ESTIMATED COST: KSh ${totalPriceEstimate.toLocaleString()}`, 14, hardwareTableEndY + 50);
+        doc.text(`TOTAL ESTIMATED PROJECT OUTLAY: KSh ${totalProjectCost.toLocaleString()}`, 14, hardwareTableEndY + 65);
       }
       
       // Footer
@@ -376,6 +386,10 @@ const SolarKitBuilder: React.FC = () => {
       return;
     }
 
+    const hardwareCost = totalPriceEstimate;
+    const expertFee = Math.round(hardwareCost * 0.15);
+    const totalProjectCost = hardwareCost + expertFee;
+
     setIsSaving(true);
     try {
       await addDoc(collection(db, 'solar_kits'), {
@@ -393,6 +407,8 @@ const SolarKitBuilder: React.FC = () => {
         totalDailyLoadWh,
         totalPeakLoadW,
         totalPriceEstimate,
+        expertFee,
+        totalProjectCost,
         recommendations: {
           panelW: recommendedPanelW,
           batteryWh: recommendedBatteryWh,
@@ -891,61 +907,160 @@ const SolarKitBuilder: React.FC = () => {
               </div>
 
               <div className="bg-stone-900 text-white p-8 rounded-[2rem] space-y-8">
-                <div className="flex justify-between items-start">
+                <div className="flex flex-col md:flex-row justify-between items-start gap-4 pb-6 border-b border-white/10">
                   <div>
-                    <h4 className="text-emerald-400 text-xs font-bold uppercase tracking-widest mb-1">Unified Document</h4>
-                    <h5 className="text-2xl font-bold tracking-tight">{kitName}</h5>
+                    <h4 className="text-emerald-400 text-xs font-bold uppercase tracking-widest mb-1">Unified Concept Summary</h4>
+                    <h5 className="text-3xl font-bold tracking-tight">{kitName}</h5>
                   </div>
                   <div className="text-right">
-                    <p className="text-emerald-400 text-xs font-bold uppercase tracking-widest mb-1">Estimated Total</p>
-                    <p className="text-3xl font-bold tracking-tighter">KSh {totalPriceEstimate.toLocaleString()}</p>
+                    <p className="text-emerald-400 text-xs font-bold uppercase tracking-widest mb-1">Estimated Investment</p>
+                    <p className="text-4xl font-black tracking-tighter text-emerald-400">
+                      KSh {(totalPriceEstimate + Math.round(totalPriceEstimate * 0.15)).toLocaleString()}
+                    </p>
+                    <span className="text-[10px] text-white/40 block">Includes 15% Expert Deployment Fee</span>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  <div className="space-y-4">
-                    <h6 className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Load Summary</h6>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-white/60">Daily Consumption</span>
-                        <span className="font-bold">{totalDailyLoadWh.toLocaleString()} Wh</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-white/60">Peak Power Demand</span>
-                        <span className="font-bold">{totalPeakLoadW.toLocaleString()} W</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h6 className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Hardware Specs</h6>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-white/60">Solar Array</span>
-                        <span className="font-bold text-emerald-400">{recommendedPanelW}W</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-white/60">Storage Capacity</span>
-                        <span className="font-bold text-blue-400">{recommendedBatteryWh}Wh</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h6 className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Marketplace Selection</h6>
-                    <div className="space-y-2">
-                      {selectedHardware.slice(0, 3).map((p, idx) => (
-                        <div key={`${p.id}-${idx}`} className="flex justify-between text-sm">
-                          <span className="text-white/60 truncate max-w-[120px]">{p.name} ({p.selectedRating})</span>
-                          <span className="font-bold">KSh {p.selectedPrice.toLocaleString()}</span>
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+                  {/* Left Column: Tech spec details (7 of 12) */}
+                  <div className="lg:col-span-7 space-y-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                      {/* Load Summary */}
+                      <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5 space-y-3">
+                        <h6 className="text-[10px] uppercase tracking-widest text-[#10B981] font-bold">Load Summary</h6>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-white/60">Daily Consumption</span>
+                            <span className="font-bold">{totalDailyLoadWh.toLocaleString()} Wh</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-white/60">Peak Power Demand</span>
+                            <span className="font-bold">{totalPeakLoadW.toLocaleString()} W</span>
+                          </div>
                         </div>
-                      ))}
-                      {selectedHardware.length > 3 && (
-                        <p className="text-[10px] text-white/30">+{selectedHardware.length - 3} more items</p>
+                      </div>
+
+                      {/* Hardware Specs */}
+                      <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5 space-y-3">
+                        <h6 className="text-[10px] uppercase tracking-widest text-blue-400 font-bold">Hardware Specs</h6>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-white/60">Solar Array</span>
+                            <span className="font-bold text-emerald-400">{recommendedPanelW}W</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-white/60">Storage Capacity</span>
+                            <span className="font-bold text-blue-400">{recommendedBatteryWh}Wh</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Detailed Component Log */}
+                    <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-6 space-y-4">
+                      <h6 className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Marketplace Selection List</h6>
+                      <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-2 custom-scrollbar">
+                        {selectedHardware.map((p, idx) => (
+                          <div key={`${p.id}-${idx}`} className="flex justify-between items-center text-sm py-2 border-b border-white/5 last:border-none">
+                            <div className="flex-1 min-w-0 pr-4">
+                              <p className="font-bold text-white truncate">{p.name}</p>
+                              <p className="text-[10px] text-white/40">{p.selectedRating} • Qty {p.quantity}</p>
+                            </div>
+                            <span className="font-bold text-white/90 font-mono shrink-0">KSh {(p.selectedPrice * p.quantity).toLocaleString()}</span>
+                          </div>
+                        ))}
+                        {selectedHardware.length === 0 && (
+                          <p className="text-xs text-white/20 italic">No hardware selected</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Cost Breakdown & Recharts Pie Chart (5 of 12) */}
+                  <div className="lg:col-span-5 bg-white/[0.03] border border-white/[0.08] rounded-3xl p-6 flex flex-col justify-between relative overflow-hidden">
+                    <div className="space-y-1">
+                      <h6 className="text-[10px] uppercase tracking-[0.15em] text-stone-400 font-bold">Cost Breakdown Visualizer</h6>
+                      <p className="text-xs text-white/60">Interactive analysis of kit procurement</p>
+                    </div>
+
+                    {/* RECHARTS PIE CHART */}
+                    <div className="h-44 flex items-center justify-center relative my-4">
+                      {totalPriceEstimate > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={[
+                                { name: 'Hardware Components', value: totalPriceEstimate },
+                                { name: 'Expert Fees (15%)', value: Math.round(totalPriceEstimate * 0.15) }
+                              ]}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={48}
+                              outerRadius={68}
+                              paddingAngle={4}
+                              dataKey="value"
+                            >
+                              <Cell fill="#10B981" />
+                              <Cell fill="#3B82F6" />
+                            </Pie>
+                            <Tooltip 
+                              content={({ active, payload }) => {
+                                if (active && payload && payload.length) {
+                                  const data = payload[0].payload;
+                                  const totalVal = totalPriceEstimate + Math.round(totalPriceEstimate * 0.15);
+                                  return (
+                                    <div className="bg-stone-850 border border-white/10 p-3 rounded-xl shadow-xl text-xs">
+                                      <p className="font-bold text-white">{data.name}</p>
+                                      <p className="text-emerald-450 font-mono mt-1 font-semibold">
+                                        KSh {data.value.toLocaleString()} 
+                                        <span className="text-stone-400 text-[10px] ml-1.5">({((data.value / totalVal) * 100).toFixed(1)}%)</span>
+                                      </p>
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              }}
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="text-center text-xs text-white/30">Add hardware to render chart</div>
                       )}
-                      {selectedHardware.length === 0 && (
-                        <p className="text-xs text-white/20 italic">No hardware selected</p>
+                      
+                      {totalPriceEstimate > 0 && (
+                        <div className="absolute text-center select-none pointer-events-none">
+                          <span className="text-[8px] uppercase tracking-wider text-stone-500 block">Expert</span>
+                          <span className="text-xs font-bold text-blue-400 font-mono">15% Fee</span>
+                        </div>
                       )}
+                    </div>
+
+                    {/* Financial Ledger Details */}
+                    <div className="space-y-3 pt-3 border-t border-white/5">
+                      <div className="flex justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-[#10B981]" />
+                          <span className="text-white/60">Hardware costs</span>
+                        </div>
+                        <span className="font-bold font-mono">KSh {totalPriceEstimate.toLocaleString()}</span>
+                      </div>
+
+                      <div className="flex justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-[#3B82F6]" />
+                          <span className="text-white/60">Expert deployment fee</span>
+                        </div>
+                        <span className="font-bold font-mono">KSh {Math.round(totalPriceEstimate * 0.15).toLocaleString()}</span>
+                      </div>
+
+                      <div className="h-px bg-white/10 my-2" />
+
+                      <div className="flex justify-between items-center bg-black/35 p-3 rounded-xl border border-white/5">
+                        <span className="text-xs font-bold text-white">Project Total</span>
+                        <span className="text-lg font-black font-mono text-emerald-400">
+                          KSh {(totalPriceEstimate + Math.round(totalPriceEstimate * 0.15)).toLocaleString()}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -27,21 +27,11 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
 
   // Function to optimize Unsplash/Picsum URLs
   const getOptimizedUrl = (url: string) => {
-    if (!url) {
-      console.warn(`[OptimizedImage] src is empty/missing for alt="${alt}". Using placeholder.`);
-      return `https://picsum.photos/seed/${encodeURIComponent(alt)}/800/600`;
-    }
+    if (!url) return `https://picsum.photos/seed/${encodeURIComponent(alt)}/800/600`;
     if (url.startsWith('data:')) return url; // Base64 images (like GenAI output)
 
     try {
       const urlObj = new URL(url);
-
-      // S3 / t3.storageapi.dev — route through server-side proxy to handle auth & CORS
-      if (urlObj.hostname.includes('t3.storageapi.dev') || urlObj.hostname.includes('storageapi.dev')) {
-        const proxyUrl = `/api/images/proxy?url=${encodeURIComponent(url)}`;
-        console.log(`[OptimizedImage] Routing S3 URL through proxy: ${proxyUrl}`);
-        return proxyUrl;
-      }
       
       // Unsplash optimization
       if (urlObj.hostname.includes('unsplash.com')) {
@@ -127,14 +117,9 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         transition={{ duration: 0.5 }}
         onLoad={() => setIsLoaded(true)}
         onError={(e) => {
-          console.warn(
-            `[OptimizedImage] ❌ Failed to load image for "${alt}".`,
-            `\n  Original src : ${src || '(empty)'}`,
-            `\n  Optimized src: ${optimizedSrc}`,
-            '\n  Possible causes: invalid URL, CORS/access-denied, network error, or missing Firestore imageUrl field.'
-          );
+          console.warn(`OptimizedImage failed to load: ${optimizedSrc}. Status: Access Denied or Network Error.`);
           const target = e.target as HTMLImageElement;
-          target.src = 'https://via.placeholder.com/800x600?text=Image+Unavailable';
+          target.src = 'https://via.placeholder.com/800x600?text=Access+Denied';
           setHasError(true);
         }}
         loading={priority ? "eager" : "lazy"}

@@ -5,6 +5,8 @@ import { Helmet } from 'react-helmet-async';
 import { Sun, Droplets, ShieldCheck, ArrowRight, Zap, Globe, Users, Sparkles, Loader2, Search, Layers } from 'lucide-react';
 import OptimizedImage from '../components/OptimizedImage';
 import { toast } from 'sonner';
+import { InteractiveImpactCalculator } from '../components/InteractiveImpactCalculator';
+
 
 const Home = () => {
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
@@ -80,42 +82,127 @@ const Home = () => {
         <meta property="og:url" content="https://www.washpivot.com/" />
       </Helmet>
       {/* Hero Section */}
-      <section className="relative h-[90vh] flex items-center overflow-hidden bg-stone-950">
-        <div className="absolute inset-0 z-0 opacity-20">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-emerald-500/20 via-transparent to-transparent" />
-          <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.05) 1px, transparent 0)', backgroundSize: '40px 40px' }} />
+      <section className="relative min-h-[95vh] flex items-center overflow-hidden bg-[#0A0F14]">
+        {/* Decorative Grid and Ambient Lights */}
+        <div className="absolute inset-0 z-0 opacity-25">
+          <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[120px]" />
+          <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-blue-500/10 rounded-full blur-[100px]" />
+          <div className="absolute inset-0 bg-[#0A0F14]" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.03) 1px, transparent 0)', backgroundSize: '30px 30px' }} />
         </div>
-        <div className="absolute inset-0 bg-gradient-to-r from-black via-black/60 to-transparent z-10" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent z-10" />
         
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-20">
-          <motion.div
-            initial={{ opacity: 0, x: -50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8 }}
-            className="max-w-2xl"
-          >
-            <h1 className="text-6xl md:text-8xl font-bold text-white tracking-tighter leading-none mb-6">
-              PIVOT TO <span className="text-emerald-500">SUSTAINABILITY.</span>
-            </h1>
-            <p className="text-xl text-white/70 mb-8 font-light max-w-lg">
-              Wash Pivot is a social enterprise dedicated to providing innovative solar, water, and sanitation solutions for a cleaner, greener future.
-            </p>
-            <div className="flex flex-wrap gap-4">
-              <Link
-                to="/marketplace"
-                className="px-8 py-4 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 transition-all flex items-center space-x-2 group"
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-20 w-full py-16">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+            
+            {/* Left Content Column */}
+            <div className="lg:col-span-7 space-y-8 select-none">
+              <motion.div
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="inline-flex items-center gap-2 px-4 py-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-full text-xs font-black tracking-widest uppercase"
               >
-                <span>Explore Solutions</span>
-                <ArrowRight className="group-hover:translate-x-1 transition-transform" />
-              </Link>
-              <Link
-                to="/funding"
-                className="px-8 py-4 bg-white text-black font-bold rounded-lg hover:bg-white/90 transition-all"
+                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Pioneering WASH Communities</span>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, x: -30 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.6, delay: 0.1 }}
+                className="space-y-4"
               >
-                Support Projects
-              </Link>
+                <h1 className="text-5xl sm:text-7xl md:text-8xl font-black text-white tracking-tighter leading-none">
+                  PIVOT TO <br className="hidden sm:inline" />
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-300">
+                    SUSTAINABILITY.
+                  </span>
+                </h1>
+                <p className="text-lg md:text-xl text-white/60 font-light max-w-xl leading-relaxed">
+                  Wash Pivot builds clean community utility micro-grids. Empowering neighborhoods through durable solar energy, pure water micro-filtration, and community funding.
+                </p>
+              </motion.div>
+
+              {/* Action Buttons */}
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+                className="flex flex-wrap gap-4 pt-2"
+              >
+                <Link
+                  to="/marketplace"
+                  className="px-8 py-4 bg-emerald-600 text-white font-black rounded-2xl hover:bg-emerald-500 transition-all shadow-lg hover:shadow-emerald-500/20 flex items-center space-x-2 group scale-100 hover:scale-[1.03]"
+                >
+                  <span>Explore Solutions</span>
+                  <ArrowRight size={18} className="group-hover:translate-x-1.5 transition-transform duration-300 pointer-events-none" />
+                </Link>
+                <Link
+                  to="/funding"
+                  className="px-8 py-4 bg-white/10 text-white font-semibold backdrop-blur-md rounded-2xl border border-white/15 hover:bg-white/20 transition-all hover:scale-[1.03]"
+                >
+                  Support Projects
+                </Link>
+              </motion.div>
             </div>
-          </motion.div>
+
+            {/* Right Interactive Counter Column (Holographic Card) */}
+            <div className="lg:col-span-5 hidden lg:block">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 30 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                transition={{ duration: 0.8, ease: "circOut" }}
+                className="relative bg-white/[0.03] backdrop-blur-xl border border-white-[0.08] p-8 rounded-[3rem] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] overflow-hidden group hover:border-emerald-500/20 transition-all duration-700"
+              >
+                {/* Ambient Internal Glow */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl group-hover:bg-emerald-500/20 transition-colors duration-500" />
+                
+                <div className="space-y-6 relative z-10 text-white">
+                  <div className="flex justify-between items-center pb-4 border-b border-white/5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+                      <div className="w-2.5 h-2.5 absolute rounded-full bg-emerald-500" />
+                      <span className="text-[10px] uppercase font-black tracking-[0.2em] text-emerald-400">WashPivot Live Node</span>
+                    </div>
+                    <span className="text-xs text-white/40 font-mono font-medium">EST. 2026</span>
+                  </div>
+
+                  {/* Impact Summary Number */}
+                  <div className="space-y-1">
+                    <span className="text-[11px] uppercase font-bold tracking-widest text-stone-400 block">Clean Water Distributed</span>
+                    <h3 className="text-4xl font-extrabold tracking-tight text-white font-mono">1,482,900 L</h3>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-[11px] uppercase font-bold tracking-widest text-stone-400 block">Solar Grid Capacity</span>
+                    <h3 className="text-4xl font-extrabold tracking-tight text-emerald-400 font-mono">142 kW</h3>
+                  </div>
+
+                  {/* Interactive Status Metrics */}
+                  <div className="grid grid-cols-2 gap-4 pt-4">
+                    <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4">
+                      <span className="block text-[10px] text-stone-400 font-bold uppercase tracking-wider mb-1">Active Projects</span>
+                      <strong className="text-xl font-bold">24 Initiatives</strong>
+                    </div>
+                    <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4">
+                      <span className="block text-[10px] text-stone-400 font-bold uppercase tracking-wider mb-1">Impact Radius</span>
+                      <strong className="text-xl font-bold">12 Districts</strong>
+                    </div>
+                  </div>
+
+                  {/* Creative Interactive Link */}
+                  <a 
+                    href="#interactive-impact-calculator" 
+                    className="flex items-center justify-between p-4 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-2xl border border-emerald-500/25 transition-all text-xs font-bold text-emerald-300"
+                  >
+                    <span>Try Sustainability Simulator</span>
+                    <ArrowRight size={14} />
+                  </a>
+                </div>
+              </motion.div>
+            </div>
+
+          </div>
         </div>
       </section>
 
@@ -146,6 +233,7 @@ const Home = () => {
         </div>
       </section>
 
+      <InteractiveImpactCalculator />
 
       {/* Visualizing Impact Section (GenAI) */}
       <section className="py-32 bg-white">

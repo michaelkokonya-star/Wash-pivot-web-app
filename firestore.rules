@@ -133,7 +133,7 @@ service cloud.firestore {
     }
 
     function isValidSolarKit(data) {
-      return hasOnlyAllowedFields(['userId', 'kitName', 'loadRequirements', 'totalDailyLoadWh', 'totalPeakLoadW', 'recommendations', 'createdAt']) &&
+      return hasOnlyAllowedFields(['userId', 'kitName', 'loadRequirements', 'selectedHardware', 'totalDailyLoadWh', 'totalPeakLoadW', 'totalPriceEstimate', 'expertFee', 'totalProjectCost', 'recommendations', 'createdAt', 'updatedAt']) &&
              data.userId == request.auth.uid &&
              data.kitName is string &&
              (!('createdAt' in data) || data.createdAt == request.time);

@@ -8,6 +8,7 @@ import AddProjectModal from '../components/AddProjectModal';
 import OptimizedImage from '../components/OptimizedImage';
 import { db } from '../firebase';
 import { collection, getDocs, query, where, updateDoc, doc } from 'firebase/firestore';
+import { toast } from 'sonner';
 
 const MicroFunding = () => {
   const { user, profile } = useAuth();
@@ -37,15 +38,17 @@ const MicroFunding = () => {
   }, [profile]);
 
   const handleSupport = async (projectId: string, current: number) => {
-    if (!user) return alert('Please sign in to support projects');
+    if (!user) return toast.error('Please sign in to support community projects.');
     try {
       const newFunding = current + 5000;
       await updateDoc(doc(db, 'projects', projectId), {
         currentFunding: newFunding
       });
+      toast.success('Thank you for your support! KSh 5,000 has been added to this community initiative.');
       fetchProjects();
     } catch (error) {
       console.error("Error supporting project:", error);
+      toast.error('Failed to register support. Please try again.');
     }
   };
 

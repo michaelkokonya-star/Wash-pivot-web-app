@@ -180,8 +180,25 @@
             }
           }
         },
+        "selectedHardware": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "rating": { "type": "string" },
+              "price": { "type": "number" },
+              "subCategory": { "type": "string" },
+              "quantity": { "type": "number" }
+            }
+          }
+        },
         "totalDailyLoadWh": { "type": "number" },
         "totalPeakLoadW": { "type": "number" },
+        "totalPriceEstimate": { "type": "number" },
+        "expertFee": { "type": "number" },
+        "totalProjectCost": { "type": "number" },
         "recommendations": {
           "type": "object",
           "properties": {
@@ -190,7 +207,8 @@
             "inverterW": { "type": "number" }
           }
         },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "kitName", "loadRequirements", "totalDailyLoadWh", "totalPeakLoadW", "createdAt"]
     },
