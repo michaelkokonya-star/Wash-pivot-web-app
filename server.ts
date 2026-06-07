@@ -93,9 +93,6 @@ console.log('PORT:', process.env.PORT);
 console.log('Stripe Initialized:', !!stripe);
 console.log('M-Pesa Configured:', !!(mpesaConfig.consumerKey && mpesaConfig.consumerSecret));
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
 });
