@@ -44,7 +44,7 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
     return 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=800';
   };
 
-  // Function to optimize Unsplash/Picsum/Google Drive URLs
+  // Function to optimize Unsplash/Picsum/Google Drive/S3 URLs
   const getOptimizedUrl = (url: string) => {
     if (!url) return getCategoryFallback(alt);
     if (url.startsWith('data:')) return url; // Base64 images
@@ -52,7 +52,17 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
 
     try {
       const urlObj = new URL(url);
-      
+
+      // S3 / storageapi.dev — proxy through backend to avoid CORS/auth issues
+      if (urlObj.hostname.includes('storageapi.dev')) {
+        // Path format: /<bucket>/uploads/filename  →  key = uploads/filename
+        const pathParts = urlObj.pathname.split('/').filter(Boolean);
+        // pathParts[0] is the bucket name; the rest is the object key
+        const key = pathParts.slice(1).join('/');
+        console.log(`[OptimizedImage] S3 URL detected (${urlObj.hostname}), proxying key="${key}" via /api/images/proxy`);
+        return `/api/images/proxy?key=${encodeURIComponent(key)}`;
+      }
+
       // Unsplash optimization
       if (urlObj.hostname.includes('unsplash.com')) {
         urlObj.searchParams.set('auto', 'format');
@@ -139,7 +149,11 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         transition={{ duration: 0.3 }}
         onLoad={() => setIsLoaded(true)}
         onError={(e) => {
-          console.warn(`OptimizedImage failed to load: ${optimizedSrc}. Status: Access Denied, network block or invalid source. Falling back to category image.`);
+          const isS3Proxy = optimizedSrc.startsWith('/api/images/proxy');
+          console.warn(
+            `[OptimizedImage] Failed to load${isS3Proxy ? ' (via S3 proxy)' : ''}: ${optimizedSrc}` +
+            ` — original src: ${src}. Falling back to category image.`
+          );
           setHasError(true);
           setIsLoaded(true); // Stop loading state
         }}
