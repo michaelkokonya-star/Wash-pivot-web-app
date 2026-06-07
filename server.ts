@@ -8,6 +8,7 @@ import axios from 'axios';
 import dotenv from 'dotenv';
 import admin from 'firebase-admin';
 import { GoogleGenAI } from "@google/genai";
+import { S3Client, GetObjectCommand, NoSuchKey } from '@aws-sdk/client-s3';
 import uploadRoutes from './routes/upload.ts';
 import settingsRoutes from './routes/settings.ts';
 import dataRoutes from './routes/data.ts';
@@ -187,35 +188,36 @@ async function startServer() {
       }
 
       const bucket = process.env.BUCKET || '';
-      let endpoint = process.env.ENDPOINT || '';
+      const rawEndpoint = process.env.ENDPOINT || '';
+      const region = process.env.REGION || 'us-east-1';
 
-      if (!bucket || !endpoint) {
+      if (!bucket || !rawEndpoint) {
         console.error('[S3 Proxy] Missing BUCKET or ENDPOINT environment variables');
         return res.status(500).json({ error: 'S3 configuration missing' });
       }
 
-      if (!endpoint.startsWith('http')) {
-        endpoint = `https://${endpoint}`;
-      }
-      const baseUrl = endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint;
+      const endpoint = rawEndpoint.startsWith('http') ? rawEndpoint : `https://${rawEndpoint}`;
       const cleanKey = key.startsWith('/') ? key.slice(1) : key;
-      const s3Url = `${baseUrl}/${bucket}/${cleanKey}`;
 
-      console.log(`[S3 Proxy] Fetching key="${cleanKey}" from ${s3Url}`);
+      console.log(`[S3 Proxy] Fetching key="${cleanKey}" bucket="${bucket}" endpoint="${endpoint}"`);
+
+      const s3 = new S3Client({
+        region,
+        credentials: {
+          accessKeyId: process.env.ACCESS_KEY_ID as string,
+          secretAccessKey: process.env.SECRET_ACCESS_KEY as string,
+        },
+        endpoint,
+        forcePathStyle: true,
+      });
 
       try {
-        const response = await axios({
-          method: 'get',
-          url: s3Url,
-          responseType: 'stream',
-          headers: {
-            'User-Agent': 'WashPivot-Hub/1.0',
-          },
-          timeout: 15000,
-          maxRedirects: 5,
-        });
+        const s3Response = await s3.send(new GetObjectCommand({
+          Bucket: bucket,
+          Key: cleanKey,
+        }));
 
-        const contentType = response.headers['content-type'];
+        const contentType = s3Response.ContentType;
         if (contentType && (contentType.startsWith('image/') || contentType.startsWith('application/octet-stream'))) {
           res.setHeader('Content-Type', contentType);
         } else {
@@ -223,9 +225,20 @@ async function startServer() {
         }
         res.setHeader('Cache-Control', 'public, max-age=86400');
 
-        response.data.pipe(res);
+        if (s3Response.Body) {
+          // @ts-ignore — Body is a Readable stream in Node.js environments
+          s3Response.Body.pipe(res);
+        } else {
+          res.status(404).json({ error: 'Object body is empty' });
+        }
+
+        console.log(`[S3 Proxy] Successfully streamed key="${cleanKey}"`);
       } catch (error: any) {
-        console.error(`[S3 Proxy] Failed to fetch key="${cleanKey}":`, error.message);
+        if (error instanceof NoSuchKey || error?.name === 'NoSuchKey') {
+          console.error(`[S3 Proxy] Key not found: "${cleanKey}"`);
+          return res.status(404).json({ error: 'Image not found' });
+        }
+        console.error(`[S3 Proxy] Failed to fetch key="${cleanKey}" from bucket="${bucket}" endpoint="${endpoint}":`, error.message);
         res.status(500).json({ error: 'Failed to proxy S3 image' });
       }
     });
