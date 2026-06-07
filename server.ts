@@ -179,6 +179,57 @@ async function startServer() {
       }
     });
 
+    // S3 Image Proxy Route - fetches images from S3 using server-side credentials
+    app.get('/api/images/proxy', async (req, res) => {
+      const key = req.query.key as string;
+      if (!key) {
+        return res.status(400).json({ error: 'No key provided' });
+      }
+
+      const bucket = process.env.BUCKET || '';
+      let endpoint = process.env.ENDPOINT || '';
+
+      if (!bucket || !endpoint) {
+        console.error('[S3 Proxy] Missing BUCKET or ENDPOINT environment variables');
+        return res.status(500).json({ error: 'S3 configuration missing' });
+      }
+
+      if (!endpoint.startsWith('http')) {
+        endpoint = `https://${endpoint}`;
+      }
+      const baseUrl = endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint;
+      const cleanKey = key.startsWith('/') ? key.slice(1) : key;
+      const s3Url = `${baseUrl}/${bucket}/${cleanKey}`;
+
+      console.log(`[S3 Proxy] Fetching key="${cleanKey}" from ${s3Url}`);
+
+      try {
+        const response = await axios({
+          method: 'get',
+          url: s3Url,
+          responseType: 'stream',
+          headers: {
+            'User-Agent': 'WashPivot-Hub/1.0',
+          },
+          timeout: 15000,
+          maxRedirects: 5,
+        });
+
+        const contentType = response.headers['content-type'];
+        if (contentType && (contentType.startsWith('image/') || contentType.startsWith('application/octet-stream'))) {
+          res.setHeader('Content-Type', contentType);
+        } else {
+          res.setHeader('Content-Type', 'image/jpeg');
+        }
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+
+        response.data.pipe(res);
+      } catch (error: any) {
+        console.error(`[S3 Proxy] Failed to fetch key="${cleanKey}":`, error.message);
+        res.status(500).json({ error: 'Failed to proxy S3 image' });
+      }
+    });
+
     // AI Proxy Routes
     app.post('/api/ai/generate', async (req, res) => {
       try {
