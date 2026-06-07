@@ -25,10 +25,30 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
 
-  // Function to optimize Unsplash/Picsum URLs
+  // Function to get a beautiful, contextual Unsplash fallback based on product names
+  const getCategoryFallback = (altText: string) => {
+    const text = altText ? altText.toLowerCase() : '';
+    if (text.includes('solar') || text.includes('panel') || text.includes('battery') || text.includes('inverter') || text.includes('charge')) {
+      return 'https://images.unsplash.com/photo-1509391366360-2e959784a276?auto=format&fit=crop&q=80&w=800';
+    }
+    if (text.includes('water') || text.includes('filter') || text.includes('treatment') || text.includes('chlorin') || text.includes('fluoride')) {
+      return 'https://images.unsplash.com/photo-1617155093730-a8bf47be792d?auto=format&fit=crop&q=80&w=800';
+    }
+    if (text.includes('sanitation') || text.includes('exhaust') || text.includes('toilet') || text.includes('vacuum') || text.includes('waste')) {
+      return 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&q=80&w=800';
+    }
+    if (text.includes('expert') || text.includes('consultant') || text.includes('install') || text.includes('service') || text.includes('engineer')) {
+      return 'https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&q=80&w=800';
+    }
+    // Standard generic clean fallback
+    return 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=800';
+  };
+
+  // Function to optimize Unsplash/Picsum/Google Drive URLs
   const getOptimizedUrl = (url: string) => {
-    if (!url) return `https://picsum.photos/seed/${encodeURIComponent(alt)}/800/600`;
-    if (url.startsWith('data:')) return url; // Base64 images (like GenAI output)
+    if (!url) return getCategoryFallback(alt);
+    if (url.startsWith('data:')) return url; // Base64 images
+    if (url.startsWith('/') || url.startsWith('http://localhost') || url.startsWith('https://localhost')) return url;
 
     try {
       const urlObj = new URL(url);
@@ -45,8 +65,6 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
 
       // Picsum optimization
       if (urlObj.hostname.includes('picsum.photos')) {
-        // Picsum format is usually /seed/id/width/height
-        // If it's a seed URL, we can try to adjust the dimensions if they are at the end
         const parts = urlObj.pathname.split('/');
         if (parts.length >= 4 && !isNaN(Number(parts[parts.length - 1]))) {
           if (width && height) {
@@ -61,14 +79,18 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         return urlObj.toString();
       }
 
-      // Google Drive optimization
-      if (urlObj.hostname.includes('drive.google.com')) {
-        // Convert share link to direct view link
-        // View URL: https://drive.google.com/file/d/[ID]/view?usp=sharing
-        // Direct URL: https://drive.google.com/uc?export=view&id=[ID]
+      // Google Drive optimization - proxy through backend server to bypass iframe block
+      if (urlObj.hostname.includes('drive.google.com') || urlObj.hostname.includes('docs.google.com')) {
+        let fileId = '';
         if (urlObj.pathname.includes('/file/d/')) {
-          const fileId = urlObj.pathname.split('/file/d/')[1].split('/')[0];
-          return `https://drive.google.com/uc?export=view&id=${fileId}`;
+          fileId = urlObj.pathname.split('/file/d/')[1].split('/')[0];
+        } else if (urlObj.searchParams.has('id')) {
+          fileId = urlObj.searchParams.get('id') || '';
+        }
+        
+        if (fileId) {
+          const directUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+          return `/api/proxy-image?url=${encodeURIComponent(directUrl)}`;
         }
       }
     } catch (e) {
@@ -79,7 +101,7 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
   };
 
   const optimizedSrc = getOptimizedUrl(src);
-  const fallbackImage = 'https://drive.google.com/uc?export=view&id=1P8CXvuVVGpLjQpS2wB7HPu3CHZiZEK2Q';
+  const fallbackImage = getCategoryFallback(alt);
 
   return (
     <div 
@@ -102,9 +124,9 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
           >
             <div className="flex flex-col items-center gap-3">
               <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-black/5">
-                <ImageIcon className="text-black/10" size={24} />
+                <ImageIcon className="text-black/15 font-bold" size={24} />
               </div>
-              <span className="text-[10px] text-black/30 font-bold uppercase tracking-widest leading-tight">Image<br/>Unavailable</span>
+              <span className="text-[10px] text-black/40 font-bold uppercase tracking-widest leading-tight">Image<br/>Unavailable</span>
             </div>
           </motion.div>
         )}
@@ -113,14 +135,13 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         src={hasError ? fallbackImage : optimizedSrc}
         alt={alt}
         initial={{ opacity: 0 }}
-        animate={{ opacity: isLoaded || hasError ? 1 : 0 }}
-        transition={{ duration: 0.5 }}
+        animate={{ opacity: isLoaded ? 1 : 0 }}
+        transition={{ duration: 0.3 }}
         onLoad={() => setIsLoaded(true)}
         onError={(e) => {
-          console.warn(`OptimizedImage failed to load: ${optimizedSrc}. Status: Access Denied or Network Error.`);
-          const target = e.target as HTMLImageElement;
-          target.src = 'https://via.placeholder.com/800x600?text=Access+Denied';
+          console.warn(`OptimizedImage failed to load: ${optimizedSrc}. Status: Access Denied, network block or invalid source. Falling back to category image.`);
           setHasError(true);
+          setIsLoaded(true); // Stop loading state
         }}
         loading={priority ? "eager" : "lazy"}
         className={`w-full h-full object-cover ${className}`}

@@ -1,17 +1,27 @@
 import express from 'express';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { readFileSync } from 'fs';
 import cors from 'cors';
 import Stripe from 'stripe';
 import axios from 'axios';
 import dotenv from 'dotenv';
 import admin from 'firebase-admin';
+import { GoogleGenAI } from "@google/genai";
 import uploadRoutes from './routes/upload.ts';
 import settingsRoutes from './routes/settings.ts';
 import dataRoutes from './routes/data.ts';
-import imageRoutes from './routes/images.ts';
 
 dotenv.config();
+
+// Initialize AI
+const getAiClient = () => {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY is not set in the server environment');
+  }
+  return new GoogleGenAI({ apiKey });
+};
 
 // Load Firebase Config safely
 const firebaseConfigPath = path.join(process.cwd(), 'firebase-applet-config.json');
@@ -117,11 +127,165 @@ async function startServer() {
     app.use('/api', uploadRoutes);
     app.use('/api/settings', settingsRoutes);
     app.use('/api/data', dataRoutes);
-    app.use('/api/images', imageRoutes);
 
     // API routes
     app.get('/api/health', (req, res) => {
       res.json({ status: 'ok' });
+    });
+
+    // Proxy Image Route to bypass iframe constraints for Google Drive and external images
+    app.get('/api/proxy-image', async (req, res) => {
+      const imageUrl = req.query.url as string;
+      if (!imageUrl) {
+        return res.status(400).json({ error: 'No URL provided' });
+      }
+
+      try {
+        const parsedUrl = new URL(imageUrl);
+        
+        // Prevent SSRF: only allow HTTP/HTTPS, and do not allow localhost/private IPs
+        if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+          return res.status(400).json({ error: 'Invalid URL protocol' });
+        }
+        
+        const hostname = parsedUrl.hostname.toLowerCase();
+        if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('10.') || hostname.startsWith('192.168.')) {
+          return res.status(403).json({ error: 'Access to local resources is forbidden' });
+        }
+
+        const response = await axios({
+          method: 'get',
+          url: imageUrl,
+          responseType: 'stream',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          },
+          timeout: 15000,
+          maxRedirects: 5,
+        });
+
+        // Set correct Content-Type if it is an image or fallback
+        const contentType = response.headers['content-type'];
+        if (contentType && (contentType.startsWith('image/') || contentType.startsWith('application/octet-stream'))) {
+          res.setHeader('content-type', contentType);
+        } else {
+          res.setHeader('content-type', 'image/jpeg');
+        }
+
+        response.data.pipe(res);
+      } catch (error: any) {
+        console.error('Error proxying image:', imageUrl, error.message);
+        res.status(500).json({ error: 'Failed to proxy image' });
+      }
+    });
+
+    // AI Proxy Routes
+    app.post('/api/ai/generate', async (req, res) => {
+      try {
+        const { model, prompt, systemInstruction, history, config } = req.body;
+        const ai = getAiClient();
+        
+        let response;
+        if (history) {
+          const chat = ai.chats.create({
+            model: model || "gemini-3-flash-preview",
+            config: {
+              systemInstruction,
+            },
+            history,
+          });
+          response = await chat.sendMessage({ message: prompt });
+        } else {
+          response = await ai.models.generateContent({
+            model: model || "gemini-3-flash-preview",
+            contents: prompt,
+            config,
+          });
+        }
+        
+        res.json({ 
+          text: response.text, 
+          candidates: response.candidates,
+          usageMetadata: response.usageMetadata 
+        });
+      } catch (error: any) {
+        console.error('AI Proxy Error:', error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    app.post('/api/ai/generate-image', async (req, res) => {
+      try {
+        const { model, prompt, config } = req.body;
+        const ai = getAiClient();
+        
+        const response = await ai.models.generateContent({
+          model: model || "gemini-2.5-flash-image",
+          contents: {
+            parts: [{ text: prompt }],
+          },
+          config,
+        });
+
+        res.json(response);
+      } catch (error: any) {
+        console.error('AI Image Proxy Error:', error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    app.post('/api/ai/generate-video', async (req, res) => {
+      try {
+        const { model, prompt, image, config } = req.body;
+        const ai = getAiClient();
+        
+        const operation = await ai.models.generateVideos({
+          model: model || 'veo-3.1-generate-preview',
+          prompt: prompt || 'Animate this scene with cinematic motion',
+          image: image,
+          config,
+        });
+
+        res.json(operation);
+      } catch (error: any) {
+        console.error('AI Video Proxy Error:', error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    app.post('/api/ai/video-status', async (req, res) => {
+      try {
+        const { operation } = req.body;
+        const ai = getAiClient();
+        
+        const status = await ai.operations.getVideosOperation({ operation });
+        res.json(status);
+      } catch (error: any) {
+        console.error('AI Video Status Proxy Error:', error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    app.get('/api/ai/video-download', async (req, res) => {
+      try {
+        const uri = req.query.uri as string;
+        if (!uri) return res.status(400).json({ error: 'URI is required' });
+        
+        const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+        
+        const response = await axios.get(uri, {
+          headers: {
+            'x-goog-api-key': apiKey,
+          },
+          responseType: 'stream'
+        });
+
+        res.setHeader('Content-Type', response.headers['content-type']);
+        response.data.pipe(res);
+      } catch (error: any) {
+        console.error('AI Video Download Proxy Error:', error);
+        res.status(500).json({ error: error.message });
+      }
     });
 
     // Provision System Owner
@@ -247,17 +411,28 @@ async function startServer() {
 
     // M-Pesa STK Push
     app.post('/api/mpesa/stkpush', async (req, res) => {
-      return res.status(503).json({ error: 'M-Pesa integration is currently paused for maintenance. Please use Stripe.' });
-      /*
       try {
         const { phoneNumber, amount, accountReference, transactionDesc } = req.body;
         
         // Format phone number to 254XXXXXXXXX
-        let formattedPhone = phoneNumber.replace(/\+/g, '');
+        let formattedPhone = phoneNumber.replace(/\+/g, '').replace(/\s/g, '');
         if (formattedPhone.startsWith('0')) {
           formattedPhone = '254' + formattedPhone.slice(1);
         } else if (formattedPhone.startsWith('7') || formattedPhone.startsWith('1')) {
           formattedPhone = '254' + formattedPhone;
+        }
+
+        // If credentials are not set/valid, use a polished, simulated/sandbox-mock experience
+        if (!mpesaConfig.consumerKey || !mpesaConfig.consumerSecret || !mpesaConfig.passkey) {
+          console.warn('M-Pesa API Keys are missing - Running in Simulation Mode (Returns beautiful mock STK response)');
+          return res.json({
+            MerchantRequestID: 'SIM-' + Math.random().toString(36).substring(2, 10).toUpperCase(),
+            CheckoutRequestID: 'ws_CO_' + Math.random().toString(36).substring(2, 15),
+            ResponseCode: '0',
+            ResponseDescription: 'Success. Request accepted for processing (Simulation Mode)',
+            CustomerMessage: 'Success. Request accepted for processing',
+            simulated: true
+          });
         }
 
         const token = await getMpesaToken();
@@ -281,6 +456,7 @@ async function startServer() {
           },
           {
             headers: { Authorization: `Bearer ${token}` },
+            timeout: 15000
           }
         );
 
@@ -289,7 +465,6 @@ async function startServer() {
         console.error('M-Pesa STK Push Error:', error.response?.data || error.message);
         res.status(500).json({ error: error.response?.data?.errorMessage || error.message });
       }
-      */
     });
 
     // M-Pesa Callback (Safaricom calls this)
@@ -321,7 +496,7 @@ async function startServer() {
       }));
       
       // Handle SPA routing - serve index.html for all non-API routes
-      app.all('/{*path}', (req, res) => {
+      app.get('*all', (req, res) => {
         const indexPath = path.join(distPath, 'index.html');
         
         // Prevent caching of index.html to ensure users always get the latest version

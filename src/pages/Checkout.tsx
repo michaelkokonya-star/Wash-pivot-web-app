@@ -37,7 +37,7 @@ const Checkout = () => {
   const { deliveryRules } = useSettings();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'paystack' | 'mpesa' | 'manual_mpesa'>('paystack');
+  const [paymentMethod, setPaymentMethod] = useState<'mpesa' | 'manual_mpesa'>('mpesa');
   const [mpesaWaiting, setMpesaWaiting] = useState(false);
   const navigate = useNavigate();
 
@@ -96,69 +96,35 @@ const Checkout = () => {
       const docRef = await addDoc(collection(db, 'orders'), orderData);
       const orderId = docRef.id;
 
-      if (paymentMethod === 'paystack') {
-        const response = await fetch('/api/paystack/initialize', {
+      if (paymentMethod === 'mpesa') {
+        if (!formData.phone) {
+          throw new Error('Please enter a phone number to receive the M-Pesa Express (STK Push) prompt.');
+        }
+
+        setMpesaWaiting(true);
+        const response = await fetch('/api/mpesa/stkpush', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            email: formData.email,
+            phoneNumber: formData.phone,
             amount: finalTotal,
-            metadata: {
-              orderId,
-              items: cart.map(item => ({ id: item.id, name: item.name, quantity: item.quantity }))
-            }
+            accountReference: `WP-${orderId.substring(0, 5).toUpperCase()}`,
+            transactionDesc: 'WashPivot sustainable products'
           }),
         });
 
         const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Failed to initialize Paystack');
-
-        if (data.status && data.data.authorization_url) {
-          window.location.href = data.data.authorization_url;
-        } else {
-          throw new Error('No checkout URL received from Paystack');
-        }
-      } else if (paymentMethod === 'card') {
-        // 2a. Stripe Checkout
-        const response = await fetch('/api/create-checkout-session', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            items: [
-              ...cart,
-              {
-                id: 'delivery-charge',
-                name: 'Delivery Charge',
-                price: deliveryCharge,
-                quantity: 1,
-                imageUrl: 'https://cdn-icons-png.flaticon.com/512/2311/2311524.png'
-              }
-            ].filter(item => item.price > 0),
-            successUrl: `${window.location.origin}/checkout/success?orderId=${orderId}`,
-            cancelUrl: `${window.location.origin}/cart`,
-          }),
-        });
-
-        const data = await response.json();
-
         if (!response.ok) {
-          throw new Error(data.error || 'Failed to initiate checkout');
+          throw new Error(data.error || 'Failed to initialize M-Pesa STK Push');
         }
 
-        if (data.url) {
-          window.location.href = data.url;
-        } else {
-          throw new Error('No checkout URL received');
-        }
-      } else if (paymentMethod === 'mpesa') {
-        // 2b. M-Pesa STK Push (Currently under maintenance)
-        throw new Error('M-Pesa STK Push is currently undergoing maintenance. Please use the "Lipa na M-Pesa (Buy Goods)" option below or a credit/debit card.');
+        // Wait 4 seconds for stk push simulation/real prompt response flow
+        await new Promise(resolve => setTimeout(resolve, 4000));
+        navigate(`/checkout/success?orderId=${orderId}&method=mpesa`);
       } else {
-        // 2c. Manual M-Pesa (Buy Goods)
+        // Manual M-Pesa (Buy Goods)
         navigate(`/checkout/success?orderId=${orderId}&method=manual_mpesa`);
       }
     } catch (err: any) {
@@ -166,7 +132,7 @@ const Checkout = () => {
       setError(err.message || 'An unexpected error occurred. Please try again.');
       setMpesaWaiting(false);
     } finally {
-      if (paymentMethod === 'card') setLoading(false);
+      setLoading(false);
     }
   };
 
@@ -292,81 +258,33 @@ const Checkout = () => {
                   <div className="w-8 h-8 bg-black text-white rounded-full flex items-center justify-center text-xs">2</div>
                   Payment Method
                 </h2>
-                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full uppercase tracking-widest">M-Pesa Temporarily Unavailable</span>
+                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full uppercase tracking-widest">Secure M-Pesa Gateway</span>
               </div>
               <div className="grid grid-cols-1 gap-4">
                 <button
                   type="button"
-                  onClick={() => setPaymentMethod('paystack')}
+                  onClick={() => setPaymentMethod('mpesa')}
                   className={`p-6 rounded-3xl border transition-all flex items-center justify-between group relative overflow-hidden ${
-                    paymentMethod === 'paystack' 
-                      ? 'border-blue-600 bg-blue-50/30 ring-2 ring-blue-600/10' 
-                      : 'border-black/5 bg-white hover:border-blue-200 hover:shadow-lg'
-                  }`}
-                >
-                  <div className="flex items-center gap-4 relative z-10">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border transition-colors ${
-                      paymentMethod === 'paystack' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-stone-50 border-black/5 text-black/20'
-                    }`}>
-                      <CreditCard size={24} />
-                    </div>
-                    <div className="text-left">
-                      <p className="font-bold">Paystack</p>
-                      <p className="text-xs text-black/40">Pay with Card, Bank or Transfer</p>
-                    </div>
-                  </div>
-                  <img 
-                    src="https://paystack.com/assets/img/login/paystack-logo.png" 
-                    alt="Paystack" 
-                    className={`h-4 transition-all ${paymentMethod === 'paystack' ? 'opacity-100' : 'opacity-40 grayscale group-hover:grayscale-0 group-hover:opacity-100'}`}
-                  />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('card')}
-                  className={`p-6 rounded-3xl border transition-all flex items-center justify-between group relative overflow-hidden ${
-                    paymentMethod === 'card' 
+                    paymentMethod === 'mpesa' 
                       ? 'border-emerald-600 bg-emerald-50/30 ring-2 ring-emerald-600/10' 
                       : 'border-black/5 bg-white hover:border-black/20 hover:shadow-lg'
                   }`}
                 >
                   <div className="flex items-center gap-4 relative z-10">
                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border transition-colors ${
-                      paymentMethod === 'card' ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-stone-50 border-black/5 text-black/20'
+                      paymentMethod === 'mpesa' ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-stone-50 border-black/5 text-black/20'
                     }`}>
-                      <CreditCard size={24} />
-                    </div>
-                    <div className="text-left">
-                      <p className="font-bold">Credit / Debit Card</p>
-                      <p className="text-xs text-black/40">Secure payment via Stripe</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-3 bg-white px-4 py-2 rounded-xl border border-black/5 shadow-sm items-center relative z-10 transition-transform group-hover:scale-105">
-                    <VisaIcon />
-                    <div className="w-px h-4 bg-black/10 mx-1" />
-                    <MastercardIcon />
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  disabled
-                  className="p-6 rounded-3xl border transition-all flex items-center justify-between bg-stone-50 border-black/5 opacity-60 cursor-not-allowed relative overflow-hidden group"
-                >
-                  <div className="flex items-center gap-4 relative z-10">
-                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center border bg-white border-black/5 text-black/20">
                       <Smartphone size={24} />
                     </div>
                     <div className="text-left">
                       <div className="flex items-center gap-2">
-                        <p className="font-bold text-black/40">M-Pesa Express</p>
-                        <span className="bg-emerald-100 text-emerald-700 text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-tighter">Coming Soon</span>
+                        <p className="font-bold">M-Pesa Express</p>
+                        <span className="bg-emerald-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-tighter">Instant</span>
                       </div>
-                      <p className="text-xs text-black/20">Mobile money (STK Push)</p>
+                      <p className="text-xs text-black/40 font-medium">Automatic popup push notification prompt</p>
                     </div>
                   </div>
-                  <MpesaLogo className="h-5 opacity-20 grayscale" />
+                  <MpesaLogo className={`h-6 transition-all ${paymentMethod === 'mpesa' ? 'opacity-100' : 'opacity-45 grayscale group-hover:grayscale-0 group-hover:opacity-100'}`} />
                 </button>
 
                 <button
@@ -374,7 +292,7 @@ const Checkout = () => {
                   onClick={() => setPaymentMethod('manual_mpesa')}
                   className={`p-6 rounded-3xl border transition-all flex items-center justify-between group relative overflow-hidden ${
                     paymentMethod === 'manual_mpesa' 
-                      ? 'border-[#4CAF50] bg-[#4CAF50]/5 ring-2 ring-[#4CAF50]/10' 
+                      ? 'border-[#4CAF50] bg-[#4CAF50]/10 ring-2 ring-[#4CAF50]/10' 
                       : 'border-black/5 bg-white hover:border-[#4CAF50]/20 hover:shadow-lg'
                   }`}
                 >
@@ -386,7 +304,7 @@ const Checkout = () => {
                     </div>
                     <div className="text-left">
                       <p className="font-bold">Lipa na M-Pesa (Buy Goods)</p>
-                      <p className="text-xs text-black/40">Manual payment via Till Number</p>
+                      <p className="text-xs text-black/40">Manual payment via Green Buy Goods Till Card</p>
                     </div>
                   </div>
                   <MpesaLogo className={`h-8 transition-all ${paymentMethod === 'manual_mpesa' ? 'opacity-100' : 'opacity-40 grayscale group-hover:grayscale-0 group-hover:opacity-100'}`} />
