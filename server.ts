@@ -12,6 +12,7 @@ import { S3Client, GetObjectCommand, NoSuchKey } from '@aws-sdk/client-s3';
 import uploadRoutes from './routes/upload.ts';
 import settingsRoutes from './routes/settings.ts';
 import dataRoutes from './routes/data.ts';
+import ordersRoutes from './routes/orders.ts';
 
 dotenv.config();
 
@@ -128,6 +129,7 @@ async function startServer() {
     app.use('/api', uploadRoutes);
     app.use('/api/settings', settingsRoutes);
     app.use('/api/data', dataRoutes);
+    app.use('/api/orders', ordersRoutes);
 
     // API routes
     app.get('/api/health', (req, res) => {
