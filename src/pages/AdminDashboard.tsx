@@ -861,11 +861,14 @@ const AdminDashboard = () => {
         const fetchedServices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setServices(fetchedServices);
       } else if (activeTab === 'orders') {
-        const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
-        const snapshot = await getDocs(q);
-        const fetchedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const response = await authFetch('/api/orders');
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error || `Failed to fetch orders (${response.status})`);
+        }
+        const fetchedOrders = await response.json();
         setOrders(fetchedOrders);
-        
+
         // Calculate stats
         const revenue = fetchedOrders.reduce((acc: number, order: any) => order.status === 'paid' ? acc + (order.totalAmount || 0) : acc, 0);
         const catSales = { Solar: 0, Water: 0, Sanitation: 0 };
@@ -898,12 +901,17 @@ const AdminDashboard = () => {
         const fetchedTeam = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setTeamMembers(fetchedTeam);
       } else if (activeTab === 'analytics') {
-        const [ordersSnap, usersSnap] = await Promise.all([
-          getDocs(query(collection(db, 'orders'), orderBy('createdAt', 'desc'))),
+        const [ordersRes, usersSnap] = await Promise.all([
+          authFetch('/api/orders'),
           getDocs(query(collection(db, 'users'), orderBy('createdAt', 'desc')))
         ]);
-        
-        const fetchedOrders = ordersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        if (!ordersRes.ok) {
+          const errData = await ordersRes.json().catch(() => ({}));
+          throw new Error(errData.error || `Failed to fetch orders for analytics (${ordersRes.status})`);
+        }
+
+        const fetchedOrders = await ordersRes.json();
         const fetchedUsers = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
         // Process Revenue by Month
@@ -1156,11 +1164,17 @@ const AdminDashboard = () => {
 
       const updatedTimeline = [...(currentOrder.trackingTimeline || []), timelineEntry];
 
-      await updateDoc(doc(db, 'orders', orderId), {
-        status: newStatus,
-        trackingTimeline: updatedTimeline
+      const response = await authFetch(`/api/orders/${orderId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus, trackingTimeline: updatedTimeline }),
       });
-      
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || `Failed to update order (${response.status})`);
+      }
+
       setOrders(orders.map(o => o.id === orderId ? { ...o, status: newStatus, trackingTimeline: updatedTimeline } : o));
       setMessage({ type: 'success', text: 'Order status updated successfully' });
       setIsUpdateStatusModalOpen(false);
@@ -1174,12 +1188,16 @@ const AdminDashboard = () => {
   const handleDeleteOrder = async (orderId: string) => {
     if (!window.confirm('Are you sure you want to delete this order?')) return;
     try {
-      await deleteDoc(doc(db, 'orders', orderId));
+      const response = await authFetch(`/api/orders/${orderId}`, { method: 'DELETE' });
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || `Failed to delete order (${response.status})`);
+      }
       setOrders(orders.filter(o => o.id !== orderId));
       setMessage({ type: 'success', text: 'Order deleted successfully' });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting order:", error);
-      setMessage({ type: 'error', text: 'Failed to delete order' });
+      setMessage({ type: 'error', text: error.message || 'Failed to delete order' });
     }
   };
 
@@ -2029,7 +2047,7 @@ const AdminDashboard = () => {
                   <tr key={order.id} className="hover:bg-stone-50/50 transition-colors">
                     <td className="px-8 py-6">
                       <p className="font-mono text-xs font-bold">{order.id.slice(0, 8)}...</p>
-                      <p className="text-[10px] text-black/40">{order.createdAt?.toDate().toLocaleDateString()}</p>
+                      <p className="text-[10px] text-black/40">{order.createdAt ? new Date(order.createdAt).toLocaleDateString() : '—'}</p>
                     </td>
                     <td className="px-8 py-6">
                       <p className="font-bold text-sm">{order.userEmail}</p>
